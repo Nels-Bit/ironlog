@@ -1,16 +1,16 @@
-
 import { GoogleGenAI, Chat, GenerateContentResponse } from "@google/genai";
 import { GEMINI_MODEL, SYSTEM_INSTRUCTION_COACH } from "../constants";
 
 // Initialize the API client
-// Note: This assumes process.env.API_KEY is available as per instructions
-const apiKey = process.env.API_KEY || ''; 
+// Supports both Vite (import.meta.env) and standard Node/Container (process.env)
+const apiKey = (import.meta as any).env?.VITE_API_KEY || process.env.API_KEY || ''; 
+
 let ai: GoogleGenAI | null = null;
 
 if (apiKey) {
     ai = new GoogleGenAI({ apiKey });
 } else {
-    console.warn("Gemini API Key is missing.");
+    console.warn("Gemini API Key is missing. Please set VITE_API_KEY in your .env file.");
 }
 
 export const createChatSession = (customInstruction?: string): Chat | null => {

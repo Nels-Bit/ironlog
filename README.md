@@ -5,18 +5,17 @@ A smart workout logger powered by Gemini. Track your lifts, view history, and ge
 ## Setup Instructions
 
 1.  **Install Node.js**: Ensure you have Node.js installed.
-2.  **Organize Files**: Ensure all source code (`App.tsx`, `index.tsx`, `components/`, `services/`, `types.ts`, `constants.ts`) is located inside a `src/` folder.
-3.  **Install Dependencies**:
+2.  **Install Dependencies**:
     ```bash
     npm install
     ```
-4.  **Configure API Key**:
+3.  **Configure API Key**:
     - Create a file named `.env` in the root directory.
     - Add your Gemini API key:
       ```
       VITE_API_KEY=your_actual_key_here
       ```
-5.  **Run Locally**:
+4.  **Run Locally**:
     ```bash
     npm run dev
     ```
