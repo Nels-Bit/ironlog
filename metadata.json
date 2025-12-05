@@ -1,0 +1,5 @@
+{
+  "name": "IronLog AI",
+  "description": "A smart workout logger powered by Gemini. Track your lifts, view history, and get AI-generated workout plans.",
+  "requestFramePermissions": []
+}

@@ -1,11 +1,30 @@
-<div align="center">
+# IronLog AI
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+A smart workout logger powered by Gemini. Track your lifts, view history, and get AI-generated workout plans.
 
-  <h1>Built with AI Studio</h2>
+## Setup Instructions
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+1.  **Install Node.js**: Ensure you have Node.js installed.
+2.  **Organize Files**: Ensure all source code (`App.tsx`, `index.tsx`, `components/`, `services/`, `types.ts`, `constants.ts`) is located inside a `src/` folder.
+3.  **Install Dependencies**:
+    ```bash
+    npm install
+    ```
+4.  **Configure API Key**:
+    - Create a file named `.env` in the root directory.
+    - Add your Gemini API key:
+      ```
+      VITE_API_KEY=your_actual_key_here
+      ```
+5.  **Run Locally**:
+    ```bash
+    npm run dev
+    ```
+    Open the link shown in the terminal (usually `http://localhost:5173`).
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+## Building for Production
 
-</div>
+To build the app for deployment:
+```bash
+npm run build
+```
