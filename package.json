@@ -10,8 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google/genai": "latest",
-    "lucide-react": "latest",
+    "@google/genai": "*",
+    "lucide-react": "^0.292.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "recharts": "^2.9.0",
