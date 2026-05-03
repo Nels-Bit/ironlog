@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Dumbbell, Calendar, Clock, Flame, Skull, ArrowDown, ChevronDown } from 'lucide-react';
 import { workoutService } from '../services/workoutService';
 import { exerciseService } from '../services/exerciseService';
+import { Button } from '../components/ui/Button';
 import { cn } from '../lib/utils';
 import type { WorkoutSession, Exercise } from '../types';
 
@@ -9,7 +11,7 @@ export const History = () => {
   const [history, setHistory] = useState<WorkoutSession[]>([]);
   const [exerciseDefs, setExerciseDefs] = useState<Map<string, Exercise>>(new Map());
   const [loading, setLoading] = useState(true);
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -43,15 +45,7 @@ export const History = () => {
   };
 
   const toggleExpanded = (id: string) => {
-    setExpandedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
+    setExpandedId(prev => (prev === id ? null : id));
   };
 
   const getTopTarget = (workout: WorkoutSession) => {
@@ -79,7 +73,12 @@ export const History = () => {
     return topTarget;
   };
 
-  const formatDate = (timestamp: number) => new Date(timestamp).toLocaleDateString();
+  const formatDate = (timestamp: number, includeWeekday = false) => new Date(timestamp).toLocaleDateString([], {
+    weekday: includeWeekday ? 'long' : undefined,
+    month: 'numeric',
+    day: 'numeric',
+    year: 'numeric'
+  });
 
   const formatTime = (timestamp: number) => new Date(timestamp).toLocaleTimeString([], {
     hour: '2-digit',
@@ -114,19 +113,23 @@ export const History = () => {
             <p className="text-zinc-500">No workouts completed yet.</p>
           </div>
         ) : (
-          history.map((workout) => (
+          history.map((workout, index) => {
+            const isExpanded = expandedId === workout.id;
+            const showWeekday = index < 7;
+
+            return (
             <div key={workout.id} className="bg-iron-950 border border-white/10 rounded-2xl overflow-hidden relative group">
               <button
                 type="button"
                 className="w-full text-left p-5 flex items-start justify-between gap-4 hover:bg-white/5 transition-colors"
                 onClick={() => toggleExpanded(workout.id)}
-                aria-expanded={expandedIds.has(workout.id)}
+                aria-expanded={isExpanded}
                 aria-controls={`workout-${workout.id}`}
               >
                 <div className="min-w-0">
                   <h3 className="text-lg font-bold text-white mb-1 truncate">{workout.name}</h3>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500 font-mono">
-                    <span className="flex items-center gap-1"><Calendar size={12} /> {formatDate(workout.startTime)}</span>
+                    <span className="flex items-center gap-1"><Calendar size={12} /> {formatDate(workout.startTime, showWeekday)}</span>
                     <span className="flex items-center gap-1"><Clock size={12} /> {formatTime(workout.startTime)}</span>
                     {getDurationMinutes(workout) && (
                       <span className="flex items-center gap-1">{getDurationMinutes(workout)} min</span>
@@ -145,69 +148,82 @@ export const History = () => {
                   )}
                   <div className={cn(
                     "w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-zinc-400 transition-transform",
-                    expandedIds.has(workout.id) ? "rotate-180" : ""
+                    isExpanded ? "rotate-180" : ""
                   )}>
                     <ChevronDown size={16} />
                   </div>
                 </div>
               </button>
 
-              {expandedIds.has(workout.id) && (
-                <div id={`workout-${workout.id}`} className="px-5 pb-5">
-                  <div className="border-t border-white/5 pt-4 space-y-4">
-                    {workout.exercises.length === 0 ? (
-                      <div className="text-xs text-zinc-500">No exercises logged.</div>
-                    ) : (
-                      workout.exercises.map((ex, i) => {
-                        const def = exerciseDefs.get(ex.exerciseId);
-                        return (
-                          <div key={ex.id || i}>
-                            <h4 className="text-sm font-bold text-white mb-2">{def?.name || 'Unknown Exercise'}</h4>
+              <div
+                id={`workout-${workout.id}`}
+                className={cn(
+                  "px-5 pb-5 overflow-hidden transition-all duration-300 ease-out",
+                  isExpanded ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0 pointer-events-none"
+                )}
+              >
+                <div className="border-t border-white/5 pt-4 space-y-4">
+                  {workout.exercises.length === 0 ? (
+                    <div className="text-xs text-zinc-500">No exercises logged.</div>
+                  ) : (
+                    workout.exercises.map((ex, i) => {
+                      const def = exerciseDefs.get(ex.exerciseId);
+                      return (
+                        <div key={ex.id || i}>
+                          <h4 className="text-sm font-bold text-white mb-2">{def?.name || 'Unknown Exercise'}</h4>
 
-                            <div className="space-y-1">
-                              {ex.sets.map((set, setIndex) => {
-                                const isDropChild = set.type === 'dropset_child';
+                          <div className="space-y-1">
+                            {ex.sets.map((set, setIndex) => {
+                              const isDropChild = set.type === 'dropset_child';
 
-                                return (
-                                  <div key={set.id || setIndex} className="relative flex items-center text-xs font-mono">
+                              return (
+                                <div key={set.id || setIndex} className="relative flex items-center text-xs font-mono">
 
-                                    {/* Visual Drop Set Line */}
-                                    {isDropChild && (
-                                      <div className="absolute -top-2 left-[11px] w-2 h-6 border-l-2 border-b-2 border-zinc-700 rounded-bl-lg z-0 pointer-events-none" />
-                                    )}
+                                  {/* Visual Drop Set Line */}
+                                  {isDropChild && (
+                                    <div className="absolute -top-2 left-[11px] w-2 h-6 border-l-2 border-b-2 border-zinc-700 rounded-bl-lg z-0 pointer-events-none" />
+                                  )}
 
-                                    <div className={cn(
-                                      "flex items-center gap-3 w-full p-1.5 rounded-lg z-10 relative",
-                                      isDropChild ? "ml-4" : ""
-                                    )}>
+                                  <div className={cn(
+                                    "flex items-center gap-3 w-full p-1.5 rounded-lg z-10 relative",
+                                    isDropChild ? "ml-4" : ""
+                                  )}>
 
-                                      {/* Set Number & Icon */}
-                                      <div className="w-6 h-6 rounded bg-white/5 flex items-center justify-center gap-0.5 text-zinc-400 font-bold border border-white/5">
-                                        {isDropChild ? <ArrowDown size={10} /> : <span className="text-[9px]">{setIndex + 1}</span>}
-                                        {!isDropChild && getTypeIcon(set.type)}
-                                      </div>
-
-                                      {/* Weight & Reps */}
-                                      <div className="flex-1 text-zinc-300">
-                                        {set.weight ? `${set.weight} lbs` : '-'}
-                                        <span className="text-zinc-600 mx-1">×</span>
-                                        {def?.isUnilateral ? `${set.repsLeft}L / ${set.repsRight}R` : set.reps}
-                                      </div>
-
+                                    {/* Set Number & Icon */}
+                                    <div className="w-6 h-6 rounded bg-white/5 flex items-center justify-center gap-0.5 text-zinc-400 font-bold border border-white/5">
+                                      {isDropChild ? <ArrowDown size={10} /> : <span className="text-[9px]">{setIndex + 1}</span>}
+                                      {!isDropChild && getTypeIcon(set.type)}
                                     </div>
+
+                                    {/* Weight & Reps */}
+                                    <div className="flex-1 text-zinc-300">
+                                      {set.weight ? `${set.weight} lbs` : '-'}
+                                      <span className="text-zinc-600 mx-1">×</span>
+                                      {def?.isUnilateral ? `${set.repsLeft}L / ${set.repsRight}R` : set.reps}
+                                    </div>
+
                                   </div>
-                                );
-                              })}
-                            </div>
+                                </div>
+                              );
+                            })}
                           </div>
-                        );
-                      })
-                    )}
-                  </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
-              )}
+
+                <div className="pt-4">
+                  <Link to={`/history/${workout.id}`} className="block">
+                    <Button className="w-full bg-green-600 hover:bg-green-700 text-white">
+                      Edit
+                    </Button>
+                  </Link>
+                </div>
+              </div>
             </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
