@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, type ReactNode } from '
 import { v4 as uuidv4 } from 'uuid';
 import { workoutService } from '../services/workoutService';
 import { exerciseService } from '../services/exerciseService';
+import { authService } from '../services/authService';
 import type { WorkoutSession, WorkoutExercise, Exercise, ExerciseSet } from '../types';
 
 interface WorkoutContextType {
@@ -90,18 +91,43 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
 
   const finishWorkout = async () => {
     if (!workout) return;
-    
+
+    const user = await authService.getUser();
+    const rawWeight = user?.weight;
+    const userWeight = typeof rawWeight === 'number'
+      ? rawWeight
+      : typeof rawWeight === 'string'
+        ? parseFloat(rawWeight)
+        : 0;
+
+    const isBodyweight = (def?: Exercise) => (def?.category || '').toLowerCase() === 'bodyweight';
+
+    const getTotalReps = (set: ExerciseSet, def?: Exercise) => {
+      if (def?.isUnilateral) {
+        return (set.repsLeft ?? 0) + (set.repsRight ?? 0);
+      }
+      return set.reps ?? 0;
+    };
+
+    const getSetLoad = (set: ExerciseSet, def?: Exercise) => {
+      const extra = typeof set.weight === 'number' && !Number.isNaN(set.weight) ? set.weight : 0;
+      if (isBodyweight(def)) {
+        return Math.max(0, (Number.isFinite(userWeight) ? userWeight : 0) + extra);
+      }
+      return Math.max(0, extra);
+    };
+
     let totalVolume = 0;
     workout.exercises.forEach(ex => {
       const def = exerciseDefs.get(ex.exerciseId);
       ex.sets.forEach(set => {
-        if (set.isCompleted && set.weight) {
-          if (def?.isUnilateral && set.repsLeft && set.repsRight) {
-             totalVolume += set.weight * (set.repsLeft + set.repsRight);
-          } else if (set.reps) {
-             totalVolume += set.weight * set.reps;
-          }
-        }
+        const totalReps = getTotalReps(set, def);
+        if (!set.isCompleted || totalReps <= 0) return;
+
+        const load = getSetLoad(set, def);
+        if (load <= 0) return;
+
+        totalVolume += load * totalReps;
       });
     });
 
@@ -118,7 +144,7 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
     repsLeft: null,
     repsRight: null,
     isCompleted: false,
-    previousBest: historySet?.weight || undefined 
+    previousBest: historySet?.weight ?? undefined 
   });
 
   const addExercise = async (exDef: Exercise) => {

@@ -61,10 +61,16 @@ export const Profile = () => {
   const handleSave = async () => {
     if (!profile) return;
     setLoading(true);
-    const updated = { ...profile, ...formData };
-    setProfile(updated as UserProfile);
-    setIsEditing(false);
-    setLoading(false);
+    try {
+      const updated = { ...profile, ...formData };
+      await authService.updateProfile(updated);
+      setProfile(updated as UserProfile);
+      setIsEditing(false);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader2 className="animate-spin text-brand-orange" /></div>;
@@ -179,16 +185,22 @@ export const Profile = () => {
               <InputGroup label="Weight (lbs)" icon={<Weight size={16} />}>
                 <input 
                   type="number"
-                  value={formData.weight || ''} 
-                  onChange={e => setFormData({...formData, weight: parseFloat(e.target.value)})}
+                  value={formData.weight ?? ''} 
+                  onChange={e => setFormData({
+                    ...formData,
+                    weight: e.target.value === '' ? undefined : parseFloat(e.target.value)
+                  })}
                   className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 pl-10 text-white focus:border-brand-orange outline-none transition-all"
                 />
               </InputGroup>
               <InputGroup label="Height (cm)" icon={<Ruler size={16} />}>
                 <input 
                   type="number"
-                  value={formData.height || ''} 
-                  onChange={e => setFormData({...formData, height: parseFloat(e.target.value)})}
+                  value={formData.height ?? ''} 
+                  onChange={e => setFormData({
+                    ...formData,
+                    height: e.target.value === '' ? undefined : parseFloat(e.target.value)
+                  })}
                   className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 pl-10 text-white focus:border-brand-orange outline-none transition-all"
                 />
               </InputGroup>

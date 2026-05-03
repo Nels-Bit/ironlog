@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/Button';
-import { Dumbbell, Loader2, ArrowRight, Mail, Lock, AlertCircle } from 'lucide-react';
+import { Dumbbell, Loader2, ArrowRight, Mail, Lock, AlertCircle, Weight } from 'lucide-react';
 
 export const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -10,6 +10,7 @@ export const Auth = () => {
   // Form State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [weight, setWeight] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -29,12 +30,20 @@ export const Auth = () => {
         if (error) throw error;
         // Success! App.tsx will automatically redirect because session state changes.
       } else {
+        const parsedWeight = Number(weight);
+        if (!Number.isFinite(parsedWeight) || parsedWeight <= 0) {
+          throw new Error('Please enter your body weight.');
+        }
+
         // --- SIGN UP LOGIC ---
         const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: window.location.origin, // Important for confirmation link
+            data: {
+              weight: parsedWeight
+            }
           },
         });
         if (error) throw error;
@@ -128,6 +137,27 @@ export const Auth = () => {
               />
             </div>
           </div>
+
+          {!isLogin && (
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase text-zinc-500 tracking-wider ml-1">
+                Body Weight (lbs)
+              </label>
+              <div className="relative">
+                <Weight className="absolute left-4 top-4 text-zinc-500" size={20} />
+                <input 
+                  type="number"
+                  min={1}
+                  step="0.1"
+                  required
+                  value={weight}
+                  onChange={(e) => setWeight(e.target.value)}
+                  className="w-full bg-black/50 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white placeholder:text-zinc-600 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange outline-none transition-all"
+                  placeholder="170"
+                />
+              </div>
+            </div>
+          )}
           
           {/* Action Button */}
           <Button 
