@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { exerciseService } from './exerciseService';
+import { getSetLoad, parseUserWeight, shouldCountSetForPR } from '../utils/workoutMath';
 import type { WorkoutSession, WorkoutExercise, Exercise, ExerciseSet } from '../types';
 
 export const workoutService = {
@@ -120,12 +121,7 @@ export const workoutService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return 0;
 
-    const rawWeight = user.user_metadata?.weight;
-    const userWeight = typeof rawWeight === 'number'
-      ? rawWeight
-      : typeof rawWeight === 'string'
-        ? parseFloat(rawWeight)
-        : 0;
+    const userWeight = parseUserWeight(user.user_metadata?.weight);
 
     const allExercises = await exerciseService.getAllExercises();
     const defMap = new Map<string, Exercise>(allExercises.map(ex => [ex.id, ex]));
@@ -142,21 +138,6 @@ export const workoutService = {
 
     let maxWeight = 0;
 
-    const isBodyweight = (def?: Exercise) => (def?.category || '').toLowerCase() === 'bodyweight';
-    const getTotalReps = (set: ExerciseSet, def?: Exercise) => {
-      if (def?.isUnilateral) {
-        return (set.repsLeft ?? 0) + (set.repsRight ?? 0);
-      }
-      return set.reps ?? 0;
-    };
-    const getSetLoad = (set: ExerciseSet, def?: Exercise) => {
-      const extra = typeof set.weight === 'number' && !Number.isNaN(set.weight) ? set.weight : 0;
-      if (isBodyweight(def)) {
-        return Math.max(0, (Number.isFinite(userWeight) ? userWeight : 0) + extra);
-      }
-      return Math.max(0, extra);
-    };
-
     data.forEach(workout => {
       if (Array.isArray(workout.exercises)) {
         const exercise = workout.exercises.find((e: any) => e.exerciseId === exerciseId);
@@ -164,10 +145,9 @@ export const workoutService = {
         
         if (exercise && Array.isArray(exercise.sets)) {
           exercise.sets.forEach((set: any) => {
-            const totalReps = getTotalReps(set, def);
-            if (!set.isCompleted || totalReps <= 0) return;
+            if (!shouldCountSetForPR(set as ExerciseSet, def, undefined, userWeight)) return;
 
-            const load = getSetLoad(set, def);
+            const load = getSetLoad(set as ExerciseSet, def, undefined, userWeight);
             if (load > maxWeight) {
               maxWeight = load;
             }

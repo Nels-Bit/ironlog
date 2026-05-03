@@ -1,5 +1,6 @@
 import { exerciseService } from '../services/exerciseService';
 import { authService } from '../services/authService';
+import { getSetLoad, parseUserWeight, shouldCountSetForPR } from './workoutMath';
 import type { WorkoutSession, Exercise, ExerciseSet } from '../types';
 
 export interface PersonalRecord {
@@ -15,12 +16,7 @@ export const statsUtils = {
     const prMap = new Map<string, PersonalRecord>();
 
     const user = await authService.getUser();
-    const rawWeight = user?.weight;
-    const userWeight = typeof rawWeight === 'number'
-      ? rawWeight
-      : typeof rawWeight === 'string'
-        ? parseFloat(rawWeight)
-        : 0;
+    const userWeight = parseUserWeight(user?.weight);
 
     // 1. Fetch ALL exercises once (Performance Optimization)
     const allExercises = await exerciseService.getAllExercises();
@@ -28,30 +24,14 @@ export const statsUtils = {
     const exerciseNames = new Map(allExercises.map(e => [e.id, e.name]));
     const exerciseDefs = new Map<string, Exercise>(allExercises.map(e => [e.id, e]));
 
-    const isBodyweight = (def?: Exercise) => (def?.category || '').toLowerCase() === 'bodyweight';
-    const getTotalReps = (set: ExerciseSet, def?: Exercise) => {
-      if (def?.isUnilateral) {
-        return (set.repsLeft ?? 0) + (set.repsRight ?? 0);
-      }
-      return set.reps ?? 0;
-    };
-    const getSetLoad = (set: ExerciseSet, def?: Exercise) => {
-      const extra = typeof set.weight === 'number' && !Number.isNaN(set.weight) ? set.weight : 0;
-      if (isBodyweight(def)) {
-        return Math.max(0, (Number.isFinite(userWeight) ? userWeight : 0) + extra);
-      }
-      return Math.max(0, extra);
-    };
-
     // 2. Loop through every workout
     history.forEach(workout => {
       workout.exercises.forEach(ex => {
         const def = exerciseDefs.get(ex.exerciseId);
         ex.sets.forEach(set => {
-          const totalReps = getTotalReps(set, def);
-          if (!set.isCompleted || totalReps <= 0) return;
+          if (!shouldCountSetForPR(set as ExerciseSet, def, undefined, userWeight)) return;
 
-          const load = getSetLoad(set, def);
+          const load = getSetLoad(set as ExerciseSet, def, undefined, userWeight);
           if (load <= 0) return;
 
           const existingPR = prMap.get(ex.exerciseId);
