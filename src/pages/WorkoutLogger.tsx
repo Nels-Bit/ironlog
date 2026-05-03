@@ -9,6 +9,17 @@ import { RestTimer } from '../components/RestTimer';
 import { cn } from '../lib/utils';
 import { useWorkout } from '../context/WorkoutContext';
 import { authService } from '../services/authService';
+import {
+  getSetLoad,
+  isBodyweightExercise,
+  parseUserWeight,
+  shouldCountSetForPR
+} from '../utils/workoutMath';
+import {
+  formatNumberInputValue,
+  getNumberPlaceholder,
+  parseNumberInputValue
+} from '../utils/numberInput';
 import type { Exercise, ExerciseSet } from '../types';
 
 export const WorkoutLogger = () => {
@@ -38,44 +49,6 @@ export const WorkoutLogger = () => {
     return { normal: 90, warmup: 60, dropset: 60, failure: 180 }; // Factory defaults
   });
   const [userWeight, setUserWeight] = useState<number | null>(null);
-
-  const parseUserWeight = (value: unknown) => {
-    const parsed = typeof value === 'number' ? value : typeof value === 'string' ? parseFloat(value) : NaN;
-    return Number.isFinite(parsed) ? parsed : null;
-  };
-
-  const formatInputValue = (value: number | null | undefined) => {
-    if (value === null || value === undefined || Number.isNaN(value)) return '';
-    return value;
-  };
-
-  const parseInputValue = (value: string) => {
-    if (value.trim() === '') return null;
-    const parsed = Number(value);
-    return Number.isNaN(parsed) ? null : parsed;
-  };
-
-  const getPlaceholderValue = (value: number | null | undefined, fallback: string) => {
-    if (value === null || value === undefined || Number.isNaN(value)) return fallback;
-    return `${value}`;
-  };
-
-  const isBodyweight = (def?: Exercise) => (def?.category || '').toLowerCase() === 'bodyweight';
-
-  const getTotalReps = (set: ExerciseSet, def?: Exercise) => {
-    if (def?.isUnilateral) {
-      return (set.repsLeft ?? 0) + (set.repsRight ?? 0);
-    }
-    return set.reps ?? 0;
-  };
-
-  const getSetLoad = (set: ExerciseSet, def?: Exercise) => {
-    const extra = typeof set.weight === 'number' && !Number.isNaN(set.weight) ? set.weight : 0;
-    if (isBodyweight(def)) {
-      return Math.max(0, (userWeight ?? 0) + extra);
-    }
-    return Math.max(0, extra);
-  };
 
   useEffect(() => {
     const loadUserWeight = async () => {
@@ -285,17 +258,16 @@ export const WorkoutLogger = () => {
               const def = exerciseDefs.get(ex.exerciseId);
               const isCollapsed = collapsed.has(ex.id);
               const isEditing = editingExercises.has(ex.id);
-              const isBodyweightExercise = isBodyweight(def);
+              const isBodyweightMovement = isBodyweightExercise(def);
               
               const ghostSets = historyCache.get(ex.exerciseId);
               const historicPR = prCache.get(ex.exerciseId) || 0;
 
               // Calculate Best Set (Current Session)
               const currentBestLoad = ex.sets.reduce((best, current) => {
-                  const totalReps = getTotalReps(current, def);
-                  if (totalReps <= 0) return best;
+                  if (!shouldCountSetForPR(current, def, undefined, userWeight)) return best;
 
-                  const load = getSetLoad(current, def);
+                  const load = getSetLoad(current, def, undefined, userWeight);
                   return load > best ? load : best;
               }, 0);
               
@@ -352,7 +324,7 @@ export const WorkoutLogger = () => {
                               
                               <div className="grid grid-cols-10 gap-2 text-[10px] font-bold text-zinc-500 uppercase tracking-wider text-center mb-2 px-2">
                                   <div className="col-span-1">#</div>
-                                  <div className="col-span-3">{isBodyweightExercise ? 'Extra LBS' : 'LBS'}</div>
+                                  <div className="col-span-3">{isBodyweightMovement ? 'Extra LBS' : 'LBS'}</div>
                                   <div className="col-span-3">Reps</div>
                                   <div className="col-span-3">{isEditing ? "Delete" : "Done"}</div>
                               </div>
@@ -401,10 +373,10 @@ export const WorkoutLogger = () => {
                                                 <input 
                                                     type="number" 
                                                 min={0}
-                                                placeholder={getPlaceholderValue(ghostSet?.weight, "-")}
-                                                value={formatInputValue(set.weight)} 
+                                                placeholder={getNumberPlaceholder(ghostSet?.weight, "-")}
+                                                value={formatNumberInputValue(set.weight)} 
                                                     disabled={isEditing}
-                                                onChange={(e) => updateSet(exIndex, setIndex, 'weight', parseInputValue(e.target.value))}
+                                                onChange={(e) => updateSet(exIndex, setIndex, 'weight', parseNumberInputValue(e.target.value))}
                                                     className="w-full bg-transparent text-center font-bold text-white text-lg outline-none placeholder:text-zinc-700 focus:text-brand-orange disabled:opacity-50" 
                                                 />
                                             </div>
@@ -412,16 +384,16 @@ export const WorkoutLogger = () => {
                                             <div className="col-span-3 flex justify-center">
                                                 {def?.isUnilateral ? (
                                                 <div className="flex gap-1 w-full">
-                                                <input type="number" min={0} placeholder={getPlaceholderValue(ghostSet?.repsLeft, "L")} value={formatInputValue(set.repsLeft)} onChange={(e) => updateSet(exIndex, setIndex, 'repsLeft', parseInputValue(e.target.value))} disabled={isEditing} className="w-1/2 bg-white/5 rounded-lg py-2 text-center font-bold text-white text-sm outline-none focus:bg-white/10 disabled:opacity-50" />
-                                                <input type="number" min={0} placeholder={getPlaceholderValue(ghostSet?.repsRight, "R")} value={formatInputValue(set.repsRight)} onChange={(e) => updateSet(exIndex, setIndex, 'repsRight', parseInputValue(e.target.value))} disabled={isEditing} className="w-1/2 bg-white/5 rounded-lg py-2 text-center font-bold text-white text-sm outline-none focus:bg-white/10 disabled:opacity-50" />
+                                                    <input type="number" min={0} placeholder={getNumberPlaceholder(ghostSet?.repsLeft, "L")} value={formatNumberInputValue(set.repsLeft)} onChange={(e) => updateSet(exIndex, setIndex, 'repsLeft', parseNumberInputValue(e.target.value))} disabled={isEditing} className="w-1/2 bg-white/5 rounded-lg py-2 text-center font-bold text-white text-sm outline-none focus:bg-white/10 disabled:opacity-50" />
+                                                    <input type="number" min={0} placeholder={getNumberPlaceholder(ghostSet?.repsRight, "R")} value={formatNumberInputValue(set.repsRight)} onChange={(e) => updateSet(exIndex, setIndex, 'repsRight', parseNumberInputValue(e.target.value))} disabled={isEditing} className="w-1/2 bg-white/5 rounded-lg py-2 text-center font-bold text-white text-sm outline-none focus:bg-white/10 disabled:opacity-50" />
                                                 </div>
                                                 ) : (
                                                 <input 
                                                     type="number" 
                                                 min={0}
-                                                placeholder={getPlaceholderValue(ghostSet?.reps, "-")}
-                                                value={formatInputValue(set.reps)} 
-                                                onChange={(e) => updateSet(exIndex, setIndex, 'reps', parseInputValue(e.target.value))}
+                                                  placeholder={getNumberPlaceholder(ghostSet?.reps, "-")}
+                                                  value={formatNumberInputValue(set.reps)} 
+                                                  onChange={(e) => updateSet(exIndex, setIndex, 'reps', parseNumberInputValue(e.target.value))}
                                                     disabled={isEditing}
                                                     className="w-full bg-white/5 rounded-lg py-2 text-center font-bold text-white text-lg outline-none focus:bg-white/10 disabled:opacity-50" 
                                                 />
