@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+
+
+@theme {
+  /* Define the IronLog Color Palette */
+  --color-iron-950: #0a0a0a;
+  --color-iron-base: #000000;
+  
+  --color-brand-orange: #ea580c;
+  --color-brand-red: #b91c1c;
+  --color-brand-accent: #f97316;
+
+  /* Fonts */
+  --font-sans: "Inter", sans-serif;
+
+  /* Radius */
+  --radius-3xl: 1.5rem;
+}
+
+html, body {
+  touch-action: pan-x pan-y;
+}
+
+/* Global Styles 
+  Note: In v4, we don't use @apply in :root or body as often.
+  We just write standard CSS using the theme variables we made.
+*/
+:root {
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--color-iron-base);
+  color: white;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background-color: var(--color-iron-base);
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--color-iron-950);
+  border-radius: 9999px;
+}
