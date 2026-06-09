@@ -20,7 +20,20 @@ import { Button } from '../components/ui/Button';
 import { ExerciseSelector } from '../components/ExerciseSelector';
 import { workoutService } from '../services/workoutService';
 import { exerciseService } from '../services/exerciseService';
+import { authService } from '../services/authService';
 import { cn } from '../lib/utils';
+import {
+  applyBodyWeightToExercises,
+  getSetLoad,
+  getTotalReps,
+  isBodyweightExercise,
+  parseUserWeight,
+  shouldCountSetForVolume
+} from '../utils/workoutMath';
+import {
+  formatNumberInputValue,
+  parseNumberInputValue
+} from '../utils/numberInput';
 import type { WorkoutSession, WorkoutExercise, Exercise, ExerciseSet } from '../types';
 
 export const EditWorkout = () => {
@@ -33,8 +46,10 @@ export const EditWorkout = () => {
   
   // Custom State for Editing
   const [durationMinutes, setDurationMinutes] = useState(0);
+  const [userWeight, setUserWeight] = useState<number | null>(null);
   
   const [workout, setWorkout] = useState<WorkoutSession | null>(null);
+
 
   // --- EFFECTS ---
 
@@ -55,6 +70,9 @@ export const EditWorkout = () => {
       const map = new Map();
       allDefs.forEach(ex => map.set(ex.id, ex));
       setExerciseDefs(map);
+
+      const user = await authService.getUser();
+      setUserWeight(parseUserWeight(user?.weight));
 
       // Load Workout
       const data = await workoutService.getWorkoutById(id);
@@ -150,26 +168,32 @@ export const EditWorkout = () => {
     if (!workout || !id) return;
 
     // Recalculate Volume
+    const workoutBodyWeight = workout.bodyWeight ?? userWeight ?? undefined;
     let totalVolume = 0;
     workout.exercises.forEach(ex => {
       const def = exerciseDefs.get(ex.exerciseId);
       ex.sets.forEach(set => {
-        if (set.isCompleted && set.weight) {
-          if (def?.isUnilateral && set.repsLeft && set.repsRight) {
-             totalVolume += set.weight * (set.repsLeft + set.repsRight);
-          } else if (set.reps) {
-             totalVolume += set.weight * set.reps;
-          }
-        }
+        if (!shouldCountSetForVolume(set, def, workoutBodyWeight, userWeight)) return;
+        const load = getSetLoad(set, def, workoutBodyWeight, userWeight);
+        const totalReps = getTotalReps(set, def);
+        totalVolume += load * totalReps;
       });
     });
+
+    const exercisesWithBodyWeight = applyBodyWeightToExercises(
+      workout.exercises,
+      exerciseDefs,
+      workoutBodyWeight
+    );
 
     const newEndTime = workout.startTime + (durationMinutes * 60 * 1000);
 
     const finalWorkout = { 
-        ...workout, 
-        volumeLoad: totalVolume,
-        endTime: newEndTime 
+      ...workout, 
+      volumeLoad: totalVolume,
+      endTime: newEndTime,
+      exercises: exercisesWithBodyWeight,
+      bodyWeight: workoutBodyWeight
     };
 
     await workoutService.updateWorkout(id, finalWorkout);
@@ -231,6 +255,7 @@ export const EditWorkout = () => {
         {/* EXERCISES */}
         {workout.exercises.map((ex, exIndex) => {
             const def = exerciseDefs.get(ex.exerciseId);
+            const weightLabel = isBodyweightExercise(def) ? 'Extra LBS' : 'LBS';
             return (
               <div key={ex.id} className="space-y-2">
                 <div className="flex justify-between items-center px-1">
@@ -248,7 +273,7 @@ export const EditWorkout = () => {
                 {/* HEADER ROW */}
                 <div className="grid grid-cols-10 gap-2 text-[10px] text-zinc-500 uppercase font-bold text-center px-2">
                     <div className="col-span-1">#</div>
-                    <div className="col-span-3">LBS</div>
+                  <div className="col-span-3">{weightLabel}</div>
                     <div className="col-span-3">Reps</div>
                     <div className="col-span-3">Done</div>
                 </div>
@@ -285,8 +310,9 @@ export const EditWorkout = () => {
                                 <div className="col-span-3">
                                     <input 
                                         type="number" 
-                                        value={set.weight || ''} 
-                                        onChange={e => updateSet(exIndex, setIndex, 'weight', parseFloat(e.target.value))}
+                                    min={0}
+                                      value={formatNumberInputValue(set.weight)} 
+                                      onChange={e => updateSet(exIndex, setIndex, 'weight', parseNumberInputValue(e.target.value))}
                                         className="w-full bg-transparent text-center text-white font-bold outline-none"
                                         placeholder="-"
                                     />
@@ -295,14 +321,15 @@ export const EditWorkout = () => {
                                 <div className="col-span-3">
                                     {def?.isUnilateral ? (
                                         <div className="flex gap-1">
-                                            <input type="number" placeholder="L" className="w-1/2 bg-white/5 text-center text-white text-xs py-1 rounded" value={set.repsLeft||''} onChange={e => updateSet(exIndex, setIndex, 'repsLeft', parseFloat(e.target.value))}/>
-                                            <input type="number" placeholder="R" className="w-1/2 bg-white/5 text-center text-white text-xs py-1 rounded" value={set.repsRight||''} onChange={e => updateSet(exIndex, setIndex, 'repsRight', parseFloat(e.target.value))}/>
+                                          <input type="number" min={0} placeholder="L" className="w-1/2 bg-white/5 text-center text-white text-xs py-1 rounded" value={formatNumberInputValue(set.repsLeft)} onChange={e => updateSet(exIndex, setIndex, 'repsLeft', parseNumberInputValue(e.target.value))}/>
+                                          <input type="number" min={0} placeholder="R" className="w-1/2 bg-white/5 text-center text-white text-xs py-1 rounded" value={formatNumberInputValue(set.repsRight)} onChange={e => updateSet(exIndex, setIndex, 'repsRight', parseNumberInputValue(e.target.value))}/>
                                         </div>
                                     ) : (
                                         <input 
                                             type="number" 
-                                            value={set.reps || ''} 
-                                            onChange={e => updateSet(exIndex, setIndex, 'reps', parseFloat(e.target.value))}
+                                          min={0}
+                                          value={formatNumberInputValue(set.reps)} 
+                                          onChange={e => updateSet(exIndex, setIndex, 'reps', parseNumberInputValue(e.target.value))}
                                             className="w-full bg-transparent text-center text-white font-bold outline-none"
                                             placeholder="-"
                                         />

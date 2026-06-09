@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, Link } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './lib/supabase';
 import { WorkoutProvider } from './context/WorkoutContext';
+import { authService } from './services/authService';
 
 // Pages
 import { Auth } from './pages/Auth';
@@ -19,9 +20,21 @@ import { cn } from './lib/utils';
 // Wrapper component to handle location-based logic
 const AppContent = () => {
   const location = useLocation();
+  const [missingWeight, setMissingWeight] = useState(false);
   
   // Define which paths should be "Full Screen" (No padding/container)
   const isFullScreen = location.pathname === '/workout' || location.pathname.startsWith('/history/');
+  const showWeightBanner = missingWeight && location.pathname !== '/profile';
+
+  useEffect(() => {
+    const loadWeight = async () => {
+      const user = await authService.getUser();
+      const rawWeight = user?.weight;
+      const parsed = typeof rawWeight === 'number' ? rawWeight : typeof rawWeight === 'string' ? parseFloat(rawWeight) : NaN;
+      setMissingWeight(!Number.isFinite(parsed) || parsed <= 0);
+    };
+    loadWeight();
+  }, []);
 
   return (
     <WorkoutProvider>
@@ -33,6 +46,18 @@ const AppContent = () => {
           "min-h-screen transition-all",
           !isFullScreen && "max-w-3xl mx-auto p-6 md:p-12"
         )}>
+          {showWeightBanner && (
+            <div className="mb-6 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-amber-200">
+              <div className="flex items-center justify-between gap-4">
+                <p className="text-sm font-medium">
+                  Add your body weight to enable accurate bodyweight calculations.
+                </p>
+                <Link to="/profile" className="text-sm font-bold text-amber-100 hover:text-white">
+                  Set Weight
+                </Link>
+              </div>
+            </div>
+          )}
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/workout" element={<WorkoutLogger />} />
