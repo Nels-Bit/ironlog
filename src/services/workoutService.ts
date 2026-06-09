@@ -6,8 +6,8 @@ import type { WorkoutSession, WorkoutExercise, Exercise, ExerciseSet } from '../
 export const workoutService = {
   
   // --- CREATE ---
-  async saveWorkout(workout: WorkoutSession): Promise<void> {
-    const { error } = await supabase
+  async saveWorkout(workout: WorkoutSession): Promise<WorkoutSession | null> {
+    const { data, error } = await supabase
       .from('workouts')
       .insert({
         user_id: (await supabase.auth.getUser()).data.user?.id,
@@ -16,9 +16,22 @@ export const workoutService = {
         end_time: workout.endTime,
         volume_load: workout.volumeLoad,
         exercises: workout.exercises
-      });
+      })
+      .select()
+      .single();
 
     if (error) throw error;
+
+    if (!data) return null;
+
+    return {
+      id: data.id,
+      name: data.name,
+      startTime: data.start_time,
+      endTime: data.end_time,
+      volumeLoad: data.volume_load,
+      exercises: data.exercises
+    };
   },
 
   // --- READ (List) ---

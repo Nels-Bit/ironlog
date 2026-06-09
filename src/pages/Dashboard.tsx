@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Dumbbell, TrendingUp, Calendar, ArrowRight, Loader2, Play
 } from 'lucide-react';
@@ -8,12 +8,14 @@ import { workoutService } from '../services/workoutService';
 import { authService } from '../services/authService';
 import { useWorkout } from '../context/WorkoutContext';
 import type { WorkoutSession, UserProfile } from '../types';
+import { calculateWorkoutStreak, formatStreakLabel } from '../utils/achievementUtils';
 
 export const Dashboard = () => {
   const [history, setHistory] = useState<WorkoutSession[]>([]);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const { startWorkout, isActive } = useWorkout();
+  const { startWorkout, logRestDay, isActive } = useWorkout();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const loadData = async () => {
@@ -36,7 +38,15 @@ export const Dashboard = () => {
   if (loading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin text-brand-orange" /></div>;
 
   const totalVolume = history.reduce((acc, curr) => acc + (curr.volumeLoad || 0), 0);
-  const recentWorkouts = history.slice(0, 3);
+  const streak = calculateWorkoutStreak(history).currentStreak;
+
+  const handleLogRestDay = async () => {
+    const id = await logRestDay();
+    const updatedHistory = await workoutService.getHistory();
+    setHistory(updatedHistory);
+    if (id) navigate(`/history/${id}`);
+    else navigate('/history');
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -53,7 +63,13 @@ export const Dashboard = () => {
       {isActive ? (
         <div className="bg-brand-orange text-white p-6 rounded-3xl shadow-lg shadow-brand-orange/20 relative overflow-hidden group">
           <div className="relative z-10">
-            <h2 className="text-2xl font-black italic mb-2">SESSION ACTIVE</h2>
+            <div className="flex items-center justify-between gap-4 mb-2">
+              <h2 className="text-2xl font-black italic">SESSION ACTIVE</h2>
+              <div className="flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5">
+                <span className="text-lg animate-pulse">🔥</span>
+                <span className="text-xs font-black uppercase tracking-widest">{formatStreakLabel(streak)}</span>
+              </div>
+            </div>
             <p className="text-white/80 mb-6 font-medium">You are currently logged in a workout.</p>
             <Link to="/workout">
               <Button variant="secondary" className="bg-white text-brand-orange hover:bg-zinc-100 border-none font-bold">
@@ -66,7 +82,13 @@ export const Dashboard = () => {
       ) : (
         <div className="bg-iron-950 border border-white/10 p-6 rounded-3xl relative overflow-hidden group hover:border-brand-orange/50 transition-colors">
           <div className="relative z-10">
-            <h2 className="text-2xl font-black italic text-white mb-2">START TRAINING</h2>
+            <div className="flex items-center justify-between gap-4 mb-2">
+              <h2 className="text-2xl font-black italic text-white">START TRAINING</h2>
+              <div className="flex items-center gap-2 rounded-full bg-white/5 px-3 py-1.5 border border-white/10">
+                <span className="text-lg animate-pulse">🔥</span>
+                <span className="text-xs font-black uppercase tracking-widest text-white">{formatStreakLabel(streak)}</span>
+              </div>
+            </div>
             <p className="text-zinc-500 mb-6">Log a new session and track your progress.</p>
             <Button onClick={() => startWorkout("New Workout")} className="w-full sm:w-auto font-bold">
               <Play className="mr-2 fill-current" size={18} /> Start Empty Workout
@@ -93,38 +115,29 @@ export const Dashboard = () => {
         </div>
       </div>
 
-      {/* RECENT HISTORY */}
+      {/* HOW TO / INSTALL CARD */}
       <div className="space-y-4">
         <div className="flex items-center justify-between px-1">
-          <h3 className="text-lg font-bold text-white">Recent Activity</h3>
-          <Link to="/history" className="text-xs font-bold text-brand-orange hover:text-orange-400 uppercase tracking-widest">View All</Link>
+          <h3 className="text-lg font-bold text-white">How To</h3>
+          <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Install as an app</span>
         </div>
-        
-        <div className="space-y-3">
-          {recentWorkouts.length === 0 ? (
-            <div className="text-center py-10 text-zinc-600 italic">No workouts yet. Go lift something heavy.</div>
-          ) : (
-            recentWorkouts.map(session => (
-              <Link to={`/history/${session.id}`} key={session.id} className="block group">
-                <div className="bg-iron-950 border border-white/5 p-4 rounded-2xl flex items-center justify-between group-hover:border-white/10 transition-all">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-zinc-500 group-hover:text-brand-orange transition-colors">
-                      <Dumbbell size={20} />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-white group-hover:text-brand-orange transition-colors">{session.name}</h4>
-                      <p className="text-xs text-zinc-500 font-medium">
-                        {new Date(session.startTime).toLocaleDateString()} • {(session.volumeLoad || 0).toLocaleString()} lbs
-                      </p>
-                    </div>
-                  </div>
-                  <ArrowRight size={18} className="text-zinc-600 group-hover:translate-x-1 transition-transform" />
-                </div>
-              </Link>
-            ))
-          )}
+
+        <div className="bg-iron-950 border border-white/5 p-4 rounded-2xl">
+          <p className="text-sm text-zinc-400 mb-3">Make Iron Log feel like a native app on your phone.</p>
+          <ol className="text-sm text-zinc-300 list-decimal list-inside space-y-2">
+            <li><strong>iOS (Safari):</strong> Open the Share menu → tap "Add to Home Screen".</li>
+            <li><strong>Android (Chrome):</strong> Open the browser menu → tap "Install app" or "Add to Home screen".</li>
+            <li><strong>Desktop:</strong> Use the browser install prompt or the menu to "Install" the app for a standalone window.</li>
+          </ol>
         </div>
       </div>
+
+      <Button
+        onClick={handleLogRestDay}
+        className="w-full bg-blue-950/90 border border-blue-400/20 text-blue-100 hover:bg-blue-900/90 hover:text-white shadow-lg shadow-blue-950/30"
+      >
+        🌙 Log Rest Day
+      </Button>
     </div>
   );
 };
