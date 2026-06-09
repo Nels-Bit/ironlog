@@ -11,6 +11,7 @@ interface WorkoutContextType {
   historyCache: Map<string, ExerciseSet[]>;
   prCache: Map<string, number>;
   startWorkout: (name: string) => void;
+  logRestDay: () => Promise<string | null>;
   cancelWorkout: () => void;
   finishWorkout: () => Promise<void>;
   addExercise: (exDef: Exercise) => void;
@@ -81,6 +82,19 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
     setElapsed(0);
     setHistoryCache(new Map());
     setPrCache(new Map());
+  };
+
+  const logRestDay = async () => {
+    const restDay: WorkoutSession = {
+      id: uuidv4(),
+      name: 'Rest Day 🌙',
+      startTime: Date.now(),
+      endTime: Date.now(),
+      volumeLoad: 0,
+      exercises: []
+    };
+    const saved = await workoutService.saveWorkout(restDay);
+    return saved?.id ?? null;
   };
 
   const cancelWorkout = () => {
@@ -219,7 +233,7 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
     <WorkoutContext.Provider value={{
       workout, elapsed, isActive: !!workout, 
       historyCache, prCache,
-      startWorkout, cancelWorkout, finishWorkout,
+      startWorkout, logRestDay, cancelWorkout, finishWorkout,
       addExercise, removeExercise, addSet, removeSet, updateSet,
       exerciseDefs
     }}>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Dumbbell, Calendar, Clock, Flame, Skull, ArrowDown, ChevronDown } from 'lucide-react';
+import { isRestDaySession } from '../utils/achievementUtils';
 import { workoutService } from '../services/workoutService';
 import { exerciseService } from '../services/exerciseService';
 import { Button } from '../components/ui/Button';
@@ -141,6 +142,7 @@ export const History = () => {
   });
 
   const isFiltered = Boolean(dateFrom || dateTo || targetFilter || exerciseFilter);
+  const displayedHistory = isFiltered ? filteredHistory : filteredHistory.slice(0, 7);
 
   const clearFilters = () => {
     setDateFrom('');
@@ -259,7 +261,7 @@ export const History = () => {
               </div>
             </div>
 
-            {filteredHistory.length === 0 ? (
+            {displayedHistory.length === 0 ? (
               <div className="text-center py-16 opacity-60 space-y-3">
                 <p className="text-zinc-400">No workouts match your filters.</p>
                 {isFiltered && (
@@ -269,12 +271,16 @@ export const History = () => {
                 )}
               </div>
             ) : (
-              filteredHistory.map((workout, index) => {
+              displayedHistory.map((workout, index) => {
                 const isExpanded = expandedId === workout.id;
                 const showWeekday = index < 7;
+                const isRest = isRestDaySession(workout);
 
                 return (
-                <div key={workout.id} className="bg-iron-950 border border-white/10 rounded-2xl overflow-hidden relative group">
+                <div key={workout.id} className={cn(
+                  "rounded-2xl overflow-hidden relative group",
+                  isRest ? "bg-blue-950/10 border border-blue-400/10" : "bg-iron-950 border border-white/10"
+                )}>
               <button
                 type="button"
                 className="w-full text-left p-5 flex items-start justify-between gap-4 hover:bg-white/5 transition-colors"
@@ -283,7 +289,7 @@ export const History = () => {
                 aria-controls={`workout-${workout.id}`}
               >
                 <div className="min-w-0">
-                  <h3 className="text-lg font-bold text-white mb-1 truncate">{workout.name}</h3>
+                  <h3 className="text-lg font-bold text-white mb-1 truncate">{isRest ? 'Rest Day 🌙' : workout.name}</h3>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500 font-mono">
                     <span className="flex items-center gap-1"><Calendar size={12} /> {formatDate(workout.startTime, showWeekday)}</span>
                     <span className="flex items-center gap-1"><Clock size={12} /> {formatTime(workout.startTime)}</span>
@@ -291,8 +297,14 @@ export const History = () => {
                       <span className="flex items-center gap-1">{getDurationMinutes(workout)} min</span>
                     )}
                   </div>
-                  <div className="mt-3 text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Most worked</div>
-                  <div className="text-sm text-zinc-200 font-semibold">{getTopTarget(workout)}</div>
+                  {isRest ? (
+                    <div className="mt-3 text-sm text-zinc-400">Rest day — recovery logged. No exercises recorded.</div>
+                  ) : (
+                    <>
+                      <div className="mt-3 text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Most worked</div>
+                      <div className="text-sm text-zinc-200 font-semibold">{getTopTarget(workout)}</div>
+                    </>
+                  )}
                 </div>
 
                 <div className="flex flex-col items-end gap-3">
@@ -311,7 +323,7 @@ export const History = () => {
                 </div>
               </button>
 
-              <div
+                <div
                 id={`workout-${workout.id}`}
                 className={cn(
                   "px-5 pb-5 overflow-hidden transition-all duration-300 ease-out",
@@ -319,53 +331,57 @@ export const History = () => {
                 )}
               >
                 <div className="border-t border-white/5 pt-4 space-y-4">
-                  {workout.exercises.length === 0 ? (
-                    <div className="text-xs text-zinc-500">No exercises logged.</div>
+                  {isRest ? (
+                    <div className="text-xs text-zinc-500">This was logged as a Rest Day. Enjoy your recovery.</div>
                   ) : (
-                    workout.exercises.map((ex, i) => {
-                      const def = exerciseDefs.get(ex.exerciseId);
-                      return (
-                        <div key={ex.id || i}>
-                          <h4 className="text-sm font-bold text-white mb-2">{def?.name || 'Unknown Exercise'}</h4>
+                    workout.exercises.length === 0 ? (
+                      <div className="text-xs text-zinc-500">No exercises logged.</div>
+                    ) : (
+                      workout.exercises.map((ex, i) => {
+                        const def = exerciseDefs.get(ex.exerciseId);
+                        return (
+                          <div key={ex.id || i}>
+                            <h4 className="text-sm font-bold text-white mb-2">{def?.name || 'Unknown Exercise'}</h4>
 
-                          <div className="space-y-1">
-                            {ex.sets.map((set, setIndex) => {
-                              const isDropChild = set.type === 'dropset_child';
+                            <div className="space-y-1">
+                              {ex.sets.map((set, setIndex) => {
+                                const isDropChild = set.type === 'dropset_child';
 
-                              return (
-                                <div key={set.id || setIndex} className="relative flex items-center text-xs font-mono">
+                                return (
+                                  <div key={set.id || setIndex} className="relative flex items-center text-xs font-mono">
 
-                                  {/* Visual Drop Set Line */}
-                                  {isDropChild && (
-                                    <div className="absolute -top-2 left-[11px] w-2 h-6 border-l-2 border-b-2 border-zinc-700 rounded-bl-lg z-0 pointer-events-none" />
-                                  )}
+                                    {/* Visual Drop Set Line */}
+                                    {isDropChild && (
+                                      <div className="absolute -top-2 left-[11px] w-2 h-6 border-l-2 border-b-2 border-zinc-700 rounded-bl-lg z-0 pointer-events-none" />
+                                    )}
 
-                                  <div className={cn(
-                                    "flex items-center gap-3 w-full p-1.5 rounded-lg z-10 relative",
-                                    isDropChild ? "ml-4" : ""
-                                  )}>
+                                    <div className={cn(
+                                      "flex items-center gap-3 w-full p-1.5 rounded-lg z-10 relative",
+                                      isDropChild ? "ml-4" : ""
+                                    )}>
 
-                                    {/* Set Number & Icon */}
-                                    <div className="w-6 h-6 rounded bg-white/5 flex items-center justify-center gap-0.5 text-zinc-400 font-bold border border-white/5">
-                                      {isDropChild ? <ArrowDown size={10} /> : <span className="text-[9px]">{setIndex + 1}</span>}
-                                      {!isDropChild && getTypeIcon(set.type)}
+                                      {/* Set Number & Icon */}
+                                      <div className="w-6 h-6 rounded bg-white/5 flex items-center justify-center gap-0.5 text-zinc-400 font-bold border border-white/5">
+                                        {isDropChild ? <ArrowDown size={10} /> : <span className="text-[9px]">{setIndex + 1}</span>}
+                                        {!isDropChild && getTypeIcon(set.type)}
+                                      </div>
+
+                                      {/* Weight & Reps */}
+                                      <div className="flex-1 text-zinc-300">
+                                        {set.weight ? `${set.weight} lbs` : '-'}
+                                        <span className="text-zinc-600 mx-1">×</span>
+                                        {def?.isUnilateral ? `${set.repsLeft}L / ${set.repsRight}R` : set.reps}
+                                      </div>
+
                                     </div>
-
-                                    {/* Weight & Reps */}
-                                    <div className="flex-1 text-zinc-300">
-                                      {set.weight ? `${set.weight} lbs` : '-'}
-                                      <span className="text-zinc-600 mx-1">×</span>
-                                      {def?.isUnilateral ? `${set.repsLeft}L / ${set.repsRight}R` : set.reps}
-                                    </div>
-
                                   </div>
-                                </div>
-                              );
-                            })}
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })
+                        );
+                      })
+                    )
                   )}
                 </div>
 

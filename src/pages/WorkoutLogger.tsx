@@ -14,7 +14,7 @@ export const WorkoutLogger = () => {
   const navigate = useNavigate();
   const { 
     workout, elapsed, isActive, historyCache, prCache,
-    startWorkout, cancelWorkout, finishWorkout, 
+    startWorkout, logRestDay, cancelWorkout, finishWorkout, 
     addExercise, removeExercise, addSet, removeSet, updateSet, exerciseDefs 
   } = useWorkout();
 
@@ -190,7 +190,10 @@ export const WorkoutLogger = () => {
 
   // --- RENDER: SETUP SCREEN ---
   if (!isActive || !workout) {
-    return <SetupScreen onStart={startWorkout} onCancel={() => navigate(-1)} />;
+    return <SetupScreen onStart={startWorkout} onRestDay={async () => {
+      const id = await logRestDay();
+      navigate(id ? `/history/${id}` : '/history');
+    }} onCancel={() => navigate(-1)} />;
   }
 
   // --- RENDER: ACTIVE LOGGER ---
@@ -485,14 +488,23 @@ export const WorkoutLogger = () => {
   );
 };
 
-const SetupScreen = ({ onStart, onCancel }: { onStart: (name: string) => void, onCancel: () => void }) => {
+const SetupScreen = ({ onStart, onCancel, onRestDay }: { onStart: (name: string) => void, onCancel: () => void, onRestDay: () => void }) => {
   const [name, setName] = useState('');
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-6 animate-in fade-in">
       <div className="w-full max-w-sm bg-iron-950 border border-white/10 rounded-3xl p-6 space-y-6">
         <div className="text-center"><div className="inline-flex w-12 h-12 bg-white/5 rounded-full items-center justify-center mb-4 text-zinc-500"><Dumbbell size={24} /></div><h2 className="text-xl font-bold text-white">Start Workout</h2></div>
         <input autoFocus type="text" placeholder={`Workout ${new Date().toLocaleDateString()}`} value={name} onChange={e => setName(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl p-4 text-white text-center font-bold focus:border-brand-orange outline-none" />
-        <div className="space-y-3"><Button className="w-full py-4" onClick={() => onStart(name)}><Play size={18} className="mr-2" /> Start Session</Button><Button variant="ghost" className="w-full text-zinc-500 hover:text-white" onClick={onCancel}>Cancel</Button></div>
+        <div className="space-y-3">
+          <Button className="w-full py-4" onClick={() => onStart(name)}><Play size={18} className="mr-2" /> Start Session</Button>
+          <Button
+            onClick={onRestDay}
+            className="w-full py-4 bg-blue-950/90 border border-blue-400/20 text-blue-100 hover:bg-blue-900/90 hover:text-white shadow-lg shadow-blue-950/30"
+          >
+            🌙 Log Rest Day
+          </Button>
+          <Button variant="ghost" className="w-full text-zinc-500 hover:text-white" onClick={onCancel}>Cancel</Button>
+        </div>
       </div>
     </div>
   );

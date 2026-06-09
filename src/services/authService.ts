@@ -1,6 +1,18 @@
 import { supabase } from '../lib/supabase'; // <--- THIS WAS MISSING
 import type { UserProfile } from '../types';
 
+const normalizeHeightInInches = (height: unknown): number | undefined => {
+  const parsed = typeof height === 'number' ? height : typeof height === 'string' ? parseFloat(height) : NaN;
+  if (!Number.isFinite(parsed) || parsed <= 0) return undefined;
+
+  // Legacy data was stored in cm; convert obvious cm values to inches.
+  if (parsed > 120) {
+    return Math.round(parsed / 2.54);
+  }
+
+  return Math.round(parsed);
+};
+
 export const authService = {
   
   async getUser(): Promise<UserProfile | null> {
@@ -16,7 +28,7 @@ export const authService = {
       email: user.email || '',
       name: meta.name || 'Athlete',
       weight: meta.weight,
-      height: meta.height,
+      height: normalizeHeightInInches(meta.height),
       age: meta.age,
       goal: meta.goal || 'Strength',
       level: meta.level || 'Beginner',
@@ -30,7 +42,7 @@ export const authService = {
       data: {
         name: updates.name,
         weight: updates.weight,
-        height: updates.height,
+        height: updates.height ? Math.round(updates.height) : updates.height,
         age: updates.age,
         goal: updates.goal,
         level: updates.level,
