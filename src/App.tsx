@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, Link } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
+import { Analytics } from '@vercel/analytics/react';
 import { supabase } from './lib/supabase';
 import { WorkoutProvider } from './context/WorkoutContext';
 import { authService } from './services/authService';
@@ -100,6 +101,7 @@ export default function App() {
       ) : (
         <AppContent />
       )}
+      <Analytics />
     </BrowserRouter>
   );
 }
