@@ -2,6 +2,14 @@ import { createContext, useContext, useState, useEffect, type ReactNode } from '
 import { v4 as uuidv4 } from 'uuid';
 import { workoutService } from '../services/workoutService';
 import { exerciseService } from '../services/exerciseService';
+import { authService } from '../services/authService';
+import {
+  applyBodyWeightToExercises,
+  getSetLoad,
+  getTotalReps,
+  parseUserWeight,
+  shouldCountSetForVolume
+} from '../utils/workoutMath';
 import type { WorkoutSession, WorkoutExercise, Exercise, ExerciseSet } from '../types';
 
 interface WorkoutContextType {
@@ -38,6 +46,7 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
   const [exerciseDefs, setExerciseDefs] = useState<Map<string, Exercise>>(new Map());
   const [historyCache, setHistoryCache] = useState<Map<string, ExerciseSet[]>>(new Map());
   const [prCache, setPrCache] = useState<Map<string, number>>(new Map());
+  const [userWeight, setUserWeight] = useState<number | null>(null);
 
   useEffect(() => {
     const loadDefs = async () => {
@@ -47,6 +56,14 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
       setExerciseDefs(map);
     };
     loadDefs();
+  }, []);
+
+  useEffect(() => {
+    const loadUserWeight = async () => {
+      const user = await authService.getUser();
+      setUserWeight(parseUserWeight(user?.weight));
+    };
+    loadUserWeight();
   }, []);
 
   useEffect(() => {
@@ -70,13 +87,19 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [workout]);
 
+  useEffect(() => {
+    if (!workout || workout.bodyWeight !== undefined || userWeight === null) return;
+    setWorkout(prev => prev ? ({ ...prev, bodyWeight: userWeight ?? undefined }) : null);
+  }, [workout, userWeight]);
+
   const startWorkout = (name: string) => {
     const newWorkout: WorkoutSession = {
       id: uuidv4(),
       name: name.trim() || `Workout ${new Date().toLocaleDateString()}`,
       startTime: Date.now(),
       volumeLoad: 0,
-      exercises: []
+      exercises: [],
+      bodyWeight: userWeight ?? undefined
     };
     setWorkout(newWorkout);
     setElapsed(0);
@@ -104,22 +127,31 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
 
   const finishWorkout = async () => {
     if (!workout) return;
-    
+    const workoutBodyWeight = workout.bodyWeight ?? userWeight ?? undefined;
     let totalVolume = 0;
     workout.exercises.forEach(ex => {
       const def = exerciseDefs.get(ex.exerciseId);
       ex.sets.forEach(set => {
-        if (set.isCompleted && set.weight) {
-          if (def?.isUnilateral && set.repsLeft && set.repsRight) {
-             totalVolume += set.weight * (set.repsLeft + set.repsRight);
-          } else if (set.reps) {
-             totalVolume += set.weight * set.reps;
-          }
-        }
+        if (!shouldCountSetForVolume(set, def, workoutBodyWeight, userWeight)) return;
+        const load = getSetLoad(set, def, workoutBodyWeight, userWeight);
+        const totalReps = getTotalReps(set, def);
+        totalVolume += load * totalReps;
       });
     });
 
-    const final = { ...workout, volumeLoad: totalVolume, endTime: Date.now() };
+    const exercisesWithBodyWeight = applyBodyWeightToExercises(
+      workout.exercises,
+      exerciseDefs,
+      workoutBodyWeight
+    );
+
+    const final = {
+      ...workout,
+      volumeLoad: totalVolume,
+      endTime: Date.now(),
+      exercises: exercisesWithBodyWeight,
+      bodyWeight: workoutBodyWeight
+    };
     await workoutService.saveWorkout(final);
     setWorkout(null);
   };
@@ -132,7 +164,7 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
     repsLeft: null,
     repsRight: null,
     isCompleted: false,
-    previousBest: historySet?.weight || undefined 
+    previousBest: historySet?.weight ?? undefined 
   });
 
   const addExercise = async (exDef: Exercise) => {

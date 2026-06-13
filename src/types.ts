@@ -29,6 +29,7 @@ export interface ExerciseSet {
   isCompleted: boolean;
   previousBest?: number;
   parentSetId?: string;
+  bodyWeight?: number;
 }
 
 export interface WorkoutExercise {
@@ -44,4 +45,5 @@ export interface WorkoutSession {
   endTime?: number;
   volumeLoad: number;
   exercises: WorkoutExercise[];
+  bodyWeight?: number;
 }

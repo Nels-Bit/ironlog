@@ -1,5 +1,7 @@
 import { supabase } from '../lib/supabase';
-import type { WorkoutSession, WorkoutExercise } from '../types';
+import { exerciseService } from './exerciseService';
+import { getSetLoad, parseUserWeight, shouldCountSetForPR } from '../utils/workoutMath';
+import type { WorkoutSession, WorkoutExercise, Exercise, ExerciseSet } from '../types';
 
 export const workoutService = {
   
@@ -132,6 +134,11 @@ export const workoutService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return 0;
 
+    const userWeight = parseUserWeight(user.user_metadata?.weight);
+
+    const allExercises = await exerciseService.getAllExercises();
+    const defMap = new Map<string, Exercise>(allExercises.map(ex => [ex.id, ex]));
+
     const { data, error } = await supabase
       .from('workouts')
       .select('exercises, start_time')
@@ -147,12 +154,15 @@ export const workoutService = {
     data.forEach(workout => {
       if (Array.isArray(workout.exercises)) {
         const exercise = workout.exercises.find((e: any) => e.exerciseId === exerciseId);
+        const def = defMap.get(exerciseId);
         
         if (exercise && Array.isArray(exercise.sets)) {
           exercise.sets.forEach((set: any) => {
-            const weight = parseFloat(set.weight);
-            if (!isNaN(weight) && weight > maxWeight) {
-              maxWeight = weight;
+            if (!shouldCountSetForPR(set as ExerciseSet, def, undefined, userWeight)) return;
+
+            const load = getSetLoad(set as ExerciseSet, def, undefined, userWeight);
+            if (load > maxWeight) {
+              maxWeight = load;
             }
           });
         }
