@@ -1,73 +1,59 @@
-# React + TypeScript + Vite
+# 🏋️‍♂️ Iron Log
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+![Iron Log](https://via.placeholder.com/1000x500.png?text=Iron+Log+-+Workout+Tracker)
 
-Currently, two official plugins are available:
+**Iron Log** is a modern, high-performance Progressive Web Application (PWA) designed for athletes to seamlessly log their workouts, track volume load, and break personal records. Built with an emphasis on speed and a dark, high-contrast aesthetic, it ensures your focus remains purely on the training.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## ✨ Features
 
-## React Compiler
+- **Offline-Tolerant Logging:** Active workout sessions are cached locally. You'll never lose your session data if you accidentally close the app, refresh, or lose connection mid-workout.
+- **Smart Set Generation (Ghost Data):** Automatically pulls in your previous workout's sets, reps, and weights for a specific exercise as placeholder "ghost data," making repeated workouts a breeze to log.
+- **Progress Tracking:** Real-time volume load calculations and Personal Record (PR) tracking.
+- **PWA Ready:** Fully installable on iOS and Android for a native app-like experience directly from the browser.
+- **Secure Authentication:** User management and data persistence are handled robustly via Supabase Auth and PostgreSQL.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🚀 Tech Stack
 
-## Expanding the ESLint configuration
+- **Frontend:** React 19, TypeScript, Vite
+- **Styling:** Tailwind CSS v4, Lucide React (Icons)
+- **State Management:** React Context API with `localStorage` for session persistence
+- **Backend & Database:** Supabase (PostgreSQL, Auth)
+- **Deployment:** Vercel
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## 🛠️ Local Development Setup
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+To run this project locally, you will need Node.js installed and a Supabase project set up.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/yourusername/iron-log.git
+   cd iron-log
+   ```
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+3. **Environment Variables:**
+   Create a `.env` file in the root directory based on the example provided:
+   ```bash
+   cp .env.example .env
+   ```
+   Then, update the `.env` file with your actual Supabase credentials.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+4. **Start the development server:**
+   ```bash
+   npm run dev
+   ```
+   The application will be available at `http://localhost:5173`.
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## 🏗️ Architecture Highlights
+
+- **`WorkoutContext.tsx`:** The core engine powering the active workout session. It manages the workout timer, handles the dynamic creation of sets/exercises, and computes the total volume load upon workout completion.
+- **Service Layer (`src/services/`):** Clean, decoupled abstractions over the Supabase client (`authService.ts`, `workoutService.ts`). This ensures the UI components remain agnostic of direct database queries, improving maintainability.
+- **CSS Utility Pattern:** Uses `clsx` and `tailwind-merge` for predictable, dynamic utility class construction across UI components.
+
+## 📝 License
+
+This project is open-source and available under the MIT License.
