@@ -8,11 +8,11 @@ import { authService } from './services/authService';
 
 // Pages
 import { Auth } from './pages/Auth';
-import { Dashboard } from './pages/Dashboard';
 import { WorkoutLogger } from './pages/WorkoutLogger';
 import { History } from './pages/History';
 import { Profile } from './pages/Profile';
 import { EditWorkout } from './pages/EditWorkout';
+import { Notifications } from './pages/Notifications';
 
 // Components
 import { Navbar } from './components/Navbar';
@@ -60,12 +60,14 @@ const AppContent = () => {
             </div>
           )}
           <Routes>
-            <Route path="/" element={<Dashboard />} />
+            <Route path="/" element={<Navigate to="/profile" replace />} />
             <Route path="/workout" element={<WorkoutLogger />} />
             <Route path="/history" element={<History />} />
             <Route path="/history/:id" element={<EditWorkout />} />
             <Route path="/profile" element={<Profile />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="/friends" element={<Navigate to="/profile?tab=friends" replace />} />
+            <Route path="/notifications" element={<Notifications />} />
+            <Route path="*" element={<Navigate to="/profile" replace />} />
           </Routes>
         </main>
       </div>
