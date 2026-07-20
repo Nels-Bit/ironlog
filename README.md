@@ -9,6 +9,7 @@
 - **Offline-Tolerant Logging:** Active workout sessions are cached locally. You'll never lose your session data if you accidentally close the app, refresh, or lose connection mid-workout.
 - **Smart Set Generation (Ghost Data):** Automatically pulls in your previous workout's sets, reps, and weights for a specific exercise as placeholder "ghost data," making repeated workouts a breeze to log.
 - **Progress Tracking:** Real-time volume load calculations and Personal Record (PR) tracking.
+- **Social Layer:** Every account receives a unique user-id, optional public/private profile visibility, friend requests, friend list, friend stats, and in-app notifications.
 - **PWA Ready:** Fully installable on iOS and Android for a native app-like experience directly from the browser.
 - **Secure Authentication:** User management and data persistence are handled robustly via Supabase Auth and PostgreSQL.
 
@@ -47,6 +48,13 @@ To run this project locally, you will need Node.js installed and a Supabase proj
    npm run dev
    ```
    The application will be available at `http://localhost:5173`.
+
+5. **Run the social migration (required):**
+   Execute `supabase/migrations/202607201800_social_graph.sql` in your Supabase SQL editor (or via Supabase CLI).  
+   This migration:
+   - Creates persistent social profiles with a generated user-id for every user
+   - Backfills user-ids for existing accounts
+   - Adds friendships and notification tables with RLS policies
 
 ## 🏗️ Architecture Highlights
 

@@ -13,6 +13,32 @@ const normalizeHeightInInches = (height: unknown): number | undefined => {
   return Math.round(parsed);
 };
 
+type SocialProfileRow = {
+  user_id: string;
+  user_code: string;
+  display_name: string;
+  is_public: boolean;
+};
+
+const isMissingSocialSchemaError = (error: { message?: string } | null): boolean => {
+  if (!error?.message) return false;
+  return error.message.includes('Could not find the function public.ensure_current_user_profile')
+    || error.message.includes("relation 'public.user_profiles' does not exist")
+    || error.message.includes('relation "public.user_profiles" does not exist')
+    || error.message.includes('function gen_random_bytes(integer) does not exist');
+};
+
+const ensureCurrentSocialProfile = async (): Promise<SocialProfileRow | null> => {
+  const { data, error } = await supabase.rpc('ensure_current_user_profile');
+  if (error) {
+    if (isMissingSocialSchemaError(error)) {
+      return null;
+    }
+    throw new Error(`Unable to load social profile. Please run the latest database migration. ${error.message}`);
+  }
+  return (data as SocialProfileRow) ?? null;
+};
+
 export const authService = {
   
   async getUser(): Promise<UserProfile | null> {
@@ -22,11 +48,16 @@ export const authService = {
 
     // We combine the Auth ID/Email with the Metadata (Name, Weight, etc.)
     const meta = user.user_metadata || {};
+    const socialProfile = await ensureCurrentSocialProfile();
+    const fallbackUserId = `user_${user.id.slice(0, 8)}`;
+    const fallbackName = user.email?.split('@')[0] || 'Athlete';
 
     return {
       id: user.id,
+      userId: socialProfile?.user_code || fallbackUserId,
       email: user.email || '',
-      name: meta.name || 'Athlete',
+      name: meta.name || socialProfile?.display_name || fallbackName,
+      isPublic: socialProfile?.is_public ?? false,
       weight: meta.weight,
       height: normalizeHeightInInches(meta.height),
       age: meta.age,
@@ -51,6 +82,31 @@ export const authService = {
     });
 
     if (error) throw error;
+
+    const socialUpdates: { display_name?: string; is_public?: boolean } = {};
+    if (typeof updates.name === 'string') {
+      socialUpdates.display_name = updates.name;
+    }
+    if (typeof updates.isPublic === 'boolean') {
+      socialUpdates.is_public = updates.isPublic;
+    }
+
+    if (Object.keys(socialUpdates).length > 0) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('You must be logged in to update your profile.');
+
+      const { error: socialError } = await supabase
+        .from('user_profiles')
+        .update(socialUpdates)
+        .eq('user_id', user.id);
+
+      if (socialError) {
+        if (isMissingSocialSchemaError(socialError)) {
+          throw new Error('Social profile settings are not available yet. Run the latest Supabase migration first.');
+        }
+        throw socialError;
+      }
+    }
   },
 
   async signOut() {
