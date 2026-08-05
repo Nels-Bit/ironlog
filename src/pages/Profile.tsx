@@ -1,7 +1,7 @@
 import { useState, useEffect, type ReactNode } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { 
-  User, Ruler, Weight, Activity, Edit2, Award, Trophy, Zap, Save, X, Loader2, Globe, Lock, Search, Users, UserPlus, Calendar
+  User, Ruler, Weight, Activity, Edit2, Award, Trophy, Zap, Save, X, Loader2, Globe, Lock, Search, Users, UserPlus, Calendar, LogOut
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { cn } from '../lib/utils';
@@ -15,6 +15,7 @@ import { calculateStrengthAchievements, calculateWorkoutStreak, getLevelProgress
 
 export const Profile = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -152,6 +153,15 @@ export const Profile = () => {
       console.error(error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await authService.signOut();
+      navigate('/auth');
+    } catch (error) {
+      console.error('Error signing out:', error);
     }
   };
 
@@ -728,6 +738,19 @@ export const Profile = () => {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {!isEditing && (
+          <div className="mt-6">
+            <Button
+              variant="destructive"
+              className="w-full"
+              onClick={handleSignOut}
+            >
+              <LogOut size={16} className="mr-2" />
+              Sign Out
+            </Button>
           </div>
         )}
           </>
