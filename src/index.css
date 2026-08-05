@@ -19,6 +19,10 @@
 }
 
 html, body {
+  /* Disable text selection globally (native app feel). Enable only for inputs/textarea below. */
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
   touch-action: pan-x pan-y;
 }
 
@@ -35,8 +39,35 @@ body {
   color: white;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
-  overscroll-behavior: none;
+  /* Contain vertical overscroll to avoid rubber-band / pull-to-refresh in mobile browsers */
+  overscroll-behavior-y: contain;
 }
+
+/* Allow text selection and pointer events on form controls */
+input, textarea, select, [contenteditable] {
+  -webkit-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+/* Remove tap highlight and long-press callout on interactive elements */
+button, a, [role="button"], img {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+/* Prevent double-tap-to-zoom delay on interactive controls */
+button, a, [role="button"], input, textarea {
+  touch-action: manipulation;
+}
+
+/* Utility classes for safe area insets (iOS notch / home indicator) */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+.pt-safe { padding-top: env(safe-area-inset-top); }
+
+/* Apply safe area padding to sticky top bars and fixed bottoms when both classes are present */
+.sticky.top-0 { padding-top: env(safe-area-inset-top); }
+.fixed.bottom-0 { padding-bottom: env(safe-area-inset-bottom); }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {

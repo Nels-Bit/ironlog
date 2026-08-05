@@ -4,6 +4,7 @@ import { Dumbbell, User, Bell } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useWorkout } from '../context/WorkoutContext';
 import { socialService } from '../services/socialService';
+import { haptics } from '../utils/haptics';
 
 export const Navbar = () => {
   const location = useLocation();
@@ -83,6 +84,7 @@ interface NavItemProps {
 const NavItem = ({ to, icon, label, active, highlight, badgeCount = 0, emphasize = false }: NavItemProps) => (
   <Link 
     to={to} 
+    onClick={() => { try { haptics.light(); } catch(e) {} }}
     className={cn(
       "flex flex-col items-center justify-center w-full h-full md:h-auto md:w-full md:px-6 md:py-4 transition-all duration-200 group active:scale-95",
       active ? "text-white" : "text-zinc-500 hover:text-zinc-300"
