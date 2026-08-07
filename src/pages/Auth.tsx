@@ -49,8 +49,8 @@ export const Auth = () => {
         if (error) throw error;
         setSuccessMsg("Check your email to confirm your account.");
       }
-    } catch (error: any) {
-      setErrorMsg(error.message || "An unexpected error occurred");
+    } catch (error: unknown) {
+      setErrorMsg(error instanceof Error ? error.message : "An unexpected error occurred");
     } finally {
       setLoading(false);
     }

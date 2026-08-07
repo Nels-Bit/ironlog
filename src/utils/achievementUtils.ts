@@ -105,7 +105,6 @@ export const calculateWorkoutStreak = (history: WorkoutSession[]): StreakSummary
     return { currentStreak: 0, lastWorkoutDate: null, longestStreak: 0 };
   }
 
-  let streak = 1;
   let longestStreak = 1;
   let currentRun = 1;
 
@@ -123,16 +122,6 @@ export const calculateWorkoutStreak = (history: WorkoutSession[]): StreakSummary
   }
 
   longestStreak = Math.max(longestStreak, currentRun);
-
-  for (let index = 0; index < sortedActiveDays.length - 1; index += 1) {
-    const current = new Date(sortedActiveDays[index]).getTime();
-    const next = new Date(sortedActiveDays[index + 1]).getTime();
-    if (current - next === DAY_MS) {
-      streak += 1;
-    } else {
-      break;
-    }
-  }
 
   const latestActiveDay = sortedActiveDays[0];
   const activeYesterdayOrToday = latestActiveDay === todayKey || latestActiveDay === yesterdayKey;

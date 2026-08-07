@@ -117,11 +117,13 @@ export const EditWorkout = () => {
     setIsSelectorOpen(false);
   };
 
-  const updateSet = (exIndex: number, setIndex: number, field: string, value: any) => {
+  const updateSet = <K extends keyof ExerciseSet>(exIndex: number, setIndex: number, field: K, value: ExerciseSet[K]) => {
     if (!workout) return;
     const updated = { ...workout };
-    // @ts-ignore
-    updated.exercises[exIndex].sets[setIndex][field] = value;
+    updated.exercises[exIndex].sets[setIndex] = {
+      ...updated.exercises[exIndex].sets[setIndex],
+      [field]: value
+    } as ExerciseSet;
     setWorkout(updated);
   };
 
@@ -157,8 +159,8 @@ export const EditWorkout = () => {
         try {
             await workoutService.deleteWorkout(id);
             navigate('/history');
-        } catch (error: any) {
-            console.error(error);
+        } catch (error: unknown) {
+          console.error(error);
             alert("Failed to delete workout. Check console for details.");
         }
     }

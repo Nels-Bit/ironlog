@@ -2,8 +2,11 @@ import { Link, useLocation } from 'react-router-dom';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Dumbbell, User, Bell } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { useWorkout } from '../context/WorkoutContext';
+import { useWorkout } from '../context/useWorkout';
 import { socialService } from '../services/socialService';
+import { motion } from 'framer-motion';
+
+const MotionLink = motion(Link);
 
 export const Navbar = () => {
   const location = useLocation();
@@ -81,12 +84,15 @@ interface NavItemProps {
 }
 
 const NavItem = ({ to, icon, label, active, highlight, badgeCount = 0, emphasize = false }: NavItemProps) => (
-  <Link 
-    to={to} 
+  <MotionLink
+    to={to}
     className={cn(
       "flex flex-col items-center justify-center w-full h-full md:h-auto md:w-full md:px-6 md:py-4 transition-all duration-200 group active:scale-95",
       active ? "text-white" : "text-zinc-500 hover:text-zinc-300"
     )}
+    whileHover={{ scale: 1.03 }}
+    whileTap={{ scale: 0.97 }}
+    transition={{ type: "spring", stiffness: 300 }}
   >
     <div className={cn(
       "relative p-3 rounded-2xl transition-all duration-300 mb-1",
@@ -107,5 +113,5 @@ const NavItem = ({ to, icon, label, active, highlight, badgeCount = 0, emphasize
     )}>
       {label}
     </span>
-  </Link>
+  </MotionLink>
 );

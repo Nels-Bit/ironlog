@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useReducer } from 'react';
 import { X, Plus, Minus, Timer } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { motion } from 'framer-motion';
 
 interface RestTimerProps {
   initialSeconds: number;
@@ -10,19 +11,48 @@ interface RestTimerProps {
   onUpdateDefault: (newSeconds: number) => void;
 }
 
+interface RestTimerState {
+  timeLeft: number;
+  endTime: number | null;
+  isMinimized: boolean;
+}
+
+type RestTimerAction =
+  | { type: 'initialize'; initialSeconds: number }
+  | { type: 'tick'; remaining: number }
+  | { type: 'adjust'; seconds: number };
+
+const createTimerState = (initialSeconds: number): RestTimerState => ({
+  timeLeft: initialSeconds,
+  endTime: Date.now() + initialSeconds * 1000,
+  isMinimized: false
+});
+
+const restTimerReducer = (state: RestTimerState, action: RestTimerAction): RestTimerState => {
+  switch (action.type) {
+    case 'initialize':
+      return createTimerState(action.initialSeconds);
+    case 'tick':
+      return state.timeLeft === action.remaining ? state : { ...state, timeLeft: action.remaining };
+    case 'adjust':
+      return {
+        ...state,
+        endTime: state.endTime ? state.endTime + action.seconds * 1000 : Date.now() + action.seconds * 1000,
+        timeLeft: Math.max(0, state.timeLeft + action.seconds)
+      };
+  }
+};
+
 export const RestTimer = ({ initialSeconds, isOpen, resetKey, onClose, onUpdateDefault }: RestTimerProps) => {
-  const [timeLeft, setTimeLeft] = useState(0);
-  const [endTime, setEndTime] = useState<number | null>(null);
-  const [isMinimized, setIsMinimized] = useState(false);
+  const [timerState, dispatch] = useReducer(restTimerReducer, initialSeconds, createTimerState);
+  const { timeLeft, endTime, isMinimized } = timerState;
 
   // 1. Initialize the Timestamp when timer opens/resets
   useEffect(() => {
     if (isOpen) {
-      setEndTime(Date.now() + initialSeconds * 1000);
-      setTimeLeft(initialSeconds);
-      setIsMinimized(false);
+      dispatch({ type: 'initialize', initialSeconds });
     }
-  }, [isOpen, resetKey]); // Deliberately ignoring initialSeconds so it doesn't restart when defaults change
+  }, [isOpen, resetKey, initialSeconds]);
 
   // 2. Countdown Logic (Immune to browser backgrounding!)
   useEffect(() => {
@@ -31,7 +61,7 @@ export const RestTimer = ({ initialSeconds, isOpen, resetKey, onClose, onUpdateD
     const interval = setInterval(() => {
       // Calculate exactly how much time is left based on the clock, not the interval ticks
       const remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
-      setTimeLeft(remaining);
+      dispatch({ type: 'tick', remaining });
 
       if (remaining <= 0) {
         clearInterval(interval);
@@ -44,8 +74,7 @@ export const RestTimer = ({ initialSeconds, isOpen, resetKey, onClose, onUpdateD
   // 3. Adjust Time Logic
   const adjustTime = (seconds: number) => {
     // Push the future end-time further out (or bring it closer)
-    setEndTime(prev => prev ? prev + (seconds * 1000) : Date.now() + (seconds * 1000));
-    setTimeLeft(prev => Math.max(0, prev + seconds));
+    dispatch({ type: 'adjust', seconds });
     
     // Save this as the new permanent default
     onUpdateDefault(initialSeconds + seconds);
@@ -72,21 +101,30 @@ export const RestTimer = ({ initialSeconds, isOpen, resetKey, onClose, onUpdateD
             <Timer size={18} className="animate-pulse" />
             <span className="text-xs font-bold uppercase tracking-widest">Rest Timer</span>
           </div>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors">
+          <motion.button
+            onClick={onClose}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            transition={{ type: "spring", stiffness: 300 }}
+            className="text-zinc-500 hover:text-white"
+          >
             <X size={18} />
-          </button>
+          </motion.button>
         </div>
 
         <div className="flex items-center justify-between gap-4">
-          <button 
+          <motion.button
             onClick={() => adjustTime(-15)}
-            className="w-12 h-12 flex items-center justify-center rounded-xl bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white active:scale-95 transition-all border border-white/5"
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            transition={{ type: "spring", stiffness: 300 }}
+            className="w-12 h-12 flex items-center justify-center rounded-xl bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white border border-white/5"
           >
             <div className="flex flex-col items-center leading-none">
               <Minus size={16} />
               <span className="text-[9px] font-bold mt-0.5">15s</span>
             </div>
-          </button>
+          </motion.button>
 
           <div className="flex-1 text-center">
             <span className="text-4xl font-black text-white tabular-nums tracking-tight">
@@ -94,15 +132,18 @@ export const RestTimer = ({ initialSeconds, isOpen, resetKey, onClose, onUpdateD
             </span>
           </div>
 
-          <button 
+          <motion.button
             onClick={() => adjustTime(15)}
-            className="w-12 h-12 flex items-center justify-center rounded-xl bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white active:scale-95 transition-all border border-white/5"
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            transition={{ type: "spring", stiffness: 300 }}
+            className="w-12 h-12 flex items-center justify-center rounded-xl bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white border border-white/5"
           >
              <div className="flex flex-col items-center leading-none">
               <Plus size={16} />
               <span className="text-[9px] font-bold mt-0.5">15s</span>
             </div>
-          </button>
+          </motion.button>
         </div>
         
         <div className="w-full h-1 bg-white/5 rounded-full mt-4 overflow-hidden">

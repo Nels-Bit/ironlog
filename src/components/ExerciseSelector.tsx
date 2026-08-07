@@ -3,6 +3,7 @@ import { X, Search, Plus, Trash2, ChevronLeft, Loader2, Dumbbell, Check } from '
 import { exerciseService } from '../services/exerciseService';
 import type { Exercise } from '../types';
 import { cn } from '../lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface Props {
   isOpen: boolean;
@@ -22,28 +23,39 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
   const [newTarget, setNewTarget] = useState('Chest');
   const [isUnilateral, setIsUnilateral] = useState(false);
 
+  const loadExercises = async () => exerciseService.getAllExercises();
+
   // Load exercises when modal opens
   useEffect(() => {
     if (isOpen) {
-      loadExercises();
       // Lock body scroll
       document.body.style.overflow = 'hidden';
+
+      let cancelled = false;
+
+      void (async () => {
+        setLoading(true);
+        const data = await loadExercises();
+        if (!cancelled) {
+          setExercises(data);
+          setLoading(false);
+        }
+      })();
+
+      return () => {
+        cancelled = true;
+        document.body.style.overflow = '';
+      };
     }
     return () => { document.body.style.overflow = ''; };
   }, [isOpen]);
-
-  const loadExercises = async () => {
-    setLoading(true);
-    const data = await exerciseService.getAllExercises();
-    setExercises(data);
-    setLoading(false);
-  };
 
   const handleDelete = async (e: React.MouseEvent, id: string, name: string) => {
     e.stopPropagation();
     if (confirm(`Delete custom exercise "${name}"?`)) {
       await exerciseService.deleteCustomExercise(id);
-      loadExercises();
+      const data = await loadExercises();
+      setExercises(data);
     }
   };
 
@@ -76,7 +88,7 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
     setMode('create');
   };
 
-  const filtered = exercises.filter(ex => 
+  const filtered = exercises.filter(ex =>
     ex.name.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -84,20 +96,36 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
 
   if (!isOpen) return null;
 
+  // Animation variants
+  const modalVariants = {
+    initial: { scale: 0.9, opacity: 0 },
+    animate: { scale: 1, opacity: 1 },
+    exit: { scale: 0.9, opacity: 0 },
+    transition: { type: "spring", stiffness: 260, damping: 20 }
+  };
+
   return (
     // FULL SCREEN CONTAINER
-    <div className="fixed inset-0 z-[100] bg-black flex flex-col animate-in slide-in-from-bottom duration-300">
+    <AnimatePresence>
+      <motion.div
+        initial={false}
+        className="fixed inset-0 z-[100] bg-black flex flex-col"
+        variants={modalVariants}
+      >
       
       {/* --- HEADER (Fixed Top) --- */}
       <header className="shrink-0 h-16 flex items-center justify-between px-4 border-b border-white/5 bg-iron-950/90 backdrop-blur-md sticky top-0 z-50">
         <div className="flex items-center gap-3">
           {mode === 'create' && (
-            <button 
+            <motion.button
               onClick={() => setMode('search')}
-              className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 text-zinc-400 hover:text-white transition-colors active:scale-95"
+              className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 text-zinc-400 hover:text-white"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ type: "spring", stiffness: 300 }}
             >
               <ChevronLeft size={24} />
-            </button>
+            </motion.button>
           )}
           <h2 className="text-xl font-bold text-white tracking-tight">
             {mode === 'search' ? 'Select Exercise' : 'New Exercise'}
@@ -106,20 +134,26 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
 
         <div className="flex items-center gap-3">
           {mode === 'search' && (
-            <button
+            <motion.button
               onClick={switchToCreate}
-              className="w-10 h-10 flex items-center justify-center rounded-full bg-brand-orange text-white shadow-lg shadow-brand-orange/20 hover:scale-105 active:scale-95 transition-all"
+              className="w-10 h-10 flex items-center justify-center rounded-full bg-brand-orange text-white"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              transition={{ type: "spring", stiffness: 300 }}
             >
               <Plus size={22} />
-            </button>
+            </motion.button>
           )}
           
-          <button 
+          <motion.button
             onClick={onClose}
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 text-zinc-400 hover:text-red-500 transition-colors active:scale-95"
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 text-zinc-400 hover:text-red-500"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 300 }}
           >
             <X size={22} />
-          </button>
+          </motion.button>
         </div>
       </header>
 
@@ -130,13 +164,15 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
           <div className="shrink-0 px-4 py-3 bg-black/80 backdrop-blur-sm sticky top-16 z-40">
             <div className="relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={20} />
-              <input 
+              <motion.input
                 autoFocus
-                type="text" 
+                type="text"
                 placeholder="Find movement..."
                 className="w-full bg-iron-950 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-lg text-white placeholder:text-zinc-600 focus:border-brand-orange outline-none transition-all shadow-sm"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
+                whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
+                transition={{ type: "spring", stiffness: 300 }}
               />
             </div>
           </div>
@@ -152,10 +188,13 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
               <>
                 {/* Exercise Cards */}
                 {filtered.map(ex => (
-                  <div
+                  <motion.div
                     key={ex.id}
                     onClick={() => onSelect(ex)}
-                    className="group relative bg-iron-950 border border-white/5 rounded-2xl p-5 active:scale-[0.98] transition-transform duration-150 cursor-pointer overflow-hidden"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    transition={{ type: "spring", stiffness: 300 }}
+                    className="group relative bg-iron-950 border border-white/5 rounded-2xl p-5 overflow-hidden"
                   >
                     {/* Active Gradient Border Effect (Subtle) */}
                     <div className="absolute inset-0 border-2 border-transparent group-hover:border-white/5 rounded-2xl pointer-events-none transition-colors" />
@@ -194,7 +233,7 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
 
                 {/* Empty State */}
@@ -345,6 +384,7 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
+    </AnimatePresence>
   );
 };
