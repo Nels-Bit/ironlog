@@ -9,7 +9,8 @@ import { RestTimer } from '../components/RestTimer';
 import { cn } from '../lib/utils';
 import { useWorkout } from '../context/useWorkout';
 import { authService } from '../services/authService';
-import { motion } from 'framer-motion';
+import { haptics } from '../utils/haptics';
+import { useWakeLock } from '../utils/useWakeLock';
 import {
   getSetLoad,
   isBodyweightExercise,
@@ -30,6 +31,9 @@ export const WorkoutLogger = () => {
     startWorkout, logRestDay, cancelWorkout, finishWorkout, 
     addExercise, removeExercise, addSet, removeSet, updateSet, exerciseDefs 
   } = useWorkout();
+
+  // Keep the screen awake while an active workout session is running
+  useWakeLock(Boolean(isActive));
 
   // --- UI STATE ---
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
@@ -96,6 +100,7 @@ export const WorkoutLogger = () => {
   const handleFinish = async () => {
     if(confirm("Finish workout?")) {
         await finishWorkout();
+        try { haptics.success(); } catch (e) { /* ignore */ }
         navigate('/history');
     }
   };
@@ -195,8 +200,11 @@ export const WorkoutLogger = () => {
     // 2. Toggle Completion
     updateSet(exIndex, setIndex, 'isCompleted', isNowComplete);
 
-    // 3. Trigger Rest Timer
+    // Provide haptic feedback for set completion
     if (isNowComplete) {
+      try { haptics.success(); } catch (e) { /* ignore */ }
+
+      // 3. Trigger Rest Timer
       const currentType = currentSet.type || 'normal';
       
       // Only set a new default duration if the timer is currently closed.
