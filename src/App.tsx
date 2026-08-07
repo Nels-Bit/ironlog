@@ -5,6 +5,7 @@ import { Analytics } from '@vercel/analytics/react';
 import { supabase } from './lib/supabase';
 import { WorkoutProvider } from './context/WorkoutContext';
 import { authService } from './services/authService';
+import { AnimatePresence, motion } from 'framer-motion';
 
 // Pages
 import { Auth } from './pages/Auth';
@@ -59,16 +60,122 @@ const AppContent = () => {
               </div>
             </div>
           )}
-          <Routes>
-            <Route path="/" element={<Navigate to="/profile" replace />} />
-            <Route path="/workout" element={<WorkoutLogger />} />
-            <Route path="/history" element={<History />} />
-            <Route path="/history/:id" element={<EditWorkout />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/friends" element={<Navigate to="/profile?tab=friends" replace />} />
-            <Route path="/notifications" element={<Notifications />} />
-            <Route path="*" element={<Navigate to="/profile" replace />} />
-          </Routes>
+          <AnimatePresence>
+            <Routes>
+              <Route
+                path="/"
+                element={
+                  <motion.div
+                    key="home"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <Navigate to="/profile" replace />
+                  </motion.div>
+                }
+              />
+              <Route
+                path="/workout"
+                element={
+                  <motion.div
+                    key="workout"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <WorkoutLogger />
+                  </motion.div>
+                }
+              />
+              <Route
+                path="/history"
+                element={
+                  <motion.div
+                    key="history"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <History />
+                  </motion.div>
+                }
+              />
+              <Route
+                path="/history/:id"
+                element={
+                  <motion.div
+                    key="edit-workout"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <EditWorkout />
+                  </motion.div>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <motion.div
+                    key="profile"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <Profile />
+                  </motion.div>
+                }
+              />
+              <Route
+                path="/friends"
+                element={
+                  <motion.div
+                    key="friends"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <Navigate to="/profile?tab=friends" replace />
+                  </motion.div>
+                }
+              />
+              <Route
+                path="/notifications"
+                element={
+                  <motion.div
+                    key="notifications"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <Notifications />
+                  </motion.div>
+                }
+              />
+              <Route
+                path="*"
+                element={
+                  <motion.div
+                    key="not-found"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <Navigate to="/profile" replace />
+                  </motion.div>
+                }
+              />
+            </Routes>
+          </AnimatePresence>
         </main>
       </div>
     </WorkoutProvider>

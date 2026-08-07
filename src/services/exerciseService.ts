@@ -1,6 +1,15 @@
 import { supabase } from '../lib/supabase';
 import type { Exercise } from '../types';
 
+interface ExerciseRow {
+  id: string;
+  name: string;
+  category: string;
+  target_muscle: string;
+  user_id: string | null;
+  is_unilateral: boolean | null;
+}
+
 export const exerciseService = {
   
   async getAllExercises(): Promise<Exercise[]> {
@@ -19,13 +28,13 @@ export const exerciseService = {
       return [];
     }
 
-    return data.map((ex: any) => ({
+    return (data as ExerciseRow[]).map(ex => ({
       id: ex.id,
       name: ex.name,
       category: ex.category,
       target: ex.target_muscle,
       isCustom: ex.user_id === user.id, // If it has a user_id, it's custom
-      isUnilateral: ex.is_unilateral // <--- Map from DB column
+      isUnilateral: ex.is_unilateral ?? undefined // <--- Map from DB column
     }));
   },
 
@@ -50,13 +59,15 @@ export const exerciseService = {
       return null;
     }
 
+    const row = data as ExerciseRow;
+
     return {
-      id: data.id,
-      name: data.name,
-      category: data.category,
-      target: data.target_muscle,
+      id: row.id,
+      name: row.name,
+      category: row.category,
+      target: row.target_muscle,
       isCustom: true,
-      isUnilateral: data.is_unilateral
+      isUnilateral: row.is_unilateral ?? undefined
     };
   },
 
