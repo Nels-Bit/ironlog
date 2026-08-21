@@ -45,6 +45,9 @@ export const Profile = () => {
   const currentLevel = levelProgress.currentLevel;
   const xpInCurrentLevel = levelProgress.xpIntoLevel;
   const progressPercent = levelProgress.progressPercent;
+  const goalOptions: NonNullable<UserProfile['goal']>[] = ['Strength', 'Hypertrophy', 'Endurance', 'Weight Loss'];
+  const environmentOptions: NonNullable<UserProfile['environment']>[] = ['Gym', 'Home'];
+  const levelOptions: NonNullable<UserProfile['level']>[] = ['Beginner', 'Intermediate', 'Pro'];
   const levelMilestones = [5, 10, 15, 20, 30, 40, 50];
 
 
@@ -461,10 +464,10 @@ export const Profile = () => {
             <div className="space-y-3">
               <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Goal</label>
               <div className="grid grid-cols-2 gap-2">
-                 {['Strength', 'Hypertrophy', 'Endurance', 'Weight Loss'].map(goal => (
+                 {goalOptions.map(goal => (
                    <button
                      key={goal}
-                     onClick={() => setFormData({...formData, goal: goal as any})}
+                     onClick={() => setFormData({...formData, goal})}
                      className={cn(
                        "p-3 rounded-xl border font-bold text-xs transition-all",
                        formData.goal === goal 
@@ -481,10 +484,10 @@ export const Profile = () => {
             <div className="space-y-3">
               <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Environment</label>
               <div className="grid grid-cols-2 gap-3">
-                 {['Gym', 'Home'].map(env => (
+                 {environmentOptions.map(env => (
                    <button
                      key={env}
-                     onClick={() => setFormData({...formData, environment: env as any})}
+                     onClick={() => setFormData({...formData, environment: env})}
                      className={cn(
                        "p-3 rounded-xl border font-bold text-sm transition-all",
                        formData.environment === env 
@@ -501,10 +504,10 @@ export const Profile = () => {
             <div className="space-y-3">
               <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Experience Level</label>
               <div className="grid grid-cols-3 gap-2">
-                 {['Beginner', 'Intermediate', 'Pro'].map(lvl => (
+                 {levelOptions.map(lvl => (
                    <button
                      key={lvl}
-                     onClick={() => setFormData({...formData, level: lvl as any})}
+                     onClick={() => setFormData({...formData, level: lvl})}
                      className={cn(
                        "p-3 rounded-xl border font-bold text-xs transition-all",
                        formData.level === lvl 
@@ -727,7 +730,13 @@ export const Profile = () => {
   );
 };
 
-const InputGroup = ({ label, icon, children }: any) => (
+interface InputGroupProps {
+  label: string;
+  icon: ReactNode;
+  children: ReactNode;
+}
+
+const InputGroup = ({ label, icon, children }: InputGroupProps) => (
   <div className="space-y-2">
     <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">{label}</label>
     <div className="relative">

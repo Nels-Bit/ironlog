@@ -1,7 +1,19 @@
 import { supabase } from '../lib/supabase';
 import { exerciseService } from './exerciseService';
 import { getSetLoad, parseUserWeight, shouldCountSetForPR } from '../utils/workoutMath';
-import type { WorkoutSession, WorkoutExercise, Exercise, ExerciseSet } from '../types';
+import type { WorkoutSession, WorkoutExercise, Exercise } from '../types';
+
+interface WorkoutRow {
+  id: string;
+  name: string;
+  start_time: number;
+  end_time: number | null;
+  volume_load: number;
+  exercises: unknown;
+}
+
+const getWorkoutExercises = (value: unknown): WorkoutExercise[] =>
+  Array.isArray(value) ? (value as WorkoutExercise[]) : [];
 
 export const workoutService = {
   
@@ -24,13 +36,15 @@ export const workoutService = {
 
     if (!data) return null;
 
+    const row = data as WorkoutRow;
+
     return {
-      id: data.id,
-      name: data.name,
-      startTime: data.start_time,
-      endTime: data.end_time,
-      volumeLoad: data.volume_load,
-      exercises: data.exercises
+      id: row.id,
+      name: row.name,
+      startTime: row.start_time,
+      endTime: row.end_time ?? undefined,
+      volumeLoad: row.volume_load,
+      exercises: getWorkoutExercises(row.exercises)
     };
   },
 
@@ -50,13 +64,13 @@ export const workoutService = {
       return [];
     }
 
-    return data.map((row: any) => ({
+    return (data as WorkoutRow[]).map(row => ({
       id: row.id,
       name: row.name,
       startTime: row.start_time,
-      endTime: row.end_time,
+      endTime: row.end_time ?? undefined,
       volumeLoad: row.volume_load,
-      exercises: row.exercises
+      exercises: getWorkoutExercises(row.exercises)
     }));
   },
 
@@ -70,13 +84,15 @@ export const workoutService = {
 
     if (error || !data) return null;
 
+    const row = data as WorkoutRow;
+
     return {
-      id: data.id,
-      name: data.name,
-      startTime: data.start_time,
-      endTime: data.end_time,
-      volumeLoad: data.volume_load,
-      exercises: data.exercises
+      id: row.id,
+      name: row.name,
+      startTime: row.start_time,
+      endTime: row.end_time ?? undefined,
+      volumeLoad: row.volume_load,
+      exercises: getWorkoutExercises(row.exercises)
     };
   },
 
@@ -121,8 +137,7 @@ export const workoutService = {
     if (error || !data) return null;
 
     for (const workout of data) {
-      // @ts-ignore
-      const ex = (workout.exercises as WorkoutExercise[]).find(e => e.exerciseId === exerciseId);
+      const ex = getWorkoutExercises((workout as WorkoutRow).exercises).find(e => e.exerciseId === exerciseId);
       if (ex) return ex;
     }
 
@@ -151,21 +166,19 @@ export const workoutService = {
 
     let maxWeight = 0;
 
-    data.forEach(workout => {
-      if (Array.isArray(workout.exercises)) {
-        const exercise = workout.exercises.find((e: any) => e.exerciseId === exerciseId);
-        const def = defMap.get(exerciseId);
-        
-        if (exercise && Array.isArray(exercise.sets)) {
-          exercise.sets.forEach((set: any) => {
-            if (!shouldCountSetForPR(set as ExerciseSet, def, undefined, userWeight)) return;
+    (data as WorkoutRow[]).forEach(workout => {
+      const exercise = getWorkoutExercises(workout.exercises).find(entry => entry.exerciseId === exerciseId);
+      const def = defMap.get(exerciseId);
 
-            const load = getSetLoad(set as ExerciseSet, def, undefined, userWeight);
-            if (load > maxWeight) {
-              maxWeight = load;
-            }
-          });
-        }
+      if (exercise && Array.isArray(exercise.sets)) {
+        exercise.sets.forEach(set => {
+          if (!shouldCountSetForPR(set, def, undefined, userWeight)) return;
+
+          const load = getSetLoad(set, def, undefined, userWeight);
+          if (load > maxWeight) {
+            maxWeight = load;
+          }
+        });
       }
     });
 

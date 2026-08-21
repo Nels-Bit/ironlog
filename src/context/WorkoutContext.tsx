@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { workoutService } from '../services/workoutService';
 import { exerciseService } from '../services/exerciseService';
@@ -11,26 +11,9 @@ import {
   shouldCountSetForVolume
 } from '../utils/workoutMath';
 import type { WorkoutSession, WorkoutExercise, Exercise, ExerciseSet } from '../types';
-
-interface WorkoutContextType {
-  workout: WorkoutSession | null;
-  elapsed: number;
-  isActive: boolean;
-  historyCache: Map<string, ExerciseSet[]>;
-  prCache: Map<string, number>;
-  startWorkout: (name: string) => void;
-  logRestDay: () => Promise<string | null>;
-  cancelWorkout: () => void;
-  finishWorkout: () => Promise<string | null>;
-  addExercise: (exDef: Exercise) => void;
-  removeExercise: (index: number) => void;
-  addSet: (exIndex: number, insertIndex?: number) => void; 
-  removeSet: (exIndex: number, setIndex: number) => void;
-  updateSet: (exIndex: number, setIndex: number, field: keyof ExerciseSet, value: any) => void;
-  exerciseDefs: Map<string, Exercise>;
-}
-
-const WorkoutContext = createContext<WorkoutContextType | undefined>(undefined);
+import { WorkoutContext } from './workoutContext.shared';
+export { useWorkout } from './useWorkout';
+export { WorkoutContext } from './workoutContext.shared';
 
 export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
   const [workout, setWorkout] = useState<WorkoutSession | null>(() => {
@@ -43,7 +26,7 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
     return saved ? Math.floor((Date.now() - parseInt(saved)) / 1000) : 0;
   });
 
-  const [exerciseDefs, setExerciseDefs] = useState<Map<string, Exercise>>(new Map());
+  const [exerciseDefs, setExerciseDefs] = useState<Map<string, Exercise>>(new Map<string, Exercise>());
   const [historyCache, setHistoryCache] = useState<Map<string, ExerciseSet[]>>(new Map());
   const [prCache, setPrCache] = useState<Map<string, number>>(new Map());
   const [userWeight, setUserWeight] = useState<number | null>(null);
@@ -51,7 +34,7 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const loadDefs = async () => {
       const all = await exerciseService.getAllExercises();
-      const map = new Map();
+      const map = new Map<string, Exercise>();
       all.forEach(ex => map.set(ex.id, ex));
       setExerciseDefs(map);
     };
@@ -66,31 +49,32 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
     loadUserWeight();
   }, []);
 
-  useEffect(() => {
-    let interval: any;
-    if (workout) {
-      interval = setInterval(() => {
-        const start = workout.startTime;
-        setElapsed(Math.floor((Date.now() - start) / 1000));
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [workout]);
+  const resolvedWorkout = useMemo(() => {
+    if (!workout) return null;
+    if (workout.bodyWeight !== undefined || userWeight === null) return workout;
+    return { ...workout, bodyWeight: userWeight ?? undefined };
+  }, [workout, userWeight]);
 
   useEffect(() => {
-    if (workout) {
-      localStorage.setItem('current_workout', JSON.stringify(workout));
-      localStorage.setItem('workout_start_time', workout.startTime.toString());
+    if (!resolvedWorkout) return;
+
+    const interval = setInterval(() => {
+      const start = resolvedWorkout.startTime;
+      setElapsed(Math.floor((Date.now() - start) / 1000));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [resolvedWorkout]);
+
+  useEffect(() => {
+    if (resolvedWorkout) {
+      localStorage.setItem('current_workout', JSON.stringify(resolvedWorkout));
+      localStorage.setItem('workout_start_time', resolvedWorkout.startTime.toString());
     } else {
       localStorage.removeItem('current_workout');
       localStorage.removeItem('workout_start_time');
     }
-  }, [workout]);
-
-  useEffect(() => {
-    if (!workout || workout.bodyWeight !== undefined || userWeight === null) return;
-    setWorkout(prev => prev ? ({ ...prev, bodyWeight: userWeight ?? undefined }) : null);
-  }, [workout, userWeight]);
+  }, [resolvedWorkout]);
 
   const startWorkout = (name: string) => {
     const newWorkout: WorkoutSession = {
@@ -126,10 +110,10 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const finishWorkout = async (): Promise<string | null> => {
-    if (!workout) return null;
-    const workoutBodyWeight = workout.bodyWeight ?? userWeight ?? undefined;
+    if (!resolvedWorkout) return null;
+    const workoutBodyWeight = resolvedWorkout.bodyWeight ?? userWeight ?? undefined;
     let totalVolume = 0;
-    workout.exercises.forEach(ex => {
+    resolvedWorkout.exercises.forEach(ex => {
       const def = exerciseDefs.get(ex.exerciseId);
       ex.sets.forEach(set => {
         if (!shouldCountSetForVolume(set, def, workoutBodyWeight, userWeight)) return;
@@ -140,13 +124,13 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
     });
 
     const exercisesWithBodyWeight = applyBodyWeightToExercises(
-      workout.exercises,
+      resolvedWorkout.exercises,
       exerciseDefs,
       workoutBodyWeight
     );
 
     const final = {
-      ...workout,
+      ...resolvedWorkout,
       volumeLoad: totalVolume,
       endTime: Date.now(),
       exercises: exercisesWithBodyWeight,
@@ -169,7 +153,7 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
   });
 
   const addExercise = async (exDef: Exercise) => {
-    if (!workout) return;
+    if (!resolvedWorkout) return;
     
     setExerciseDefs(prev => new Map(prev).set(exDef.id, exDef));
 
@@ -250,13 +234,12 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  const updateSet = (exIndex: number, setIndex: number, field: keyof ExerciseSet, value: any) => {
+  const updateSet = <K extends keyof ExerciseSet>(exIndex: number, setIndex: number, field: K, value: ExerciseSet[K]) => {
     setWorkout(prev => {
         if(!prev) return null;
         const exs = [...prev.exercises];
         const sets = [...exs[exIndex].sets];
-        // @ts-ignore
-        sets[setIndex] = { ...sets[setIndex], [field]: value };
+        sets[setIndex] = { ...sets[setIndex], [field]: value } as ExerciseSet;
         exs[exIndex] = { ...exs[exIndex], sets };
         return { ...prev, exercises: exs };
     });
@@ -264,7 +247,7 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <WorkoutContext.Provider value={{
-      workout, elapsed, isActive: !!workout, 
+      workout: resolvedWorkout, elapsed, isActive: !!resolvedWorkout, 
       historyCache, prCache,
       startWorkout, logRestDay, cancelWorkout, finishWorkout,
       addExercise, removeExercise, addSet, removeSet, updateSet,
@@ -273,10 +256,4 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
       {children}
     </WorkoutContext.Provider>
   );
-};
-
-export const useWorkout = () => {
-  const context = useContext(WorkoutContext);
-  if (!context) throw new Error('useWorkout must be used within a WorkoutProvider');
-  return context;
 };

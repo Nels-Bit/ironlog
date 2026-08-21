@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
+import {
   Plus, Check, Trash2, Dumbbell, X, Save, ChevronDown, ArrowDown, Flame, Skull, Circle, Pencil, Play
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
+import { motion } from 'framer-motion';
 import { ExerciseSelector } from '../components/ExerciseSelector';
 import { RestTimer } from '../components/RestTimer';
 import { cn } from '../lib/utils';
-import { useWorkout } from '../context/WorkoutContext';
+import { useWorkout } from '../context/useWorkout';
 import { authService } from '../services/authService';
 import { haptics } from '../utils/haptics';
 import { useWakeLock } from '../utils/useWakeLock';
@@ -303,7 +304,12 @@ export const WorkoutLogger = () => {
             <p className="text-zinc-500 font-bold">Tap to add first exercise</p>
           </button>
         ) : (
-          <>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+          >
             {workout.exercises.map((ex, exIndex) => {
               const def = exerciseDefs.get(ex.exerciseId);
               const isCollapsed = collapsed.has(ex.id);
@@ -354,18 +360,21 @@ export const WorkoutLogger = () => {
                           </div>
                         </div>
 
-                        <button 
+                        <motion.button
                           onClick={(e) => {
-                            e.stopPropagation(); 
+                            e.stopPropagation();
                             toggleEditMode(ex.id);
                           }}
+                          whileHover={{ scale: 1.03 }}
+                          whileTap={{ scale: 0.97 }}
+                          transition={{ type: "spring", stiffness: 300 }}
                           className={cn(
-                            "w-9 h-9 flex items-center justify-center rounded-full transition-colors",
+                            "w-9 h-9 flex items-center justify-center rounded-full",
                             isEditing ? "bg-red-500/20 text-red-500" : "bg-white/5 text-zinc-500 hover:text-white"
                           )}
                         >
                           {isEditing ? <Check size={18} /> : <Pencil size={16} />}
-                        </button>
+                        </motion.button>
                       </div>
 
                       {/* CONTENT */}
@@ -423,60 +432,71 @@ export const WorkoutLogger = () => {
                                             </div>
                                             
                                             <div className="col-span-3">
-                                                <input 
-                                                    type="number" 
+                                                <motion.input
+                                                    type="number"
                                                 min={0}
                                                 placeholder={getNumberPlaceholder(ghostSet?.weight, "-")}
-                                                value={formatNumberInputValue(set.weight)} 
+                                                value={formatNumberInputValue(set.weight)}
                                                     disabled={isEditing}
                                                 onChange={(e) => updateSet(exIndex, setIndex, 'weight', parseNumberInputValue(e.target.value))}
-                                                    className="w-full bg-transparent text-center font-bold text-white text-lg outline-none placeholder:text-zinc-700 focus:text-brand-orange disabled:opacity-50" 
+                                                    whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
+                                                    transition={{ type: "spring", stiffness: 300 }}
+                                                    className="w-full bg-transparent text-center font-bold text-white text-lg outline-none placeholder:text-zinc-700 focus:text-brand-orange disabled:opacity-50"
                                                 />
                                             </div>
                                             
                                             <div className="col-span-3 flex justify-center">
                                                 {def?.isUnilateral ? (
                                                 <div className="flex gap-1 w-full">
-                                                    <input
+                                                    <motion.input
                                                       type="number"
                                                       min={0}
                                                       placeholder={getNumberPlaceholder(ghostSet?.repsLeft, "L")}
                                                       value={formatNumberInputValue(set.repsLeft)}
                                                       onChange={(e) => handleUnilateralChange(exIndex, setIndex, set.id, 'repsLeft', e.target.value)}
                                                       disabled={isEditing}
+                                                      whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
+                                                      transition={{ type: "spring", stiffness: 300 }}
                                                       className="w-1/2 bg-white/5 rounded-lg py-2 text-center font-bold text-white text-sm outline-none focus:bg-white/10 disabled:opacity-50"
                                                     />
-                                                    <input
+                                                    <motion.input
                                                       type="number"
                                                       min={0}
                                                       placeholder={getNumberPlaceholder(ghostSet?.repsRight, "R")}
                                                       value={formatNumberInputValue(set.repsRight)}
                                                       onChange={(e) => handleUnilateralChange(exIndex, setIndex, set.id, 'repsRight', e.target.value)}
                                                       disabled={isEditing}
+                                                      whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
+                                                      transition={{ type: "spring", stiffness: 300 }}
                                                       className="w-1/2 bg-white/5 rounded-lg py-2 text-center font-bold text-white text-sm outline-none focus:bg-white/10 disabled:opacity-50"
                                                     />
                                                 </div>
                                                 ) : (
-                                                <input 
-                                                    type="number" 
+                                                <motion.input
+                                                    type="number"
                                                 min={0}
                                                   placeholder={getNumberPlaceholder(ghostSet?.reps, "-")}
-                                                  value={formatNumberInputValue(set.reps)} 
+                                                  value={formatNumberInputValue(set.reps)}
                                                   onChange={(e) => updateSet(exIndex, setIndex, 'reps', parseNumberInputValue(e.target.value))}
                                                     disabled={isEditing}
-                                                    className="w-full bg-white/5 rounded-lg py-2 text-center font-bold text-white text-lg outline-none focus:bg-white/10 disabled:opacity-50" 
+                                                    whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
+                                                    transition={{ type: "spring", stiffness: 300 }}
+                                                    className="w-full bg-white/5 rounded-lg py-2 text-center font-bold text-white text-lg outline-none focus:bg-white/10 disabled:opacity-50"
                                                 />
                                                 )}
                                             </div>
 
                                             <div className="col-span-3 flex items-center gap-2">
                                               {isEditing ? (
-                                                <button 
+                                                <motion.button
                                                   onClick={() => handleDeleteSet(exIndex, setIndex)}
-                                                  className="flex-1 h-10 rounded-lg flex items-center justify-center bg-red-500/10 text-red-500 border border-red-500/50 hover:bg-red-500 hover:text-white transition-all active:scale-95"
+                                                  whileHover={{ scale: 1.03 }}
+                                                  whileTap={{ scale: 0.97 }}
+                                                  transition={{ type: "spring", stiffness: 300 }}
+                                                  className="flex-1 h-10 rounded-lg flex items-center justify-center bg-red-500/10 text-red-500 border border-red-500/50 hover:bg-red-500 hover:text-white"
                                                 >
                                                   <Trash2 size={18} />
-                                                </button>
+                                                </motion.button>
                                               ) : (
                                                 <button 
                                                     onClick={(e) => {
@@ -500,13 +520,25 @@ export const WorkoutLogger = () => {
                               
                               <div className="flex gap-2 mt-2">
                                 {isEditing ? (
-                                  <Button variant="destructive" size="sm" className="w-full py-3" onClick={() => removeExercise(exIndex)}>
+                                  <motion.button
+                                      whileHover={{ scale: 1.03 }}
+                                      whileTap={{ scale: 0.97 }}
+                                      transition={{ type: "spring", stiffness: 300 }}
+                                      onClick={() => removeExercise(exIndex)}
+                                      className="w-full py-3 bg-red-500/10 text-red-500 border border-red-500/50 hover:bg-red-500 hover:text-white"
+                                  >
                                       Delete Exercise
-                                  </Button>
+                                  </motion.button>
                                 ) : (
-                                  <Button variant="ghost" size="sm" className="w-full bg-white/5 hover:bg-white/10 text-zinc-400 py-3" onClick={() => addSet(exIndex)}>
+                                  <motion.button
+                                      whileHover={{ scale: 1.03 }}
+                                      whileTap={{ scale: 0.97 }}
+                                      transition={{ type: "spring", stiffness: 300 }}
+                                      onClick={() => addSet(exIndex)}
+                                      className="w-full bg-white/5 hover:bg-white/10 text-zinc-400 py-3"
+                                  >
                                       <Plus size={16} className="mr-2" /> Add Set
-                                  </Button>
+                                  </motion.button>
                                 )}
                               </div>
                           </div>
@@ -524,7 +556,7 @@ export const WorkoutLogger = () => {
             >
               <Plus className="mr-2" size={24} /> Add Another Exercise
             </Button>
-          </>
+          </motion.div>
         )}
       </div>
 

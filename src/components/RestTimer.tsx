@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Plus, Minus, Timer } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { motion } from 'framer-motion';
 
 interface RestTimerProps {
   initialSeconds: number;
@@ -117,22 +118,31 @@ export const RestTimer = ({
               {isOvertime ? 'Overtime' : 'Rest Timer'}
             </span>
           </div>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors">
+          <motion.button
+            onClick={onClose}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            transition={{ type: 'spring', stiffness: 300 }}
+            className="text-zinc-500 hover:text-white"
+          >
             <X size={18} />
-          </button>
+          </motion.button>
         </div>
 
         {/* Time display + controls */}
         <div className="flex items-center justify-between gap-4">
-          <button
+          <motion.button
             onClick={() => adjustTime(-15)}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            transition={{ type: 'spring', stiffness: 300 }}
             className="w-12 h-12 flex items-center justify-center rounded-xl bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white active:scale-95 transition-all border border-white/5"
           >
             <div className="flex flex-col items-center leading-none">
               <Minus size={16} />
               <span className="text-[9px] font-bold mt-0.5">15s</span>
             </div>
-          </button>
+          </motion.button>
 
           <div className="flex-1 text-center">
             {isOvertime ? (
@@ -146,15 +156,18 @@ export const RestTimer = ({
             )}
           </div>
 
-          <button
+          <motion.button
             onClick={() => adjustTime(15)}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
+            transition={{ type: 'spring', stiffness: 300 }}
             className="w-12 h-12 flex items-center justify-center rounded-xl bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white active:scale-95 transition-all border border-white/5"
           >
             <div className="flex flex-col items-center leading-none">
               <Plus size={16} />
               <span className="text-[9px] font-bold mt-0.5">15s</span>
             </div>
-          </button>
+          </motion.button>
         </div>
 
         {/* Progress bar */}

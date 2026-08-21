@@ -6,6 +6,7 @@ import { workoutService } from '../services/workoutService';
 import { exerciseService } from '../services/exerciseService';
 import { Button } from '../components/ui/Button';
 import { cn } from '../lib/utils';
+import { motion } from 'framer-motion';
 import type { WorkoutSession, Exercise } from '../types';
 
 export const History = () => {
@@ -277,10 +278,17 @@ export const History = () => {
                 const isRest = isRestDaySession(workout);
 
                 return (
-                <div key={workout.id} className={cn(
-                  "rounded-2xl overflow-hidden relative group",
-                  isRest ? "bg-blue-950/10 border border-blue-400/10" : "bg-iron-950 border border-white/10"
-                )}>
+                <motion.div
+                  key={workout.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                  className={cn(
+                    "rounded-2xl overflow-hidden relative group",
+                    isRest ? "bg-blue-950/10 border border-blue-400/10" : "bg-iron-950 border border-white/10"
+                  )}
+                >
               <button
                 type="button"
                 className="w-full text-left p-5 flex items-start justify-between gap-4 hover:bg-white/5 transition-colors"
@@ -323,13 +331,15 @@ export const History = () => {
                 </div>
               </button>
 
-                <div
-                id={`workout-${workout.id}`}
-                className={cn(
-                  "px-5 pb-5 overflow-hidden transition-all duration-300 ease-out",
-                  isExpanded ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0 pointer-events-none"
-                )}
-              >
+                <motion.div
+                  id={`workout-${workout.id}`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: isExpanded ? 1 : 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  layout
+                  className="px-5 pb-5 overflow-hidden"
+                >
                 <div className="border-t border-white/5 pt-4 space-y-4">
                   {isRest ? (
                     <div className="text-xs text-zinc-500">This was logged as a Rest Day. Enjoy your recovery.</div>
@@ -397,8 +407,8 @@ export const History = () => {
                     </Button>
                   </Link>
                 </div>
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
                 );
               })
             )}
