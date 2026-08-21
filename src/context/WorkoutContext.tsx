@@ -107,8 +107,8 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
     setElapsed(0);
   };
 
-  const finishWorkout = async () => {
-    if (!resolvedWorkout) return;
+  const finishWorkout = async (): Promise<string | null> => {
+    if (!resolvedWorkout) return null;
     const workoutBodyWeight = resolvedWorkout.bodyWeight ?? userWeight ?? undefined;
     let totalVolume = 0;
     resolvedWorkout.exercises.forEach(ex => {
@@ -134,8 +134,9 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
       exercises: exercisesWithBodyWeight,
       bodyWeight: workoutBodyWeight
     };
-    await workoutService.saveWorkout(final);
+    const saved = await workoutService.saveWorkout(final);
     setWorkout(null);
+    return saved?.id ?? null;
   };
 
   const createSet = (historySet?: ExerciseSet): ExerciseSet => ({

@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import type { FriendRequest, FriendSummary, FriendWithStats, NotificationItem, SocialProfile } from '../types';
+import type { FriendProfileDetails, FriendRequest, FriendSummary, FriendWithStats, NotificationItem, SocialProfile, WorkoutSession } from '../types';
 
 type UserProfileRow = {
   user_id: string;
@@ -372,5 +372,75 @@ export const socialService = {
       throw error;
     }
     return count ?? 0;
+  },
+
+  async getFriendProfile(userCodeOrId: string): Promise<FriendProfileDetails | null> {
+    const trimmed = userCodeOrId.trim();
+    if (!trimmed) return null;
+
+    const { data: profile, error } = await supabase
+      .from('user_profiles')
+      .select('user_id, user_code, display_name, is_public')
+      .or(`user_code.eq.${trimmed},user_id.eq.${trimmed}`)
+      .maybeSingle();
+
+    if (error || !profile) return null;
+
+    const typedProfile = profile as UserProfileRow;
+
+    if (!typedProfile.is_public) {
+      return {
+        authUserId: typedProfile.user_id,
+        userId: typedProfile.user_code,
+        name: typedProfile.display_name,
+        isPublic: false,
+        totalWorkouts: 0,
+        totalVolume: 0,
+        recentWorkouts: []
+      };
+    }
+
+    const [workoutsCountRes, recentWorkoutsRes] = await Promise.all([
+      supabase
+        .from('workouts')
+        .select('volume_load')
+        .eq('user_id', typedProfile.user_id),
+      supabase
+        .from('workouts')
+        .select('id, name, start_time, end_time, volume_load, exercises')
+        .eq('user_id', typedProfile.user_id)
+        .order('start_time', { ascending: false })
+        .limit(3)
+    ]);
+
+    const allWorkouts = (workoutsCountRes.data ?? []) as { volume_load: number | null }[];
+    const totalWorkouts = allWorkouts.length;
+    const totalVolume = allWorkouts.reduce((sum, w) => sum + (w.volume_load || 0), 0);
+
+    const recentWorkouts: WorkoutSession[] = ((recentWorkoutsRes.data ?? []) as Array<{
+      id: string;
+      name: string;
+      start_time: number | string;
+      end_time?: number | string | null;
+      volume_load?: number | null;
+      exercises?: WorkoutSession['exercises'];
+    }>).map((row) => ({
+      id: row.id,
+      name: row.name,
+      startTime: Number(row.start_time),
+      endTime: row.end_time ? Number(row.end_time) : undefined,
+      volumeLoad: row.volume_load || 0,
+      exercises: row.exercises || []
+    }));
+
+    return {
+      authUserId: typedProfile.user_id,
+      userId: typedProfile.user_code,
+      name: typedProfile.display_name,
+      isPublic: true,
+      totalWorkouts,
+      totalVolume,
+      recentWorkouts
+    };
   }
 };

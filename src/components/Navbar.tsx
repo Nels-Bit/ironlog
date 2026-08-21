@@ -1,10 +1,13 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Dumbbell, User, Bell } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { cn } from '../lib/utils';
 import { useWorkout } from '../context/useWorkout';
 import { socialService } from '../services/socialService';
 import { haptics } from '../utils/haptics';
+
+const MotionLink = motion.create(Link);
 
 export const Navbar = () => {
   const location = useLocation();
@@ -82,9 +85,9 @@ interface NavItemProps {
 }
 
 const NavItem = ({ to, icon, label, active, highlight, badgeCount = 0, emphasize = false }: NavItemProps) => (
-  <Link 
+  <MotionLink 
     to={to} 
-    onClick={() => { try { haptics.light(); } catch(e) {} }}
+    onClick={() => { try { haptics.light(); } catch { /* ignore */ } }}
     className={cn(
       "flex flex-col items-center justify-center w-full h-full md:h-auto md:w-full md:px-6 md:py-4 transition-all duration-200 group active:scale-95",
       active ? "text-white" : "text-zinc-500 hover:text-zinc-300"

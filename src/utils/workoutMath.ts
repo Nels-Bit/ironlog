@@ -13,6 +13,13 @@ export const parseUserWeight = (value: unknown): number | null => {
 export const isBodyweightExercise = (def?: Exercise) =>
   (def?.category || '').toLowerCase() === 'bodyweight';
 
+export const isAssistedExercise = (def?: Exercise): boolean => {
+  if (!def) return false;
+  const nameMatch = /assist/i.test(def.name);
+  const catMatch = (def.category || '').toLowerCase() === 'assisted';
+  return nameMatch || catMatch;
+};
+
 export const hasCompleteUnilateralReps = (set: ExerciseSet, def?: Exercise) => {
   if (!def?.isUnilateral) return true;
   const left = set.repsLeft ?? 0;
@@ -45,6 +52,11 @@ export const getSetLoad = (
   userWeight?: number | null
 ) => {
   const extra = typeof set.weight === 'number' && !Number.isNaN(set.weight) ? set.weight : 0;
+
+  if (isAssistedExercise(def)) {
+    const bodyWeight = resolveBodyWeight(set, workoutBodyWeight, userWeight);
+    return Math.max(0, bodyWeight - extra);
+  }
 
   if (isBodyweightExercise(def)) {
     const bodyWeight = resolveBodyWeight(set, workoutBodyWeight, userWeight);
@@ -88,7 +100,7 @@ export const applyBodyWeightToExercises = (
   bodyWeight?: number
 ) => exercises.map(exercise => {
   const def = defMap.get(exercise.exerciseId);
-  if (!isBodyweightExercise(def)) return exercise;
+  if (!isBodyweightExercise(def) && !isAssistedExercise(def)) return exercise;
 
   const updatedSets = exercise.sets.map(set => {
     if (Number.isFinite(set.bodyWeight ?? NaN)) return set;
