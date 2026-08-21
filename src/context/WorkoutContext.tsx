@@ -21,7 +21,7 @@ interface WorkoutContextType {
   startWorkout: (name: string) => void;
   logRestDay: () => Promise<string | null>;
   cancelWorkout: () => void;
-  finishWorkout: () => Promise<void>;
+  finishWorkout: () => Promise<string | null>;
   addExercise: (exDef: Exercise) => void;
   removeExercise: (index: number) => void;
   addSet: (exIndex: number, insertIndex?: number) => void; 
@@ -125,8 +125,8 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
     setElapsed(0);
   };
 
-  const finishWorkout = async () => {
-    if (!workout) return;
+  const finishWorkout = async (): Promise<string | null> => {
+    if (!workout) return null;
     const workoutBodyWeight = workout.bodyWeight ?? userWeight ?? undefined;
     let totalVolume = 0;
     workout.exercises.forEach(ex => {
@@ -152,8 +152,9 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
       exercises: exercisesWithBodyWeight,
       bodyWeight: workoutBodyWeight
     };
-    await workoutService.saveWorkout(final);
+    const saved = await workoutService.saveWorkout(final);
     setWorkout(null);
+    return saved?.id ?? null;
   };
 
   const createSet = (historySet?: ExerciseSet): ExerciseSet => ({

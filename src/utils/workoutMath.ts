@@ -10,6 +10,9 @@ export const parseUserWeight = (value: unknown): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+export const isAssistedExercise = (def?: Exercise) =>
+  /assist/i.test(def?.name ?? '') || (def?.category || '').toLowerCase() === 'assisted';
+
 export const isBodyweightExercise = (def?: Exercise) =>
   (def?.category || '').toLowerCase() === 'bodyweight';
 
@@ -45,6 +48,11 @@ export const getSetLoad = (
   userWeight?: number | null
 ) => {
   const extra = typeof set.weight === 'number' && !Number.isNaN(set.weight) ? set.weight : 0;
+
+  if (isAssistedExercise(def)) {
+    const bodyWeight = resolveBodyWeight(set, workoutBodyWeight, userWeight);
+    return Math.max(0, bodyWeight - extra);
+  }
 
   if (isBodyweightExercise(def)) {
     const bodyWeight = resolveBodyWeight(set, workoutBodyWeight, userWeight);
@@ -88,7 +96,7 @@ export const applyBodyWeightToExercises = (
   bodyWeight?: number
 ) => exercises.map(exercise => {
   const def = defMap.get(exercise.exerciseId);
-  if (!isBodyweightExercise(def)) return exercise;
+  if (!isBodyweightExercise(def) && !isAssistedExercise(def)) return exercise;
 
   const updatedSets = exercise.sets.map(set => {
     if (Number.isFinite(set.bodyWeight ?? NaN)) return set;

@@ -9,14 +9,23 @@ import { authService } from './services/authService';
 // Pages
 import { Auth } from './pages/Auth';
 import { WorkoutLogger } from './pages/WorkoutLogger';
-import { History } from './pages/History';
 import { Profile } from './pages/Profile';
 import { EditWorkout } from './pages/EditWorkout';
 import { Notifications } from './pages/Notifications';
+import { WorkoutSummary } from './pages/WorkoutSummary';
 
 // Components
 import { Navbar } from './components/Navbar';
 import { cn } from './lib/utils';
+
+// Resets scroll position to top on every route change (fixes PWA scroll retention)
+const ScrollToTop = () => {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+  }, [pathname]);
+  return null;
+};
 
 // Wrapper component to handle location-based logic
 const AppContent = () => {
@@ -24,7 +33,10 @@ const AppContent = () => {
   const [missingWeight, setMissingWeight] = useState(false);
   
   // Define which paths should be "Full Screen" (No padding/container)
-  const isFullScreen = location.pathname === '/workout' || location.pathname.startsWith('/history/');
+  const isFullScreen = location.pathname === '/workout' || 
+    location.pathname.startsWith('/history/') ||
+    location.pathname.startsWith('/summary') ||
+    location.pathname.startsWith('/workout/summary');
   const showWeightBanner = missingWeight && location.pathname !== '/profile';
 
   useEffect(() => {
@@ -39,6 +51,7 @@ const AppContent = () => {
 
   return (
     <WorkoutProvider>
+      <ScrollToTop />
       <div className="min-h-screen bg-black text-white font-sans selection:bg-brand-orange selection:text-white pb-20 md:pb-0 md:pl-64">
         
         <Navbar />
@@ -62,8 +75,11 @@ const AppContent = () => {
           <Routes>
             <Route path="/" element={<Navigate to="/profile" replace />} />
             <Route path="/workout" element={<WorkoutLogger />} />
-            <Route path="/history" element={<History />} />
+            <Route path="/history" element={<Navigate to="/profile?tab=activity" replace />} />
             <Route path="/history/:id" element={<EditWorkout />} />
+            <Route path="/summary/:id" element={<WorkoutSummary />} />
+            <Route path="/workout/summary/:id" element={<WorkoutSummary />} />
+            <Route path="/summary" element={<WorkoutSummary />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/friends" element={<Navigate to="/profile?tab=friends" replace />} />
             <Route path="/notifications" element={<Notifications />} />

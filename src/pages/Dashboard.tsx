@@ -41,11 +41,10 @@ export const Dashboard = () => {
   const streak = calculateWorkoutStreak(history).currentStreak;
 
   const handleLogRestDay = async () => {
-    const id = await logRestDay();
+    await logRestDay();
     const updatedHistory = await workoutService.getHistory();
     setHistory(updatedHistory);
-    if (id) navigate(`/history/${id}`);
-    else navigate('/history');
+    navigate('/profile?tab=activity');
   };
 
   return (

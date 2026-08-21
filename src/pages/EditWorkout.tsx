@@ -26,6 +26,7 @@ import {
   applyBodyWeightToExercises,
   getSetLoad,
   getTotalReps,
+  isAssistedExercise,
   isBodyweightExercise,
   parseUserWeight,
   shouldCountSetForVolume
@@ -156,7 +157,7 @@ export const EditWorkout = () => {
     if (confirm("Are you sure you want to delete this entire workout history? This cannot be undone.")) {
         try {
             await workoutService.deleteWorkout(id);
-            navigate('/history');
+            navigate('/profile?tab=activity');
         } catch (error: any) {
             console.error(error);
             alert("Failed to delete workout. Check console for details.");
@@ -197,7 +198,7 @@ export const EditWorkout = () => {
     };
 
     await workoutService.updateWorkout(id, finalWorkout);
-    navigate('/history');
+    navigate('/profile?tab=activity');
   };
 
   if (loading || !workout) return <div className="flex justify-center p-10"><Loader2 className="animate-spin text-brand-orange"/></div>;
@@ -207,7 +208,7 @@ export const EditWorkout = () => {
       
       {/* HEADER */}
       <div className="sticky top-0 z-50 bg-iron-950/90 backdrop-blur border-b border-white/5 px-4 py-4 flex justify-between items-center">
-        <Button size="icon" variant="ghost" onClick={() => navigate('/history')}>
+        <Button size="icon" variant="ghost" onClick={() => navigate('/profile?tab=activity')}>
           <ChevronLeft />
         </Button>
         <h1 className="font-bold text-white">Edit Workout</h1>
@@ -255,7 +256,11 @@ export const EditWorkout = () => {
         {/* EXERCISES */}
         {workout.exercises.map((ex, exIndex) => {
             const def = exerciseDefs.get(ex.exerciseId);
-            const weightLabel = isBodyweightExercise(def) ? 'Extra LBS' : 'LBS';
+            const weightLabel = isAssistedExercise(def)
+              ? 'Assistance'
+              : isBodyweightExercise(def)
+                ? 'Extra LBS'
+                : 'LBS';
             return (
               <div key={ex.id} className="space-y-2">
                 <div className="flex justify-between items-center px-1">
