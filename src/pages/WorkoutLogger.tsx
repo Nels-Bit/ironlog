@@ -4,6 +4,7 @@ import {
   Plus, Check, Trash2, Dumbbell, X, Save, ChevronDown, ArrowDown, Flame, Skull, Circle, Pencil, Play
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
+import { motion } from 'framer-motion';
 import { ExerciseSelector } from '../components/ExerciseSelector';
 import { RestTimer } from '../components/RestTimer';
 import { cn } from '../lib/utils';
@@ -13,6 +14,7 @@ import { haptics } from '../utils/haptics';
 import { useWakeLock } from '../utils/useWakeLock';
 import {
   getSetLoad,
+  isAssistedExercise,
   isBodyweightExercise,
   parseUserWeight,
   shouldCountSetForPR
@@ -40,6 +42,9 @@ export const WorkoutLogger = () => {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [editingExercises, setEditingExercises] = useState<Set<string>>(new Set());
   const [typeSheetOpen, setTypeSheetOpen] = useState<{ exIndex: number; setIndex: number } | null>(null);
+  // Tracks which set-sides have been manually edited to break unilateral auto-mirror
+  // Key format: `${setId}-left` or `${setId}-right`
+  const [manualOverrides, setManualOverrides] = useState<Set<string>>(new Set());
 
   // --- TIMER STATE & PREFERENCES ---
   const [timerOpen, setTimerOpen] = useState(false);
@@ -99,9 +104,9 @@ export const WorkoutLogger = () => {
 
   const handleFinish = async () => {
     if(confirm("Finish workout?")) {
-        await finishWorkout();
-        try { haptics.success(); } catch (e) { /* ignore */ }
-        navigate('/history');
+        const id = await finishWorkout();
+        try { haptics.success(); } catch { /* ignore */ }
+        navigate(id ? `/summary/${id}` : '/profile');
     }
   };
 
@@ -177,6 +182,40 @@ export const WorkoutLogger = () => {
     removeSet(exIndex, setIndex);
   };
 
+  /**
+   * Smart unilateral rep change.
+   * Mirrors the new value to the opposite side unless that side has a manual override.
+   * Once the user types into a side, it is flagged as overridden and will never be
+   * auto-overwritten again (until the set is cleared/reset).
+   */
+  const handleUnilateralChange = (
+    exIndex: number,
+    setIndex: number,
+    setId: string,
+    side: 'repsLeft' | 'repsRight',
+    rawValue: string
+  ) => {
+    const parsed = parseNumberInputValue(rawValue);
+    const thisKey = `${setId}-${side === 'repsLeft' ? 'left' : 'right'}`;
+    const otherSide = side === 'repsLeft' ? 'repsRight' : 'repsLeft';
+    const otherKey = `${setId}-${side === 'repsLeft' ? 'right' : 'left'}`;
+
+    // Mark this side as manually touched
+    setManualOverrides(prev => {
+      const next = new Set(prev);
+      next.add(thisKey);
+      return next;
+    });
+
+    // Update the edited side
+    updateSet(exIndex, setIndex, side, parsed);
+
+    // Mirror to the other side only if it hasn't been manually overridden yet
+    if (!manualOverrides.has(otherKey)) {
+      updateSet(exIndex, setIndex, otherSide, parsed);
+    }
+  };
+
   const handleSmartComplete = (exIndex: number, setIndex: number, currentSet: ExerciseSet, ghostSet?: ExerciseSet) => {
     const isNowComplete = !currentSet.isCompleted;
 
@@ -202,7 +241,7 @@ export const WorkoutLogger = () => {
 
     // Provide haptic feedback for set completion
     if (isNowComplete) {
-      try { haptics.success(); } catch (e) { /* ignore */ }
+      try { haptics.success(); } catch { /* ignore */ }
 
       // 3. Trigger Rest Timer
       const currentType = currentSet.type || 'normal';
@@ -223,8 +262,8 @@ export const WorkoutLogger = () => {
   // --- RENDER: SETUP SCREEN ---
   if (!isActive || !workout) {
     return <SetupScreen onStart={startWorkout} onRestDay={async () => {
-      const id = await logRestDay();
-      navigate(id ? `/history/${id}` : '/history');
+      await logRestDay();
+      navigate('/profile?tab=activity');
     }} onCancel={() => navigate(-1)} />;
   }
 
@@ -276,6 +315,7 @@ export const WorkoutLogger = () => {
               const isCollapsed = collapsed.has(ex.id);
               const isEditing = editingExercises.has(ex.id);
               const isBodyweightMovement = isBodyweightExercise(def);
+              const isAssisted = isAssistedExercise(def);
               
               const ghostSets = historyCache.get(ex.exerciseId);
               const historicPR = prCache.get(ex.exerciseId) || 0;
@@ -344,7 +384,9 @@ export const WorkoutLogger = () => {
                               
                               <div className="grid grid-cols-10 gap-2 text-[10px] font-bold text-zinc-500 uppercase tracking-wider text-center mb-2 px-2">
                                   <div className="col-span-1">#</div>
-                                  <div className="col-span-3">{isBodyweightMovement ? 'Extra LBS' : 'LBS'}</div>
+                                  <div className="col-span-3">
+                                    {isAssisted ? 'Assistance' : isBodyweightMovement ? 'Extra LBS' : 'LBS'}
+                                  </div>
                                   <div className="col-span-3">Reps</div>
                                   <div className="col-span-3">{isEditing ? "Delete" : "Done"}</div>
                               </div>
@@ -406,8 +448,28 @@ export const WorkoutLogger = () => {
                                             <div className="col-span-3 flex justify-center">
                                                 {def?.isUnilateral ? (
                                                 <div className="flex gap-1 w-full">
-                                                    <motion.input type="number" min={0} placeholder={getNumberPlaceholder(ghostSet?.repsLeft, "L")} value={formatNumberInputValue(set.repsLeft)} onChange={(e) => updateSet(exIndex, setIndex, 'repsLeft', parseNumberInputValue(e.target.value))} disabled={isEditing} whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }} transition={{ type: "spring", stiffness: 300 }} className="w-1/2 bg-white/5 rounded-lg py-2 text-center font-bold text-white text-sm outline-none focus:bg-white/10 disabled:opacity-50" />
-                                                    <motion.input type="number" min={0} placeholder={getNumberPlaceholder(ghostSet?.repsRight, "R")} value={formatNumberInputValue(set.repsRight)} onChange={(e) => updateSet(exIndex, setIndex, 'repsRight', parseNumberInputValue(e.target.value))} disabled={isEditing} whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }} transition={{ type: "spring", stiffness: 300 }} className="w-1/2 bg-white/5 rounded-lg py-2 text-center font-bold text-white text-sm outline-none focus:bg-white/10 disabled:opacity-50" />
+                                                    <motion.input
+                                                      type="number"
+                                                      min={0}
+                                                      placeholder={getNumberPlaceholder(ghostSet?.repsLeft, "L")}
+                                                      value={formatNumberInputValue(set.repsLeft)}
+                                                      onChange={(e) => handleUnilateralChange(exIndex, setIndex, set.id, 'repsLeft', e.target.value)}
+                                                      disabled={isEditing}
+                                                      whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
+                                                      transition={{ type: "spring", stiffness: 300 }}
+                                                      className="w-1/2 bg-white/5 rounded-lg py-2 text-center font-bold text-white text-sm outline-none focus:bg-white/10 disabled:opacity-50"
+                                                    />
+                                                    <motion.input
+                                                      type="number"
+                                                      min={0}
+                                                      placeholder={getNumberPlaceholder(ghostSet?.repsRight, "R")}
+                                                      value={formatNumberInputValue(set.repsRight)}
+                                                      onChange={(e) => handleUnilateralChange(exIndex, setIndex, set.id, 'repsRight', e.target.value)}
+                                                      disabled={isEditing}
+                                                      whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
+                                                      transition={{ type: "spring", stiffness: 300 }}
+                                                      className="w-1/2 bg-white/5 rounded-lg py-2 text-center font-bold text-white text-sm outline-none focus:bg-white/10 disabled:opacity-50"
+                                                    />
                                                 </div>
                                                 ) : (
                                                 <motion.input
@@ -543,6 +605,7 @@ export const WorkoutLogger = () => {
         initialSeconds={timerDuration}
         resetKey={timerKey}
         onUpdateDefault={handleUpdateRestDefault}
+        isSelectorOpen={isSelectorOpen}
       />
 
     </div>

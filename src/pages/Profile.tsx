@@ -6,12 +6,13 @@ import {
 import { Button } from '../components/ui/Button';
 import { cn } from '../lib/utils';
 import { authService } from '../services/authService';
-import { exerciseService } from '../services/exerciseService';
 import { workoutService } from '../services/workoutService';
 import { socialService } from '../services/socialService';
 import type { UserProfile, WorkoutSession, FriendRequest, FriendSummary, FriendWithStats } from '../types';
 import { statsUtils, type PersonalRecord } from '../utils/statsUtils';
-import { calculateStrengthAchievements, calculateWorkoutStreak, getLevelProgress, getLevelRequirementXP, isRestDaySession, type StrengthAchievement } from '../utils/achievementUtils';
+import { getLevelProgress, getLevelRequirementXP, isRestDaySession } from '../utils/achievementUtils';
+import { AchievementList, type AchievementItem } from '../components/ui/achievement-list';
+import { FluidTabs } from '../components/ui/fluid-tabs';
 
 export const Profile = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -22,13 +23,9 @@ export const Profile = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'activity' | 'friends'>('overview');
   const [stats, setStats] = useState({ totalWorkouts: 0, totalVolume: 0 });
   const [prCount, setPrCount] = useState(0);
-  const [streakSummary, setStreakSummary] = useState({ currentStreak: 0, longestStreak: 0 });
   const [workoutHistory, setWorkoutHistory] = useState<WorkoutSession[]>([]);
   const [activeWorkouts, setActiveWorkouts] = useState<WorkoutSession[]>([]);
   const [prRecords, setPrRecords] = useState<PersonalRecord[]>([]);
-  const [strengthAchievements, setStrengthAchievements] = useState<StrengthAchievement[]>([]);
-  const [showAllMedals, setShowAllMedals] = useState(false);
-  const [restDayToday, setRestDayToday] = useState(false);
   const [socialError, setSocialError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<FriendSummary[]>([]);
@@ -48,14 +45,12 @@ export const Profile = () => {
   const currentLevel = levelProgress.currentLevel;
   const xpInCurrentLevel = levelProgress.xpIntoLevel;
   const progressPercent = levelProgress.progressPercent;
-  const xpToNext = levelProgress.xpToNext;
   const goalOptions: NonNullable<UserProfile['goal']>[] = ['Strength', 'Hypertrophy', 'Endurance', 'Weight Loss'];
   const environmentOptions: NonNullable<UserProfile['environment']>[] = ['Gym', 'Home'];
   const levelOptions: NonNullable<UserProfile['level']>[] = ['Beginner', 'Intermediate', 'Pro'];
   const levelMilestones = [5, 10, 15, 20, 30, 40, 50];
-  const streakMilestones = [3, 7, 14, 30];
-  const nextStreakGoal = streakMilestones.find(goal => goal > streakSummary.currentStreak) ?? null;
-  const streakProgressPercent = nextStreakGoal ? (streakSummary.currentStreak / nextStreakGoal) * 100 : 100;
+
+
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -100,9 +95,6 @@ export const Profile = () => {
 
   const loadData = async () => {
     try {
-      const exercises = await exerciseService.getAllExercises();
-      const exerciseDefs = new Map(exercises.map(exercise => [exercise.id, exercise]));
-
       const user = await authService.getUser();
       if (user) {
         setProfile(user);
@@ -123,9 +115,6 @@ export const Profile = () => {
       const history = await workoutService.getHistory();
       const activeWorkouts = history.filter(session => !isRestDaySession(session));
       setWorkoutHistory(history);
-      const todayKey = new Date().toISOString().slice(0,10);
-      const hasRestToday = history.some(s => isRestDaySession(s) && new Date(s.startTime).toISOString().slice(0,10) === todayKey);
-      setRestDayToday(hasRestToday);
       const activeWorkoutsAscending = [...activeWorkouts].sort((a, b) => a.startTime - b.startTime);
       const volume = activeWorkouts.reduce((acc, curr) => acc + (curr.volumeLoad || 0), 0);
       const prs = await statsUtils.calculatePRs(activeWorkouts);
@@ -136,8 +125,6 @@ export const Profile = () => {
       setPrCount(prs.length);
       setActiveWorkouts(activeWorkoutsAscending);
       setPrRecords(prs);
-      setStreakSummary(calculateWorkoutStreak(history));
-      setStrengthAchievements(calculateStrengthAchievements(activeWorkouts, exerciseDefs));
 
       try {
         const [friendsData, incoming, outgoing] = await Promise.all([
@@ -294,58 +281,21 @@ export const Profile = () => {
     return a.sortOrder - b.sortOrder;
   });
 
-  const visibleMedals = showAllMedals ? mergedMedals : mergedMedals.slice(0, 4);
+
 
   return (
     <div className="min-h-screen bg-black pb-32 animate-in fade-in duration-500">
-      
-      <div className="sticky top-0 z-50 bg-black/80 backdrop-blur-md border-b border-white/5 px-4 h-14 flex justify-between items-center">
-        <h1 className="text-xl font-black italic text-white tracking-tighter">ATHLETE PROFILE</h1>
-        {activeTab === 'overview' && (
-          <Button 
-            size="icon" 
-            variant="ghost" 
-            onClick={() => isEditing ? setIsEditing(false) : setIsEditing(true)}
-            className={cn("rounded-full", isEditing ? "text-zinc-500" : "text-brand-orange bg-brand-orange/10")}
-          >
-            {isEditing ? <X size={20} /> : <Edit2 size={18} />}
-          </Button>
-        )}
-      </div>
 
       <div className="p-4 space-y-4 max-w-lg mx-auto mt-2">
-        <div className="grid grid-cols-3 gap-2 rounded-2xl border border-white/10 bg-zinc-950/70 p-1">
-          <button
-            type="button"
-            onClick={() => setTab('overview')}
-            className={cn(
-              "rounded-xl py-2 text-xs font-bold uppercase tracking-widest transition-all",
-              activeTab === 'overview' ? "bg-brand-orange text-white" : "text-zinc-400 hover:text-white"
-            )}
-          >
-            Overview
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('activity')}
-            className={cn(
-              "rounded-xl py-2 text-xs font-bold uppercase tracking-widest transition-all",
-              activeTab === 'activity' ? "bg-brand-orange text-white" : "text-zinc-400 hover:text-white"
-            )}
-          >
-            Activity
-          </button>
-          <button
-            type="button"
-            onClick={() => setTab('friends')}
-            className={cn(
-              "rounded-xl py-2 text-xs font-bold uppercase tracking-widest transition-all",
-              activeTab === 'friends' ? "bg-brand-orange text-white" : "text-zinc-400 hover:text-white"
-            )}
-          >
-            Friends
-          </button>
-        </div>
+        <FluidTabs
+          tabs={[
+            { id: 'overview', label: 'Overview' },
+            { id: 'activity', label: 'Activity' },
+            { id: 'friends', label: 'Friends' },
+          ]}
+          activeTab={activeTab}
+          onChange={(id) => setTab(id as 'overview' | 'activity' | 'friends')}
+        />
 
         {activeTab === 'overview' && (
           <>
@@ -353,6 +303,16 @@ export const Profile = () => {
         {!isEditing ? (
           <div className="relative overflow-hidden bg-zinc-900/50 border border-white/10 rounded-3xl p-6">
             <div className="absolute top-0 right-0 w-64 h-64 bg-brand-orange/20 blur-[100px] rounded-full pointer-events-none" />
+
+            {/* Edit button — top-right of card */}
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setIsEditing(true)}
+              className="absolute top-4 right-4 z-20 rounded-full text-brand-orange bg-brand-orange/10 hover:bg-brand-orange/20"
+            >
+              <Edit2 size={16} />
+            </Button>
 
             <div className="relative z-10 flex items-center gap-5 mb-6">
               <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-red-600 to-orange-500 flex items-center justify-center shadow-lg shadow-orange-500/20 text-3xl font-black text-white">
@@ -363,20 +323,6 @@ export const Profile = () => {
                 <div className="flex items-center gap-2 mb-1">
                   <h2 className="text-2xl font-bold text-white">{profile?.name || 'Athlete'}</h2>
                   {currentLevel >= 5 && <Award className="text-yellow-500" size={20} fill="currentColor" />}
-                </div>
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10">
-                  <Trophy size={12} className="text-brand-orange" />
-                  <span className="text-xs font-bold text-zinc-300 uppercase tracking-wide">Level {currentLevel} Athlete</span>
-                </div>
-                <div className="mt-2 inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-black/30 border border-white/10">
-                  <span className="text-xs font-bold text-zinc-400 uppercase tracking-wide">@{profile?.userId || 'loading'}</span>
-                  <span className={cn(
-                    "inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest",
-                    profile?.isPublic ? "text-emerald-300" : "text-zinc-400"
-                  )}>
-                    {profile?.isPublic ? <Globe size={11} /> : <Lock size={11} />}
-                    {profile?.isPublic ? 'Public' : 'Private'}
-                  </span>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
                   <MiniStat label="Weight" value={profile?.weight ? `${profile.weight} lbs` : '-'} />
@@ -401,7 +347,7 @@ export const Profile = () => {
                 </div>
               </div>
               <p className="text-right text-[10px] font-bold text-brand-orange mt-1">
-                {xpToNext} XP to Level {currentLevel + 1}
+                Current Level: {currentLevel}
               </p>
             </div>
           </div>
@@ -416,6 +362,18 @@ export const Profile = () => {
 
         {isEditing && (
           <div className="space-y-5 animate-in slide-in-from-bottom-4 duration-500">
+            {/* Edit form header */}
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-white">Edit Profile</h2>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setIsEditing(false)}
+                className="rounded-full text-zinc-500 hover:text-white"
+              >
+                <X size={20} />
+              </Button>
+            </div>
             <InputGroup label="Full Name" icon={<User size={16} />}>
               <input 
                 value={formData.name || ''} 
@@ -570,178 +528,23 @@ export const Profile = () => {
         )}
 
         {!isEditing && (
-          <div className="rounded-3xl border border-white/10 bg-zinc-900/25 p-4 space-y-3">
-            <div>
-              <h3 className="text-base font-bold text-white">Performance Snapshot</h3>
-              <p className="text-xs text-zinc-500">Your core training numbers at a glance.</p>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <OverviewMetric label="Workouts" value={stats.totalWorkouts.toString()} />
-              <OverviewMetric label="Best Streak" value={`${streakSummary.longestStreak} 🔥`} accent="blue" />
-              <OverviewMetric label="Total Volume" value={`${Math.round(stats.totalVolume).toLocaleString()} lbs`} />
-              <OverviewMetric label="PRs" value={prCount.toString()} />
-            </div>
-          </div>
-        )}
-
-        {!isEditing && (
-          <div className="rounded-3xl border border-white/10 bg-zinc-900/20 p-4 space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-bold text-white">Medals & Achievements</h3>
-                <p className="text-xs text-zinc-500 font-medium">Unlocked first, locked last.</p>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowAllMedals(prev => !prev)}
-                className="shrink-0 text-brand-orange hover:text-white"
-              >
-                {showAllMedals ? 'Collapse' : 'See all'}
-              </Button>
-            </div>
-
-            <div className={cn(
-              "grid gap-3",
-              showAllMedals ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1 sm:grid-cols-2"
-            )}>
-              {visibleMedals.map(medal => (
-                <div
-                  key={medal.id}
-                  className={cn(
-                    "rounded-2xl border p-4 flex items-start gap-3 transition-all",
-                    medal.unlocked
-                      ? medal.category === 'level'
-                        ? "bg-blue-950/25 border-blue-400/20"
-                        : "bg-brand-orange/10 border-brand-orange/20"
-                      : "bg-zinc-900/30 border-white/5 opacity-70"
-                  )}
-                >
-                  <div className={cn(
-                    "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
-                    medal.unlocked
-                      ? medal.category === 'level'
-                        ? "bg-blue-500 text-white"
-                        : "bg-brand-orange text-white"
-                      : "bg-white/5 text-zinc-500"
-                  )}>
-                    {medal.icon}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="font-bold text-white">{medal.title}</h4>
-                      {medal.unlocked && <span className="text-[10px] font-bold uppercase tracking-widest text-brand-orange">Unlocked</span>}
-                      {!medal.unlocked && <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Locked</span>}
-                    </div>
-                    <p className="text-xs text-zinc-500 mt-1">{medal.description}</p>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mt-2">
-                      {medal.unlocked
-                        ? medal.earnedAt
-                          ? `${medal.title} earned (${new Date(medal.earnedAt).toLocaleDateString()})`
-                          : `${medal.title} earned`
-                        : `Unlocks when ${medal.description.toLowerCase()}`}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {!isEditing && (
-          <div className="rounded-3xl border border-blue-400/15 bg-blue-950/20 p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-white">Streak Medal</h3>
-              <span className="text-xs font-bold uppercase tracking-widest text-zinc-500">Moon lit</span>
-            </div>
-            <div className="rounded-2xl border border-blue-400/15 bg-blue-950/30 p-4">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-blue-200/70 mb-1">Current Streak</p>
-                  <p className="text-3xl font-black text-white flex items-center gap-2"><span>{restDayToday && streakSummary.currentStreak > 0 ? '🌙' : '🔥'}</span>{streakSummary.currentStreak}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs font-bold uppercase tracking-widest text-blue-200/70 mb-1">Goal</p>
-                  <p className="text-2xl font-black text-blue-100">{nextStreakGoal ?? 'Max'}</p>
-                </div>
-              </div>
-              <div className="mt-4 space-y-2">
-                <div className="relative pt-4">
-                  <div className="absolute -top-2 z-20 flex flex-col items-center" style={{ left: `${Math.max(6, Math.min(100, streakProgressPercent))}%`, transform: 'translateX(-50%)' }}>
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-300 whitespace-nowrap bg-black/60 px-2 py-0.5 rounded-full border border-white/10 backdrop-blur-sm">
-                      {streakSummary.currentStreak} / {nextStreakGoal ?? '—'} Day(s)
-                    </div>
-                    <div className="h-3 w-px bg-zinc-300/80" />
-                  </div>
-                  <div className="h-3 rounded-full bg-black/40 overflow-hidden border border-white/5">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-blue-600 to-sky-400 transition-all duration-700"
-                      style={{ width: `${Math.min(100, streakProgressPercent)}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="text-xs text-zinc-500 px-1">🌙 marks a logged rest day. Rest days protect your current streak but do not increase it.</div>
-          </div>
-        )}
-
-        {!isEditing && (
-          <div className="rounded-3xl border border-white/10 bg-zinc-900/20 p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-white">Strength Medals</h3>
-              <span className="text-xs font-bold uppercase tracking-widest text-zinc-500">The 3 Major Lifts</span>
-            </div>
-            <div className="grid grid-cols-1 gap-3">
-              {strengthAchievements.map(achievement => (
-                <div key={achievement.lift} className={cn(
-                  "relative rounded-2xl border p-4 flex items-start justify-between gap-4 overflow-hidden",
-                  achievement.unlocked ? "bg-brand-orange/10 border-brand-orange/20" : "bg-zinc-900/30 border-white/5 opacity-70"
-                )}>
-                  <div className="absolute top-4 right-4 text-right">
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Next Achievement</div>
-                    <div className="text-sm font-black text-white">
-                      {achievement.nextThreshold ?? achievement.threshold} lbs
-                    </div>
-                  </div>
-                  <div className="min-w-0 flex items-start gap-3 flex-1">
-                    <div className={cn(
-                      "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
-                      achievement.unlocked ? "bg-brand-orange text-white" : "bg-white/5 text-zinc-500"
-                    )}>
-                      <Trophy size={18} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="font-bold text-white">{achievement.label}</h4>
-                      </div>
-                      <p className="text-xs text-zinc-500 mt-1">
-                        {achievement.unlocked
-                          ? `${achievement.threshold} Medal earned (${achievement.achievedDateLabel || 'recently'})`
-                          : `Keep pushing to unlock the ${achievement.nextThreshold ?? achievement.threshold} Medal.`}
-                      </p>
-                      <div className="mt-3 space-y-2">
-                        <div className="relative pt-4">
-                          <div className="absolute -top-1 z-20 flex flex-col items-center" style={{ left: `${Math.max(18, Math.min(100, achievement.progressPercent))}%`, transform: 'translateX(-50%)' }}>
-                            <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-300 whitespace-nowrap bg-black/60 px-2 py-0.5 rounded-full border border-white/10 backdrop-blur-sm">
-                              PR: {achievement.currentWeight} / {achievement.nextThreshold ?? achievement.threshold}
-                            </div>
-                            <div className="h-3 w-px bg-zinc-300/80" />
-                          </div>
-                          <div className="h-3 rounded-full bg-black/50 overflow-hidden border border-white/5">
-                          <div
-                            className="h-full rounded-full bg-gradient-to-r from-blue-500 via-sky-400 to-brand-orange transition-all duration-700 shadow-[0_0_12px_rgba(56,189,248,0.45)]"
-                            style={{ width: `${Math.max(18, Math.min(100, achievement.progressPercent))}%` }}
-                          />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <AchievementList
+            items={mergedMedals.map((medal): AchievementItem => ({
+              id: medal.id,
+              title: medal.title,
+              description: medal.description,
+              sublabel: medal.unlocked
+                ? medal.earnedAt
+                  ? `${medal.title} earned (${new Date(medal.earnedAt).toLocaleDateString()})`
+                  : `${medal.title} earned`
+                : `Unlocks when ${medal.description.toLowerCase()}`,
+              unlocked: medal.unlocked,
+              category: medal.category,
+              icon: medal.icon,
+              accentColor: medal.category === 'level' ? 'blue' : 'orange',
+            }))}
+            initialVisible={5}
+          />
         )}
 
         {!isEditing && (
@@ -762,8 +565,8 @@ export const Profile = () => {
         {activeTab === 'activity' && (
           <div className="space-y-3">
             <div className="rounded-2xl border border-white/10 bg-zinc-900/40 p-4">
-              <p className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-1">Workout History</p>
-              <p className="text-sm text-zinc-400">Showing your last 7 sessions. Use Older Workouts to search and filter everything.</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-1">Activity</p>
+              <p className="text-sm text-zinc-400">Your logged workout sessions and history.</p>
             </div>
 
             {workoutHistory.length === 0 ? (
@@ -771,38 +574,37 @@ export const Profile = () => {
                 No workouts logged yet.
               </div>
             ) : (
-              workoutHistory.slice(0, 7).map((workout) => {
+              workoutHistory.map((workout) => {
                 const isRest = isRestDaySession(workout);
                 return (
                   <div key={workout.id} className="rounded-2xl border border-white/10 bg-zinc-900/30 p-4">
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
                         <h3 className="font-bold text-white truncate">{isRest ? 'Rest Day 🌙' : workout.name}</h3>
                         <p className="mt-1 text-xs text-zinc-500 inline-flex items-center gap-1">
                           <Calendar size={12} /> {new Date(workout.startTime).toLocaleDateString()}
                         </p>
-                        {!isRest && (
-                          <p className="text-xs text-zinc-400 mt-1">
-                            {workout.exercises.length} exercise(s) • {workout.volumeLoad.toLocaleString()} lbs volume
-                          </p>
-                        )}
                       </div>
-                      <Link to={`/history/${workout.id}`}>
-                        <Button size="sm">Edit</Button>
-                      </Link>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Link to={`/summary/${workout.id}`}>
+                          <Button size="sm" variant="ghost" className="border border-white/10 hover:bg-white/5 text-zinc-300">
+                            Summary
+                          </Button>
+                        </Link>
+                        <Link to={`/history/${workout.id}`}>
+                          <Button size="sm">
+                            Edit
+                          </Button>
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 );
               })
             )}
-
-            {workoutHistory.length > 7 && (
-              <Link to="/history" className="block pt-1">
-                <Button className="w-full py-6 text-base">Older Workouts</Button>
-              </Link>
-            )}
           </div>
         )}
+
 
         {activeTab === 'friends' && (
           <div className="space-y-3">
@@ -953,15 +755,8 @@ const MiniStat = ({ label, value }: { label: string; value: string }) => (
   </div>
 );
 
-const OverviewMetric = ({ label, value, accent = 'default' }: { label: string; value: string; accent?: 'default' | 'blue' }) => (
-  <div className={cn(
-    "rounded-2xl border p-3",
-    accent === 'blue' ? "bg-blue-950/20 border-blue-400/15" : "bg-black/25 border-white/10"
-  )}>
-    <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">{label}</p>
-    <p className="text-lg font-black text-white mt-1">{value}</p>
-  </div>
-);
+
+
 
 const formatHeight = (cm?: number) => {
   if (!cm) return '-';

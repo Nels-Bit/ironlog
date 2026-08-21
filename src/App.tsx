@@ -5,19 +5,27 @@ import { Analytics } from '@vercel/analytics/react';
 import { supabase } from './lib/supabase';
 import { WorkoutProvider } from './context/WorkoutContext';
 import { authService } from './services/authService';
-import { AnimatePresence, motion } from 'framer-motion';
 
 // Pages
 import { Auth } from './pages/Auth';
 import { WorkoutLogger } from './pages/WorkoutLogger';
-import { History } from './pages/History';
 import { Profile } from './pages/Profile';
 import { EditWorkout } from './pages/EditWorkout';
 import { Notifications } from './pages/Notifications';
+import { WorkoutSummary } from './pages/WorkoutSummary';
 
 // Components
 import { Navbar } from './components/Navbar';
 import { cn } from './lib/utils';
+
+// Resets scroll position to top on every route change (fixes PWA scroll retention)
+const ScrollToTop = () => {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+  }, [pathname]);
+  return null;
+};
 
 // Wrapper component to handle location-based logic
 const AppContent = () => {
@@ -25,7 +33,10 @@ const AppContent = () => {
   const [missingWeight, setMissingWeight] = useState(false);
   
   // Define which paths should be "Full Screen" (No padding/container)
-  const isFullScreen = location.pathname === '/workout' || location.pathname.startsWith('/history/');
+  const isFullScreen = location.pathname === '/workout' || 
+    location.pathname.startsWith('/history/') ||
+    location.pathname.startsWith('/summary') ||
+    location.pathname.startsWith('/workout/summary');
   const showWeightBanner = missingWeight && location.pathname !== '/profile';
 
   useEffect(() => {
@@ -40,6 +51,7 @@ const AppContent = () => {
 
   return (
     <WorkoutProvider>
+      <ScrollToTop />
       <div className="min-h-screen bg-black text-white font-sans selection:bg-brand-orange selection:text-white pb-20 md:pb-0 md:pl-64">
         
         <Navbar />
@@ -60,122 +72,19 @@ const AppContent = () => {
               </div>
             </div>
           )}
-          <AnimatePresence>
-            <Routes>
-              <Route
-                path="/"
-                element={
-                  <motion.div
-                    key="home"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <Navigate to="/profile" replace />
-                  </motion.div>
-                }
-              />
-              <Route
-                path="/workout"
-                element={
-                  <motion.div
-                    key="workout"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <WorkoutLogger />
-                  </motion.div>
-                }
-              />
-              <Route
-                path="/history"
-                element={
-                  <motion.div
-                    key="history"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <History />
-                  </motion.div>
-                }
-              />
-              <Route
-                path="/history/:id"
-                element={
-                  <motion.div
-                    key="edit-workout"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <EditWorkout />
-                  </motion.div>
-                }
-              />
-              <Route
-                path="/profile"
-                element={
-                  <motion.div
-                    key="profile"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <Profile />
-                  </motion.div>
-                }
-              />
-              <Route
-                path="/friends"
-                element={
-                  <motion.div
-                    key="friends"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <Navigate to="/profile?tab=friends" replace />
-                  </motion.div>
-                }
-              />
-              <Route
-                path="/notifications"
-                element={
-                  <motion.div
-                    key="notifications"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <Notifications />
-                  </motion.div>
-                }
-              />
-              <Route
-                path="*"
-                element={
-                  <motion.div
-                    key="not-found"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ duration: 0.3 }}
-                  >
-                    <Navigate to="/profile" replace />
-                  </motion.div>
-                }
-              />
-            </Routes>
-          </AnimatePresence>
+          <Routes>
+            <Route path="/" element={<Navigate to="/profile" replace />} />
+            <Route path="/workout" element={<WorkoutLogger />} />
+            <Route path="/history" element={<Navigate to="/profile?tab=activity" replace />} />
+            <Route path="/history/:id" element={<EditWorkout />} />
+            <Route path="/summary/:id" element={<WorkoutSummary />} />
+            <Route path="/workout/summary/:id" element={<WorkoutSummary />} />
+            <Route path="/summary" element={<WorkoutSummary />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/friends" element={<Navigate to="/profile?tab=friends" replace />} />
+            <Route path="/notifications" element={<Notifications />} />
+            <Route path="*" element={<Navigate to="/profile" replace />} />
+          </Routes>
         </main>
       </div>
     </WorkoutProvider>

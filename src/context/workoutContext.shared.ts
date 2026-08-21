@@ -10,7 +10,7 @@ export interface WorkoutContextType {
   startWorkout: (name: string) => void;
   logRestDay: () => Promise<string | null>;
   cancelWorkout: () => void;
-  finishWorkout: () => Promise<void>;
+  finishWorkout: () => Promise<string | null>;
   addExercise: (exDef: Exercise) => void;
   removeExercise: (index: number) => void;
   addSet: (exIndex: number, insertIndex?: number) => void;
