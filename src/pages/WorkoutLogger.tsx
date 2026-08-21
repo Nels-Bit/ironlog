@@ -105,7 +105,7 @@ export const WorkoutLogger = () => {
   const handleFinish = async () => {
     if(confirm("Finish workout?")) {
         const id = await finishWorkout();
-        try { haptics.success(); } catch (e) { /* ignore */ }
+        try { haptics.success(); } catch { /* ignore */ }
         navigate(id ? `/summary/${id}` : '/profile');
     }
   };
@@ -241,7 +241,7 @@ export const WorkoutLogger = () => {
 
     // Provide haptic feedback for set completion
     if (isNowComplete) {
-      try { haptics.success(); } catch (e) { /* ignore */ }
+      try { haptics.success(); } catch { /* ignore */ }
 
       // 3. Trigger Rest Timer
       const currentType = currentSet.type || 'normal';

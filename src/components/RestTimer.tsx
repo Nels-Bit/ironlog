@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useReducer } from 'react';
 import { X, Plus, Minus, Timer } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion } from 'framer-motion';
@@ -13,6 +13,69 @@ interface RestTimerProps {
   isSelectorOpen?: boolean;
 }
 
+interface RestTimerState {
+  timeLeft: number;
+  endTime: number | null;
+  overtime: number;
+  isOvertime: boolean;
+}
+
+type RestTimerAction =
+  | { type: 'initialize'; initialSeconds: number }
+  | { type: 'tick'; now: number }
+  | { type: 'adjust'; seconds: number };
+
+const createTimerState = (initialSeconds: number): RestTimerState => ({
+  timeLeft: initialSeconds,
+  endTime: Date.now() + initialSeconds * 1000,
+  overtime: 0,
+  isOvertime: false,
+});
+
+const restTimerReducer = (state: RestTimerState, action: RestTimerAction): RestTimerState => {
+  switch (action.type) {
+    case 'initialize':
+      return createTimerState(action.initialSeconds);
+    case 'tick': {
+      if (!state.endTime) return state;
+      const remaining = Math.ceil((state.endTime - action.now) / 1000);
+      if (remaining > 0) {
+        return {
+          ...state,
+          timeLeft: remaining,
+          isOvertime: false,
+          overtime: 0,
+        };
+      } else {
+        const overtimeElapsed = Math.floor((action.now - state.endTime) / 1000);
+        return {
+          ...state,
+          timeLeft: 0,
+          isOvertime: true,
+          overtime: overtimeElapsed,
+        };
+      }
+    }
+    case 'adjust': {
+      if (state.isOvertime) {
+        const newDuration = Math.max(15, action.seconds);
+        return {
+          timeLeft: newDuration,
+          endTime: Date.now() + newDuration * 1000,
+          overtime: 0,
+          isOvertime: false,
+        };
+      }
+      const newEndTime = state.endTime ? state.endTime + action.seconds * 1000 : Date.now() + action.seconds * 1000;
+      return {
+        ...state,
+        endTime: newEndTime,
+        timeLeft: Math.max(0, state.timeLeft + action.seconds),
+      };
+    }
+  }
+};
+
 export const RestTimer = ({
   initialSeconds,
   isOpen,
@@ -21,44 +84,22 @@ export const RestTimer = ({
   onUpdateDefault,
   isSelectorOpen = false,
 }: RestTimerProps) => {
-  const [timeLeft, setTimeLeft] = useState(0);
-  const [endTime, setEndTime] = useState<number | null>(null);
-  const [overtime, setOvertime] = useState(0);
-  const [isOvertime, setIsOvertime] = useState(false);
-  const overtimeStartRef = useRef<number | null>(null);
+  const [timerState, dispatch] = useReducer(restTimerReducer, initialSeconds, createTimerState);
+  const { timeLeft, endTime, overtime, isOvertime } = timerState;
 
   // 1. Initialize timestamp when timer opens/resets
   useEffect(() => {
     if (isOpen) {
-      setEndTime(Date.now() + initialSeconds * 1000);
-      setTimeLeft(initialSeconds);
-      setOvertime(0);
-      setIsOvertime(false);
-      overtimeStartRef.current = null;
+      dispatch({ type: 'initialize', initialSeconds });
     }
-  }, [isOpen, resetKey]); // Deliberately ignoring initialSeconds so it doesn't restart when defaults change
+  }, [isOpen, resetKey, initialSeconds]);
 
   // 2. Countdown + Overtime logic (immune to browser backgrounding)
   useEffect(() => {
     if (!isOpen || !endTime) return;
 
     const interval = setInterval(() => {
-      const now = Date.now();
-      const remaining = Math.ceil((endTime - now) / 1000);
-
-      if (remaining > 0) {
-        setTimeLeft(remaining);
-        setIsOvertime(false);
-        overtimeStartRef.current = null;
-      } else {
-        setTimeLeft(0);
-        setIsOvertime(true);
-        if (!overtimeStartRef.current) {
-          overtimeStartRef.current = now;
-        }
-        const elapsed = Math.floor((now - overtimeStartRef.current) / 1000);
-        setOvertime(elapsed);
-      }
+      dispatch({ type: 'tick', now: Date.now() });
     }, 500); // 500ms ticks for snappier overtime response
 
     return () => clearInterval(interval);
@@ -66,18 +107,10 @@ export const RestTimer = ({
 
   // 3. Adjust time ±15s
   const adjustTime = (seconds: number) => {
+    dispatch({ type: 'adjust', seconds });
     if (isOvertime) {
-      // In overtime: +15 resets the timer to 15s of positive time
-      const newDuration = Math.max(15, seconds);
-      setEndTime(Date.now() + newDuration * 1000);
-      setTimeLeft(newDuration);
-      setIsOvertime(false);
-      setOvertime(0);
-      overtimeStartRef.current = null;
-      onUpdateDefault(newDuration);
+      onUpdateDefault(Math.max(15, seconds));
     } else {
-      setEndTime(prev => (prev ? prev + seconds * 1000 : Date.now() + seconds * 1000));
-      setTimeLeft(prev => Math.max(0, prev + seconds));
       onUpdateDefault(initialSeconds + seconds);
     }
   };

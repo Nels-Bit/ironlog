@@ -2,14 +2,14 @@
 
 export type HapticType = 'light' | 'medium' | 'success';
 
-const supportsVibrate = typeof navigator !== 'undefined' && typeof (navigator as any).vibrate === 'function';
+const supportsVibrate = typeof navigator !== 'undefined' && 'vibrate' in navigator && typeof navigator.vibrate === 'function';
 
 export const haptics = {
   vibrate: (pattern: number | number[]) => {
     if (supportsVibrate) {
       try {
-        (navigator as any).vibrate(pattern);
-      } catch (e) {
+        navigator.vibrate(pattern);
+      } catch {
         // ignore vibration errors
       }
     }

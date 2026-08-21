@@ -6,7 +6,7 @@ import { useEffect, useRef } from 'react';
  * No-ops gracefully on browsers that don't support the API.
  */
 export const useWakeLock = (enabled: boolean) => {
-  const wakeRef = useRef<any>(null);
+  const wakeRef = useRef<WakeLockSentinel | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -15,12 +15,12 @@ export const useWakeLock = (enabled: boolean) => {
     const requestLock = async () => {
       if (!isSupported || !enabled) return;
       try {
-        wakeRef.current = await (navigator as any).wakeLock.request('screen');
+        wakeRef.current = await navigator.wakeLock.request('screen');
         // When released by the UA, clear reference
         wakeRef.current?.addEventListener?.('release', () => {
           wakeRef.current = null;
         });
-      } catch (err) {
+      } catch {
         // Ignore request failures (user agent restrictions, cross-origin, etc.)
         wakeRef.current = null;
       }
@@ -28,8 +28,8 @@ export const useWakeLock = (enabled: boolean) => {
 
     const releaseLock = async () => {
       try {
-        await wakeRef.current?.release?.();
-      } catch (e) {
+        await wakeRef.current?.release();
+      } catch {
         // ignore
       }
       wakeRef.current = null;

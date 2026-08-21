@@ -12,8 +12,6 @@ import {
 } from '../utils/workoutMath';
 import type { WorkoutSession, WorkoutExercise, Exercise, ExerciseSet } from '../types';
 import { WorkoutContext } from './workoutContext.shared';
-export { useWorkout } from './useWorkout';
-export { WorkoutContext } from './workoutContext.shared';
 
 export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
   const [workout, setWorkout] = useState<WorkoutSession | null>(() => {
