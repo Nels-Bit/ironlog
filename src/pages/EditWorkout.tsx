@@ -264,7 +264,7 @@ export const EditWorkout = () => {
                 ? 'Extra LBS'
                 : 'LBS';
             return (
-              <div key={ex.id} className="space-y-2">
+              <div key={ex.id} className="bg-iron-950/90 border border-white/10 rounded-2xl p-4 space-y-3 shadow-lg shadow-black/40">
                 <div className="flex justify-between items-center px-1">
                   <h3 className="text-white font-bold text-lg flex items-center gap-2">
                     {def?.name || 'Unknown'}
@@ -272,7 +272,7 @@ export const EditWorkout = () => {
                        <span className="text-[10px] bg-brand-orange/20 text-brand-orange px-1.5 py-0.5 rounded uppercase tracking-wider">Uni</span>
                     )}
                   </h3>
-                  <Button size="icon" variant="ghost" className="text-red-500" onClick={() => removeExercise(exIndex)}>
+                  <Button size="icon" variant="ghost" className="text-red-500 hover:bg-red-500/10 rounded-xl" onClick={() => removeExercise(exIndex)}>
                     <Trash2 size={16} />
                   </Button>
                 </div>
@@ -286,6 +286,7 @@ export const EditWorkout = () => {
                 </div>
 
                 {/* SETS */}
+                <div className="space-y-2">
                 {ex.sets.map((set, setIndex) => {
                     const isDropChild = set.type === 'dropset_child';
                     
@@ -358,10 +359,18 @@ export const EditWorkout = () => {
                         </div>
                     );
                 })}
+                </div>
                 
-                <Button variant="ghost" size="sm" className="w-full text-zinc-500 py-2 bg-white/5" onClick={() => addSet(exIndex)}>
-                    <Plus size={14} className="mr-2"/> Add Set
-                </Button>
+                <div className="mt-3">
+                  <button 
+                    type="button"
+                    className="w-full py-3 px-4 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] active:scale-[0.98] border border-white/[0.08] hover:border-white/20 text-zinc-400 hover:text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all duration-200 shadow-sm"
+                    onClick={() => addSet(exIndex)}
+                  >
+                    <Plus size={15} className="text-brand-orange" strokeWidth={2.5} />
+                    <span>Add Set</span>
+                  </button>
+                </div>
               </div>
             );
         })}
