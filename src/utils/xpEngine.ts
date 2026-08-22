@@ -3,12 +3,12 @@ import { isRestDaySession } from './achievementUtils';
 import { getSetLoad } from './workoutMath';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
-const BASE_XP = 85;
-const VOLUME_DIVISOR = 500;
-const PR_BONUS = 85;
-const NEW_EXERCISE_BONUS = 15;
-const MAX_STREAK_MULTIPLIER = 1.30;
-const STREAK_PER_DAY = 0.01;
+export const BASE_XP = 85;
+export const VOLUME_XP_PER_THOUSAND = 2;
+export const PR_BONUS = 85;
+export const NEW_EXERCISE_BONUS = 15;
+export const MAX_STREAK_MULTIPLIER = 1.30;
+export const STREAK_PER_DAY = 0.01;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -82,8 +82,8 @@ export const calculateWorkoutXP = (
   // Base
   const base = BASE_XP;
 
-  // Volume: 1 XP per full 1,000 lbs moved
-  const volume = Math.floor((workout.volumeLoad || 0) / VOLUME_DIVISOR);
+  // Volume: 2 XP per full 1,000 lbs moved
+  const volume = Math.floor((workout.volumeLoad || 0) / 1000) * VOLUME_XP_PER_THOUSAND;
 
   // PR & New Exercise detection
   let prCount = 0;
@@ -253,3 +253,4 @@ export const getXPForWorkout = (
 
   return { breakdown, totalXPBefore, totalXPAfter };
 };
+
