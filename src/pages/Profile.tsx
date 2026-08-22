@@ -741,9 +741,19 @@ export const Profile = () => {
                           <p className="font-bold text-white">{friend.name}</p>
                           <p className="text-xs text-zinc-500">@{friend.userId}</p>
                         </div>
-                        <span className="text-[10px] text-zinc-500 uppercase tracking-widest">{friend.totalWorkouts} workouts</span>
+                        <div className="flex flex-col items-end gap-2">
+                          <span className="text-[10px] text-zinc-500 uppercase tracking-widest">{friend.totalWorkouts} workouts</span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => navigate(`/friends/${friend.userId}`)}
+                            className="h-7 text-xs bg-white/5 hover:bg-white/10 text-brand-orange border border-white/5"
+                          >
+                            View Profile
+                          </Button>
+                        </div>
                       </div>
-                      <p className="text-xs text-zinc-400 mt-1">{friend.totalVolume.toLocaleString()} lbs total volume</p>
+                      <p className="text-xs text-zinc-400 mt-2">{friend.totalVolume.toLocaleString()} lbs total volume</p>
                     </div>
                   ))}
                 </div>

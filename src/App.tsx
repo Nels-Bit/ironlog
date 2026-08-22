@@ -11,9 +11,9 @@ import { Auth } from './pages/Auth';
 import { WorkoutLogger } from './pages/WorkoutLogger';
 import { Profile } from './pages/Profile';
 import { EditWorkout } from './pages/EditWorkout';
-import { Notifications } from './pages/Notifications';
+import { Alerts } from './pages/Alerts';
 import { WorkoutSummary } from './pages/WorkoutSummary';
-
+import { FriendProfile } from './pages/FriendProfile';
 // Components
 import { Navbar } from './components/Navbar';
 import { cn } from './lib/utils';
@@ -82,7 +82,9 @@ const AppContent = () => {
             <Route path="/summary" element={<WorkoutSummary />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/friends" element={<Navigate to="/profile?tab=friends" replace />} />
-            <Route path="/notifications" element={<Notifications />} />
+            <Route path="/friends/:userId" element={<FriendProfile />} />
+            <Route path="/alerts" element={<Alerts />} />
+            <Route path="/notifications" element={<Navigate to="/alerts" replace />} />
             <Route path="*" element={<Navigate to="/profile" replace />} />
           </Routes>
         </main>
