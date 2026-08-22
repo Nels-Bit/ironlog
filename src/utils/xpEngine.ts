@@ -3,9 +3,9 @@ import { isRestDaySession } from './achievementUtils';
 import { getSetLoad } from './workoutMath';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
-const BASE_XP = 50;
-const VOLUME_DIVISOR = 1000;
-const PR_BONUS = 30;
+const BASE_XP = 85;
+const VOLUME_DIVISOR = 500;
+const PR_BONUS = 85;
 const NEW_EXERCISE_BONUS = 15;
 const MAX_STREAK_MULTIPLIER = 1.30;
 const STREAK_PER_DAY = 0.01;

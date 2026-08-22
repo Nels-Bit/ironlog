@@ -413,7 +413,7 @@ export const WorkoutSummary = () => {
                 <XPLine
                   key={`pr-${name}`}
                   label={`PR: ${name}`}
-                  value={`+${30}`}
+                  value={`+${breakdown.prCount > 0 ? Math.round(breakdown.prBonus / breakdown.prCount) : 85}`}
                   icon={<Trophy size={13} className="text-yellow-500" />}
                   delay={0.69 + i * 0.06}
                   accent
@@ -424,7 +424,7 @@ export const WorkoutSummary = () => {
                 <XPLine
                   key={`new-${name}`}
                   label={`New: ${name}`}
-                  value={`+${15}`}
+                  value={`+${breakdown.newExerciseCount > 0 ? Math.round(breakdown.newExerciseBonus / breakdown.newExerciseCount) : 15}`}
                   icon={<Sparkles size={13} className="text-blue-400" />}
                   delay={0.69 + (breakdown.prCount + i) * 0.06}
                 />
