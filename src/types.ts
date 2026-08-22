@@ -47,11 +47,26 @@ export interface FriendRequest {
 
 export interface NotificationItem {
   id: string;
-  type: 'friend_request' | 'friend_request_accepted';
+  type: 'friend_request' | 'friend_request_accepted' | 'workout_completed' | 'achievement_unlocked';
   message: string;
   createdAt: number;
   readAt: number | null;
   actor: FriendSummary | null;
+  payload?: Record<string, unknown>;
+}
+
+export interface FriendProfileData {
+  profile: UserProfile;
+  isPrivate: boolean;
+  stats?: {
+    totalWorkouts: number;
+    totalVolume: number;
+    topMuscle: string;
+  };
+  totalXP?: number;
+  streak?: number;
+  achievements?: { lift: string; label: string; currentWeight: number; threshold: number }[];
+  recentWorkouts?: WorkoutSession[];
 }
 
 export interface Exercise {
