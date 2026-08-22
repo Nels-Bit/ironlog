@@ -29,8 +29,8 @@ export interface LevelProgress {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const XP_BASE = 120;
-const XP_STEP = 25;
+const XP_BASE = 250;
+const XP_STEP = 85;
 
 const normalizeDateKey = (value: number) => new Date(value).toISOString().slice(0, 10);
 const getDateKeyForToday = () => normalizeDateKey(Date.now());
@@ -49,7 +49,7 @@ const countStreakEndingAt = (activeDays: Set<string>, endDateKey: string) => {
 
 export const isRestDaySession = (session: WorkoutSession) => session.name.toLowerCase().includes('rest day');
 
-const getNextLevelXP = (level: number) => XP_BASE + ((level - 1) * XP_STEP);
+const getNextLevelXP = (level: number) => Math.round(XP_BASE + (level * XP_STEP));
 
 export const getLevelRequirementXP = (level: number) => {
   let requiredXP = 0;
@@ -81,6 +81,23 @@ export const getLevelProgress = (totalXP: number): LevelProgress => {
     xpToNext,
     progressPercent: xpForNextLevel > 0 ? (xpIntoLevel / xpForNextLevel) * 100 : 0,
     totalXP
+  };
+};
+
+export const getLevelFromXP = (totalXP: number): number => {
+  return getLevelProgress(totalXP).currentLevel;
+};
+
+export const getXPProgressInCurrentLevel = (totalXP: number): {
+  currentLevelXP: number;
+  requiredLevelXP: number;
+  progressPercent: number;
+} => {
+  const progress = getLevelProgress(totalXP);
+  return {
+    currentLevelXP: progress.xpIntoLevel,
+    requiredLevelXP: progress.xpForNextLevel,
+    progressPercent: progress.progressPercent,
   };
 };
 
