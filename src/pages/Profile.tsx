@@ -7,12 +7,16 @@ import { Button } from '../components/ui/Button';
 import { cn } from '../lib/utils';
 import { authService } from '../services/authService';
 import { workoutService } from '../services/workoutService';
+import { exerciseService } from '../services/exerciseService';
 import { socialService } from '../services/socialService';
-import type { UserProfile, WorkoutSession, FriendRequest, FriendSummary, FriendWithStats } from '../types';
+import type { UserProfile, WorkoutSession, Exercise, FriendRequest, FriendSummary, FriendWithStats } from '../types';
 import { statsUtils, type PersonalRecord } from '../utils/statsUtils';
-import { getLevelProgress, getLevelRequirementXP, isRestDaySession } from '../utils/achievementUtils';
+import { getLevelProgress, getLevelRequirementXP, isRestDaySession, formatStreakLabel } from '../utils/achievementUtils';
+import { replayAllXP, type TotalXPResult } from '../utils/xpEngine';
+import { parseUserWeight } from '../utils/workoutMath';
 import { AchievementList, type AchievementItem } from '../components/ui/achievement-list';
 import { FluidTabs } from '../components/ui/fluid-tabs';
+import { ProfileSkeleton } from '../components/ProfileSkeleton';
 
 export const Profile = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -38,13 +42,14 @@ export const Profile = () => {
   const [formData, setFormData] = useState<Partial<UserProfile>>({});
   const [heightFeet, setHeightFeet] = useState('');
   const [heightInches, setHeightInches] = useState('');
+  const [xpResult, setXpResult] = useState<TotalXPResult | null>(null);
 
-  const XP_PER_WORKOUT = 100;
-  const totalXP = stats.totalWorkouts * XP_PER_WORKOUT;
+  const totalXP = xpResult?.totalXP ?? 0;
   const levelProgress = getLevelProgress(totalXP);
   const currentLevel = levelProgress.currentLevel;
   const xpInCurrentLevel = levelProgress.xpIntoLevel;
   const progressPercent = levelProgress.progressPercent;
+  const currentStreak = xpResult?.currentStreak ?? 0;
   const goalOptions: NonNullable<UserProfile['goal']>[] = ['Strength', 'Hypertrophy', 'Endurance', 'Weight Loss'];
   const environmentOptions: NonNullable<UserProfile['environment']>[] = ['Gym', 'Home'];
   const levelOptions: NonNullable<UserProfile['level']>[] = ['Beginner', 'Intermediate', 'Pro'];
@@ -125,6 +130,13 @@ export const Profile = () => {
       setPrCount(prs.length);
       setActiveWorkouts(activeWorkoutsAscending);
       setPrRecords(prs);
+
+      // XP replay: load exercise defs and compute total XP from history
+      const allExercises = await exerciseService.getAllExercises();
+      const defMap = new Map<string, Exercise>(allExercises.map(e => [e.id, e]));
+      const userWeight = parseUserWeight(user?.weight);
+      const xp = replayAllXP(history, defMap, userWeight);
+      setXpResult(xp);
 
       try {
         const [friendsData, incoming, outgoing] = await Promise.all([
@@ -222,7 +234,7 @@ export const Profile = () => {
     }
   };
 
-  if (loading) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader2 className="animate-spin text-brand-orange" /></div>;
+  if (loading) return <ProfileSkeleton />;
 
   const workoutsAscending = activeWorkouts;
 
@@ -258,15 +270,27 @@ export const Profile = () => {
     { id: 'pr-hunter', title: 'PR Hunter', description: 'Set 5 personal records', unlocked: prCount >= 5, earnedAt: prRecords[4]?.date ?? null, icon: <Award size={18} />, category: 'achievement', sortOrder: 5 }
   ];
 
+  // Find the workout date when cumulative XP first crossed a level threshold
+  const getLevelEarnedAt = (targetLevel: number): number | null => {
+    if (!xpResult) return null;
+    const requiredXP = getLevelRequirementXP(targetLevel);
+    let cumulativeXP = 0;
+    const sorted = [...activeWorkouts].sort((a, b) => a.startTime - b.startTime);
+    for (const w of sorted) {
+      const bd = xpResult.breakdowns.get(w.id);
+      if (bd) cumulativeXP += bd.finalXP;
+      if (cumulativeXP >= requiredXP) return w.startTime;
+    }
+    return null;
+  };
+
   const levelMedals: MedalCard[] = levelMilestones.map((level, index) => {
-    const requiredXP = getLevelRequirementXP(level);
-    const requiredWorkouts = Math.max(1, Math.ceil(requiredXP / XP_PER_WORKOUT));
     return {
       id: `level-${level}`,
       title: `Level ${level}`,
       description: `Reach level ${level}`,
       unlocked: currentLevel >= level,
-      earnedAt: getWorkoutDate(requiredWorkouts - 1),
+      earnedAt: getLevelEarnedAt(level),
       icon: <Award size={18} />,
       category: 'level',
       sortOrder: 100 + index
@@ -329,6 +353,9 @@ export const Profile = () => {
                   <MiniStat label="Height" value={formatHeight(profile?.height)} />
                   <MiniStat label="Age" value={profile?.age ? `${profile.age}` : '-'} />
                   <MiniStat label="Goal" value={profile?.goal || '-'} />
+                  {currentStreak > 0 && (
+                    <MiniStat label="Streak" value={`🔥 ${formatStreakLabel(currentStreak)}`} />
+                  )}
                 </div>
               </div>
             </div>
@@ -543,7 +570,7 @@ export const Profile = () => {
               icon: medal.icon,
               accentColor: medal.category === 'level' ? 'blue' : 'orange',
             }))}
-            initialVisible={5}
+            initialVisible={2}
           />
         )}
 

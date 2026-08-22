@@ -442,7 +442,7 @@ export const WorkoutLogger = () => {
                                                 onChange={(e) => updateSet(exIndex, setIndex, 'weight', parseNumberInputValue(e.target.value))}
                                                     whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
                                                     transition={{ type: "spring", stiffness: 300 }}
-                                                    className="w-full bg-transparent text-center font-bold text-white text-lg outline-none placeholder:text-zinc-700 focus:text-brand-orange disabled:opacity-50"
+                                                    className="w-full bg-white/5 rounded-lg py-2 text-center font-bold text-white text-lg outline-none focus:bg-white/10 disabled:opacity-50"
                                                 />
                                             </div>
                                             

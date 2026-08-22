@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { CheckCircle, Zap, Dumbbell, Clock, BarChart2, Share2, ChevronRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { CheckCircle, Zap, Dumbbell, Clock, BarChart2, Share2, ChevronRight, Trophy, Sparkles, Flame } from 'lucide-react';
 import { workoutService } from '../services/workoutService';
 import { exerciseService } from '../services/exerciseService';
+import { authService } from '../services/authService';
 import { getLevelProgress } from '../utils/achievementUtils';
+import { getXPForWorkout, PR_BONUS, NEW_EXERCISE_BONUS, type WorkoutXPResult } from '../utils/xpEngine';
+import { parseUserWeight } from '../utils/workoutMath';
 import { cn } from '../lib/utils';
 import { Button } from '../components/ui/Button';
 import type { WorkoutSession, Exercise } from '../types';
-
-const XP_PER_WORKOUT = 100;
 
 // ─── Animated count-up hook ────────────────────────────────────────────────
 function useCountUp(target: number, durationMs = 1200, startDelay = 300) {
@@ -69,6 +70,88 @@ const StatCard = ({ label, value, icon, accent = false, delay = 0 }: StatCardPro
   </motion.div>
 );
 
+// ─── XP Line Item ──────────────────────────────────────────────────────────
+interface XPLineProps {
+  label: string;
+  value: string;
+  icon?: React.ReactNode;
+  detail?: string;
+  accent?: boolean;
+  delay?: number;
+}
+
+const XPLine = ({ label, value, icon, detail, accent, delay = 0 }: XPLineProps) => (
+  <motion.div
+    initial={{ opacity: 0, x: -12 }}
+    animate={{ opacity: 1, x: 0 }}
+    transition={{ duration: 0.3, delay }}
+    className="flex items-center justify-between py-1.5"
+  >
+    <div className="flex items-center gap-2 min-w-0">
+      {icon && <span className="shrink-0">{icon}</span>}
+      <span className={cn('text-sm font-medium', accent ? 'text-brand-orange' : 'text-zinc-300')}>{label}</span>
+      {detail && <span className="text-xs text-zinc-500 truncate">{detail}</span>}
+    </div>
+    <span className={cn('text-sm font-bold tabular-nums shrink-0 ml-2', accent ? 'text-brand-orange' : 'text-white')}>
+      {value}
+    </span>
+  </motion.div>
+);
+
+// ─── Level Up Overlay ──────────────────────────────────────────────────────
+const LevelUpOverlay = ({ level, onDismiss }: { level: number; onDismiss: () => void }) => (
+  <AnimatePresence>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      onClick={onDismiss}
+    >
+      <motion.div
+        initial={{ scale: 0, rotate: -15 }}
+        animate={{ scale: 1, rotate: 0 }}
+        exit={{ scale: 0, rotate: 15 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+        className="relative flex flex-col items-center gap-4 p-10 rounded-3xl bg-gradient-to-br from-amber-500/20 via-orange-500/20 to-red-500/20 border border-yellow-400/30 shadow-2xl shadow-yellow-500/20"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Glow ring */}
+        <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-yellow-400/10 to-orange-500/10 blur-xl pointer-events-none" />
+
+        <motion.div
+          animate={{ rotate: [0, -5, 5, -5, 0], scale: [1, 1.1, 1] }}
+          transition={{ duration: 0.6, delay: 0.3, ease: 'easeInOut' }}
+          className="relative z-10"
+        >
+          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center shadow-lg shadow-orange-500/40">
+            <Trophy size={40} className="text-white" />
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="relative z-10 text-center"
+        >
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-yellow-400 mb-1">Level Up!</p>
+          <p className="text-5xl font-black text-white">{level}</p>
+        </motion.div>
+
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.7 }}
+          className="relative z-10 text-xs text-zinc-400 font-medium"
+        >
+          Tap anywhere to continue
+        </motion.p>
+      </motion.div>
+    </motion.div>
+  </AnimatePresence>
+);
+
 // ─── Format helpers ─────────────────────────────────────────────────────────
 const formatDuration = (ms: number) => {
   const totalSec = Math.floor(ms / 1000);
@@ -92,26 +175,43 @@ export const WorkoutSummary = () => {
 
   const [workout, setWorkout] = useState<WorkoutSession | null>(null);
   const [exerciseDefs, setExerciseDefs] = useState<Map<string, Exercise>>(new Map());
-  const [totalWorkouts, setTotalWorkouts] = useState(0);
   const [loading, setLoading] = useState(true);
   const [xpBarFilled, setXpBarFilled] = useState(false);
+  const [xpData, setXpData] = useState<WorkoutXPResult | null>(null);
+  const [showLevelUp, setShowLevelUp] = useState(false);
 
   // Load data
   useEffect(() => {
     if (!id) return;
     const load = async () => {
-      const [session, defs, history] = await Promise.all([
+      const [session, defs, history, user] = await Promise.all([
         workoutService.getWorkoutById(id),
         exerciseService.getAllExercises(),
         workoutService.getHistory(),
+        authService.getUser(),
       ]);
       if (session) setWorkout(session);
       const map = new Map(defs.map(d => [d.id, d]));
       setExerciseDefs(map);
-      setTotalWorkouts(history.filter(w => !w.name.toLowerCase().includes('rest day')).length);
+
+      // Compute XP breakdown via replay engine
+      const userWeight = parseUserWeight(user?.weight);
+      const xpResult = getXPForWorkout(id, history, map, userWeight);
+      setXpData(xpResult);
+
       setLoading(false);
+
       // Trigger XP bar animation shortly after content appears
       setTimeout(() => setXpBarFilled(true), 600);
+
+      // Show level up overlay if applicable
+      if (xpResult) {
+        const prev = getLevelProgress(xpResult.totalXPBefore);
+        const next = getLevelProgress(xpResult.totalXPAfter);
+        if (next.currentLevel > prev.currentLevel) {
+          setTimeout(() => setShowLevelUp(true), 1400);
+        }
+      }
     };
     load();
   }, [id]);
@@ -125,7 +225,7 @@ export const WorkoutSummary = () => {
     0
   ) ?? 0;
 
-  // Most worked muscle: exercise with most completed sets → its target
+  // Most worked muscle
   const topMuscle = (() => {
     if (!workout) return '—';
     const counts = new Map<string, number>();
@@ -139,14 +239,13 @@ export const WorkoutSummary = () => {
     return Array.from(counts.entries()).sort((a, b) => b[1] - a[1])[0][0];
   })();
 
-  // XP
-  const newTotalXP = totalWorkouts * XP_PER_WORKOUT;
-  const prevTotalXP = Math.max(0, newTotalXP - XP_PER_WORKOUT);
-  const prevProgress = getLevelProgress(prevTotalXP);
-  const newProgress = getLevelProgress(newTotalXP);
+  // XP derived values
+  const breakdown = xpData?.breakdown ?? null;
+  const totalXPBefore = xpData?.totalXPBefore ?? 0;
+  const totalXPAfter = xpData?.totalXPAfter ?? 0;
+  const prevProgress = getLevelProgress(totalXPBefore);
+  const newProgress = getLevelProgress(totalXPAfter);
   const leveledUp = newProgress.currentLevel > prevProgress.currentLevel;
-
-  // Which progress % to animate to: if leveled up, fill to 100% then reset to newProgress.progressPercent
   const targetPct = xpBarFilled ? newProgress.progressPercent : prevProgress.progressPercent;
 
   // Animated volume count-up
@@ -154,7 +253,8 @@ export const WorkoutSummary = () => {
 
   const handleShare = async () => {
     if (!workout) return;
-    const text = `💪 Just crushed "${workout.name}"!\n📦 ${formatVolume(totalVolume)} lbs total volume\n⏱ ${formatDuration(duration)}\n🏅 Top muscle: ${topMuscle}\n\nLogged on IronLog`;
+    const xpText = breakdown ? `⚡ +${breakdown.finalXP} XP earned\n` : '';
+    const text = `💪 Just crushed "${workout.name}"!\n📦 ${formatVolume(totalVolume)} lbs total volume\n⏱ ${formatDuration(duration)}\n🏅 Top muscle: ${topMuscle}\n${xpText}\nLogged on IronLog`;
     try {
       if (navigator.share) {
         await navigator.share({ title: 'My Workout', text });
@@ -254,65 +354,129 @@ export const WorkoutSummary = () => {
           />
         </div>
 
-        {/* ── XP Section ── */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.45 }}
-          className="rounded-2xl border border-white/8 bg-zinc-900/60 p-5 space-y-4"
-        >
-          {/* Header row */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">XP Earned</span>
-              {leveledUp && (
-                <motion.span
-                  initial={{ scale: 0, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 18, delay: 0.9 }}
-                  className="text-[10px] font-black uppercase tracking-widest text-yellow-400 bg-yellow-400/15 border border-yellow-400/25 px-2 py-0.5 rounded-full"
-                >
-                  ✨ Level Up!
-                </motion.span>
-              )}
+        {/* ── XP Breakdown Section ── */}
+        {breakdown && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.45 }}
+            className="rounded-2xl border border-white/8 bg-zinc-900/60 p-5 space-y-4"
+          >
+            {/* Header row */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">XP Earned</span>
+                {leveledUp && (
+                  <motion.span
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ type: 'spring', stiffness: 300, damping: 18, delay: 0.9 }}
+                    className="text-[10px] font-black uppercase tracking-widest text-yellow-400 bg-yellow-400/15 border border-yellow-400/25 px-2 py-0.5 rounded-full"
+                  >
+                    ✨ Level Up!
+                  </motion.span>
+                )}
+              </div>
+
+              {/* Total XP badge */}
+              <motion.div
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 320, damping: 20, delay: 0.55 }}
+                className="flex items-center gap-1 bg-brand-orange/15 border border-brand-orange/30 rounded-full px-3 py-1"
+              >
+                <Zap size={12} className="text-brand-orange" fill="currentColor" />
+                <span className="text-sm font-black text-brand-orange">+{breakdown.finalXP} XP</span>
+              </motion.div>
             </div>
 
-            {/* +XP badge pop-in */}
-            <motion.div
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: 'spring', stiffness: 320, damping: 20, delay: 0.55 }}
-              className="flex items-center gap-1 bg-brand-orange/15 border border-brand-orange/30 rounded-full px-3 py-1"
-            >
-              <Zap size={12} className="text-brand-orange" fill="currentColor" />
-              <span className="text-sm font-black text-brand-orange">+{XP_PER_WORKOUT} XP</span>
-            </motion.div>
-          </div>
+            {/* ── Itemized Breakdown ── */}
+            <div className="border-t border-white/5 pt-3 space-y-0.5">
+              <XPLine
+                label="Base Workout"
+                value={`+${breakdown.base}`}
+                icon={<Dumbbell size={13} className="text-zinc-500" />}
+                delay={0.55}
+              />
 
-          {/* Level labels */}
-          <div className="flex justify-between text-xs font-bold">
-            <span className="text-zinc-400">Level {newProgress.currentLevel}</span>
-            <span className="text-zinc-500">
-              {Math.round(newProgress.xpIntoLevel)} / {newProgress.xpForNextLevel} XP
-            </span>
-          </div>
+              {breakdown.volume > 0 && (
+                <XPLine
+                  label="Volume"
+                  value={`+${breakdown.volume}`}
+                  icon={<BarChart2 size={13} className="text-zinc-500" />}
+                  detail={`(${formatVolume(totalVolume)} lbs)`}
+                  delay={0.62}
+                />
+              )}
 
-          {/* Animated progress bar */}
-          <div className="h-3 bg-black/50 rounded-full overflow-hidden border border-white/5 relative">
-            <motion.div
-              className="h-full rounded-full bg-gradient-to-r from-red-600 to-orange-500 shadow-[0_0_12px_rgba(234,88,12,0.5)] relative overflow-hidden"
-              initial={{ width: `${prevProgress.progressPercent}%` }}
-              animate={{ width: `${targetPct}%` }}
-              transition={{ duration: 1.1, delay: 0.65, ease: [0.25, 0.46, 0.45, 0.94] }}
-            >
-              <div className="absolute inset-0 bg-white/20 animate-[shimmer_2s_infinite]" />
-            </motion.div>
-          </div>
+              {breakdown.prExerciseNames.map((name, i) => (
+                <XPLine
+                  key={`pr-${name}`}
+                  label={`PR: ${name}`}
+                  value={`+${PR_BONUS}`}
+                  icon={<Trophy size={13} className="text-yellow-500" />}
+                  delay={0.69 + i * 0.06}
+                  accent
+                />
+              ))}
 
-          <p className="text-right text-[11px] font-bold text-brand-orange">
-            {newProgress.xpToNext} XP to Level {newProgress.currentLevel + 1}
-          </p>
-        </motion.div>
+              {breakdown.newExerciseNames.map((name, i) => (
+                <XPLine
+                  key={`new-${name}`}
+                  label={`New: ${name}`}
+                  value={`+${NEW_EXERCISE_BONUS}`}
+                  icon={<Sparkles size={13} className="text-blue-400" />}
+                  delay={0.69 + (breakdown.prCount + i) * 0.06}
+                />
+              ))}
+            </div>
+
+            {/* ── Subtotal & Streak ── */}
+            {breakdown.streakDays > 0 && breakdown.streakBonus !== 0 && (
+              <div className="border-t border-white/5 pt-2 space-y-0.5">
+                <XPLine
+                  label="Subtotal"
+                  value={`${breakdown.rawXP}`}
+                  delay={0.85}
+                />
+                <XPLine
+                  label={`Streak ×${breakdown.multiplier.toFixed(2)}`}
+                  value={`+${breakdown.streakBonus}`}
+                  icon={<Flame size={13} className="text-orange-400" />}
+                  detail={`(${breakdown.streakDays}d)`}
+                  delay={0.92}
+                  accent
+                />
+              </div>
+            )}
+
+            {/* ── Level progress bar ── */}
+            <div className="border-t border-white/5 pt-3 space-y-2">
+              <div className="flex justify-between text-xs font-bold">
+                <span className="text-zinc-400">Level {newProgress.currentLevel}</span>
+                <span className="text-zinc-500">
+                  {Math.round(newProgress.xpIntoLevel)} / {newProgress.xpForNextLevel} XP
+                </span>
+              </div>
+
+              {/* Animated progress bar */}
+              <div className="h-3 bg-black/50 rounded-full overflow-hidden border border-white/5 relative">
+                <motion.div
+                  className="h-full rounded-full bg-gradient-to-r from-red-600 to-orange-500 shadow-[0_0_12px_rgba(234,88,12,0.5)] relative overflow-hidden"
+                  initial={{ width: `${prevProgress.progressPercent}%` }}
+                  animate={{ width: `${targetPct}%` }}
+                  transition={{ duration: 1.1, delay: 0.65, ease: [0.25, 0.46, 0.45, 0.94] }}
+                >
+                  <div className="absolute inset-0 bg-white/20 animate-[shimmer_2s_infinite]" />
+                </motion.div>
+              </div>
+
+              <p className="text-right text-[11px] font-bold text-brand-orange">
+                {newProgress.xpToNext} XP to Level {newProgress.currentLevel + 1}
+              </p>
+            </div>
+          </motion.div>
+        )}
 
         {/* ── Exercise list summary ── */}
         {workout.exercises.length > 0 && (
@@ -377,6 +541,14 @@ export const WorkoutSummary = () => {
         </motion.div>
 
       </div>
+
+      {/* ── Level Up Overlay ── */}
+      {showLevelUp && (
+        <LevelUpOverlay
+          level={newProgress.currentLevel}
+          onDismiss={() => setShowLevelUp(false)}
+        />
+      )}
     </div>
   );
 };
