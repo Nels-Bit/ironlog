@@ -280,7 +280,7 @@ export const EditWorkout = () => {
                 {/* HEADER ROW */}
                 <div className="grid grid-cols-10 gap-2 text-[10px] text-zinc-500 uppercase font-bold text-center px-2">
                     <div className="col-span-1">#</div>
-                  <div className="col-span-3">{weightLabel}</div>
+                    <div className="col-span-3">{weightLabel}</div>
                     <div className="col-span-3">Reps</div>
                     <div className="col-span-3">Done</div>
                 </div>
@@ -318,28 +318,28 @@ export const EditWorkout = () => {
                                 <div className="col-span-3">
                                     <input 
                                         type="number" 
-                                    min={0}
-                                      value={formatNumberInputValue(set.weight)} 
-                                      onChange={e => updateSet(exIndex, setIndex, 'weight', parseNumberInputValue(e.target.value))}
-                                        className="w-full bg-transparent text-center text-white font-bold outline-none"
+                                        min={0}
                                         placeholder="-"
+                                        value={formatNumberInputValue(set.weight)} 
+                                        onChange={e => updateSet(exIndex, setIndex, 'weight', parseNumberInputValue(e.target.value))}
+                                        className="w-full bg-white/5 rounded-lg py-2 text-center text-white font-bold outline-none focus:bg-white/10"
                                     />
                                 </div>
 
                                 <div className="col-span-3">
                                     {def?.isUnilateral ? (
                                         <div className="flex gap-1">
-                                          <input type="number" min={0} placeholder="L" className="w-1/2 bg-white/5 text-center text-white text-xs py-1 rounded" value={formatNumberInputValue(set.repsLeft)} onChange={e => updateSet(exIndex, setIndex, 'repsLeft', parseNumberInputValue(e.target.value))}/>
-                                          <input type="number" min={0} placeholder="R" className="w-1/2 bg-white/5 text-center text-white text-xs py-1 rounded" value={formatNumberInputValue(set.repsRight)} onChange={e => updateSet(exIndex, setIndex, 'repsRight', parseNumberInputValue(e.target.value))}/>
+                                          <input type="number" min={0} placeholder="L" className="w-1/2 bg-white/5 rounded-lg py-2 text-center text-white text-xs font-bold outline-none focus:bg-white/10" value={formatNumberInputValue(set.repsLeft)} onChange={e => updateSet(exIndex, setIndex, 'repsLeft', parseNumberInputValue(e.target.value))}/>
+                                          <input type="number" min={0} placeholder="R" className="w-1/2 bg-white/5 rounded-lg py-2 text-center text-white text-xs font-bold outline-none focus:bg-white/10" value={formatNumberInputValue(set.repsRight)} onChange={e => updateSet(exIndex, setIndex, 'repsRight', parseNumberInputValue(e.target.value))}/>
                                         </div>
                                     ) : (
                                         <input 
                                             type="number" 
-                                          min={0}
-                                          value={formatNumberInputValue(set.reps)} 
-                                          onChange={e => updateSet(exIndex, setIndex, 'reps', parseNumberInputValue(e.target.value))}
-                                            className="w-full bg-transparent text-center text-white font-bold outline-none"
+                                            min={0}
                                             placeholder="-"
+                                            value={formatNumberInputValue(set.reps)} 
+                                            onChange={e => updateSet(exIndex, setIndex, 'reps', parseNumberInputValue(e.target.value))}
+                                            className="w-full bg-white/5 rounded-lg py-2 text-center text-white font-bold outline-none focus:bg-white/10"
                                         />
                                     )}
                                 </div>

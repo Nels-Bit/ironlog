@@ -13,6 +13,7 @@ import { statsUtils, type PersonalRecord } from '../utils/statsUtils';
 import { getLevelProgress, getLevelRequirementXP, isRestDaySession } from '../utils/achievementUtils';
 import { AchievementList, type AchievementItem } from '../components/ui/achievement-list';
 import { FluidTabs } from '../components/ui/fluid-tabs';
+import { ProfileSkeleton } from '../components/ProfileSkeleton';
 
 export const Profile = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -222,7 +223,7 @@ export const Profile = () => {
     }
   };
 
-  if (loading) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader2 className="animate-spin text-brand-orange" /></div>;
+  if (loading) return <ProfileSkeleton />;
 
   const workoutsAscending = activeWorkouts;
 
@@ -543,7 +544,7 @@ export const Profile = () => {
               icon: medal.icon,
               accentColor: medal.category === 'level' ? 'blue' : 'orange',
             }))}
-            initialVisible={5}
+            initialVisible={2}
           />
         )}
 

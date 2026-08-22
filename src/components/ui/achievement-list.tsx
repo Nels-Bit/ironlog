@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronDown } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 export interface AchievementItem {
@@ -113,7 +114,7 @@ const AchievementRow = ({ item }: { item: AchievementItem }) => {
 
 export const AchievementList = ({
   items,
-  initialVisible = 5,
+  initialVisible = 2,
 }: AchievementListProps) => {
   const [showAll, setShowAll] = useState(false);
 
@@ -130,15 +131,6 @@ export const AchievementList = ({
             Unlocked first, locked last.
           </p>
         </div>
-        {hasMore && (
-          <button
-            type="button"
-            onClick={() => setShowAll((prev) => !prev)}
-            className="shrink-0 text-sm font-semibold text-brand-orange hover:text-white transition-colors"
-          >
-            {showAll ? 'Collapse' : 'See all'}
-          </button>
-        )}
       </div>
 
       {/* Animated list */}
@@ -155,18 +147,23 @@ export const AchievementList = ({
         </AnimatePresence>
       </motion.div>
 
-      {/* Expand / collapse with smooth height */}
-      <AnimatePresence>
-        {!showAll && hasMore && (
-          <motion.div
-            key="gradient-fade"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="pointer-events-none h-6 -mt-1 bg-gradient-to-t from-zinc-900/60 to-transparent rounded-b-3xl"
+      {/* Expand / collapse "See More" / "Show Less" Button */}
+      {hasMore && (
+        <motion.button
+          type="button"
+          onClick={() => setShowAll((prev) => !prev)}
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.98 }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          className="w-full py-2.5 px-4 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] active:bg-white/[0.12] border border-white/[0.08] hover:border-white/20 text-zinc-400 hover:text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all duration-200 shadow-sm"
+        >
+          <span>{showAll ? 'Show Less' : 'See More'}</span>
+          <ChevronDown
+            size={15}
+            className={cn('transition-transform duration-300 text-brand-orange', showAll && 'rotate-180')}
           />
-        )}
-      </AnimatePresence>
+        </motion.button>
+      )}
     </div>
   );
 };
