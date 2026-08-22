@@ -255,4 +255,3 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
     </WorkoutContext.Provider>
   );
 };
-

@@ -10,15 +10,11 @@ export const parseUserWeight = (value: unknown): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+export const isAssistedExercise = (def?: Exercise) =>
+  /assist/i.test(def?.name ?? '') || (def?.category || '').toLowerCase() === 'assisted';
+
 export const isBodyweightExercise = (def?: Exercise) =>
   (def?.category || '').toLowerCase() === 'bodyweight';
-
-export const isAssistedExercise = (def?: Exercise): boolean => {
-  if (!def) return false;
-  const nameMatch = /assist/i.test(def.name);
-  const catMatch = (def.category || '').toLowerCase() === 'assisted';
-  return nameMatch || catMatch;
-};
 
 export const hasCompleteUnilateralReps = (set: ExerciseSet, def?: Exercise) => {
   if (!def?.isUnilateral) return true;

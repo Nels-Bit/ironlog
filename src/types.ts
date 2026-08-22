@@ -36,16 +36,6 @@ export interface FriendWithStats {
   friendsSince: number;
 }
 
-export interface FriendProfileDetails {
-  authUserId: string;
-  userId: string;
-  name: string;
-  isPublic: boolean;
-  totalWorkouts: number;
-  totalVolume: number;
-  recentWorkouts: WorkoutSession[];
-}
-
 export interface FriendRequest {
   id: string;
   requester: FriendSummary;

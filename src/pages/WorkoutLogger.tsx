@@ -1,19 +1,23 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
+import {
   Plus, Check, Trash2, Dumbbell, X, Save, ChevronDown, ArrowDown, Flame, Skull, Circle, Pencil, Play
 } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { Button } from '../components/ui/Button';
+import { motion } from 'framer-motion';
 import { ExerciseSelector } from '../components/ExerciseSelector';
 import { RestTimer } from '../components/RestTimer';
 import { cn } from '../lib/utils';
 import { useWorkout } from '../context/useWorkout';
+import { authService } from '../services/authService';
 import { haptics } from '../utils/haptics';
 import { useWakeLock } from '../utils/useWakeLock';
 import {
+  getSetLoad,
   isAssistedExercise,
-  isBodyweightExercise
+  isBodyweightExercise,
+  parseUserWeight,
+  shouldCountSetForPR
 } from '../utils/workoutMath';
 import {
   formatNumberInputValue,
@@ -25,20 +29,22 @@ import type { Exercise, ExerciseSet } from '../types';
 export const WorkoutLogger = () => {
   const navigate = useNavigate();
   const { 
-    workout, elapsed, isActive, 
-    startWorkout, cancelWorkout, finishWorkout, 
-    addExercise, removeExercise, 
-    addSet, removeSet, updateSet,
-    exerciseDefs, historyCache, prCache
+    workout, elapsed, isActive, historyCache, prCache,
+    startWorkout, logRestDay, cancelWorkout, finishWorkout, 
+    addExercise, removeExercise, addSet, removeSet, updateSet, exerciseDefs 
   } = useWorkout();
 
-  useWakeLock(isActive);
+  // Keep the screen awake while an active workout session is running
+  useWakeLock(Boolean(isActive));
 
+  // --- UI STATE ---
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
-  const [workoutName, setWorkoutName] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [editingExercises, setEditingExercises] = useState<Set<string>>(new Set());
   const [typeSheetOpen, setTypeSheetOpen] = useState<{ exIndex: number; setIndex: number } | null>(null);
+  // Tracks which set-sides have been manually edited to break unilateral auto-mirror
+  // Key format: `${setId}-left` or `${setId}-right`
+  const [manualOverrides, setManualOverrides] = useState<Set<string>>(new Set());
 
   // --- TIMER STATE & PREFERENCES ---
   const [timerOpen, setTimerOpen] = useState(false);
@@ -46,15 +52,21 @@ export const WorkoutLogger = () => {
   const [timerKey, setTimerKey] = useState(0); 
   const [timerType, setTimerType] = useState<string>('normal'); // Tracks which set type triggered it
 
-  // Unilateral manual override tracking
-  const [manualOverrides, setManualOverrides] = useState<Set<string>>(new Set());
-
   // Load user's preferred rest times from storage
   const [restPrefs, setRestPrefs] = useState<Record<string, number>>(() => {
     const saved = localStorage.getItem('ironlog_rest_prefs');
     if (saved) return JSON.parse(saved);
     return { normal: 90, warmup: 60, dropset: 60, failure: 180 }; // Factory defaults
   });
+  const [userWeight, setUserWeight] = useState<number | null>(null);
+
+  useEffect(() => {
+    const loadUserWeight = async () => {
+      const user = await authService.getUser();
+      setUserWeight(parseUserWeight(user?.weight));
+    };
+    loadUserWeight();
+  }, []);
 
   // Function to save new defaults forever
   const handleUpdateRestDefault = (newDuration: number) => {
@@ -81,19 +93,20 @@ export const WorkoutLogger = () => {
   }, []); 
 
   const handleAddExercise = (ex: Exercise) => {
+    // Collapse all existing exercises before adding the new one
     if (workout?.exercises) {
-        const allIds = new Set(workout.exercises.map(e => e.id));
-        setCollapsed(allIds);
+      const currentIds = workout.exercises.map(e => e.id);
+      setCollapsed(new Set(currentIds));
     }
     addExercise(ex);
     setIsSelectorOpen(false);
   };
 
   const handleFinish = async () => {
-    if (confirm("Finish workout?")) {
-      const id = await finishWorkout();
-      try { haptics.success(); } catch { /* ignore */ }
-      navigate(id ? `/summary/${id}` : '/profile');
+    if(confirm("Finish workout?")) {
+        const id = await finishWorkout();
+        try { haptics.success(); } catch { /* ignore */ }
+        navigate(id ? `/summary/${id}` : '/profile');
     }
   };
 
@@ -113,7 +126,7 @@ export const WorkoutLogger = () => {
     });
   };
 
-  const toggleExerciseEdit = (exerciseId: string) => {
+  const toggleEditMode = (exerciseId: string) => {
     setEditingExercises(prev => {
       const next = new Set(prev);
       if (next.has(exerciseId)) next.delete(exerciseId);
@@ -122,34 +135,104 @@ export const WorkoutLogger = () => {
     });
   };
 
-  // --- SMART COMPLETE & REST TIMER TRIGGER ---
-  const handleSmartComplete = (
-    exIndex: number, 
-    setIndex: number, 
-    currentSet: ExerciseSet, 
-    ghostSet?: ExerciseSet
+  const handleSetType = (exIndex: number, setIndex: number, newType: ExerciseSet['type']) => {
+    if (!workout) return;
+    const currentSet = workout.exercises[exIndex].sets[setIndex];
+    if (!currentSet) return;
+    const currentType = currentSet.type;
+
+    if (newType === 'dropset' && currentType !== 'dropset') {
+      updateSet(exIndex, setIndex, 'type', 'dropset');
+      setTimeout(() => {
+        addSet(exIndex, setIndex + 1);
+        setTimeout(() => {
+          updateSet(exIndex, setIndex + 1, 'type', 'dropset_child');
+          updateSet(exIndex, setIndex + 1, 'parentSetId', currentSet.id);
+        }, 0);
+      }, 0);
+    } else if (currentType === 'dropset' && newType !== 'dropset') {
+      const childIndex = workout.exercises[exIndex].sets.findIndex(
+        (s, i) => i > setIndex && s.type === 'dropset_child' && s.parentSetId === currentSet.id
+      );
+      if (childIndex !== undefined && childIndex > -1) removeSet(exIndex, childIndex);
+      updateSet(exIndex, setIndex, 'type', newType);
+    } else {
+      updateSet(exIndex, setIndex, 'type', newType);
+    }
+    setTypeSheetOpen(null);
+  };
+
+  const getTypeIcon = (type: ExerciseSet['type']) => {
+    switch(type) {
+      case 'warmup': return <Flame size={14} className="text-yellow-500" />;
+      case 'dropset': return <ArrowDown size={14} className="text-zinc-400" />;
+      case 'failure': return <Skull size={14} className="text-red-500" />;
+      default: return null;
+    }
+  };
+
+  const handleDeleteSet = (exIndex: number, setIndex: number) => {
+    const set = workout?.exercises[exIndex].sets[setIndex];
+    if (set?.type === 'dropset') {
+      const childIndex = workout?.exercises[exIndex].sets.findIndex(
+        (s, i) => i > setIndex && s.type === 'dropset_child' && s.parentSetId === set.id
+      );
+      if (childIndex !== undefined && childIndex > -1) removeSet(exIndex, childIndex);
+    }
+    removeSet(exIndex, setIndex);
+  };
+
+  /**
+   * Smart unilateral rep change.
+   * Mirrors the new value to the opposite side unless that side has a manual override.
+   * Once the user types into a side, it is flagged as overridden and will never be
+   * auto-overwritten again (until the set is cleared/reset).
+   */
+  const handleUnilateralChange = (
+    exIndex: number,
+    setIndex: number,
+    setId: string,
+    side: 'repsLeft' | 'repsRight',
+    rawValue: string
   ) => {
+    const parsed = parseNumberInputValue(rawValue);
+    const thisKey = `${setId}-${side === 'repsLeft' ? 'left' : 'right'}`;
+    const otherSide = side === 'repsLeft' ? 'repsRight' : 'repsLeft';
+    const otherKey = `${setId}-${side === 'repsLeft' ? 'right' : 'left'}`;
+
+    // Mark this side as manually touched
+    setManualOverrides(prev => {
+      const next = new Set(prev);
+      next.add(thisKey);
+      return next;
+    });
+
+    // Update the edited side
+    updateSet(exIndex, setIndex, side, parsed);
+
+    // Mirror to the other side only if it hasn't been manually overridden yet
+    if (!manualOverrides.has(otherKey)) {
+      updateSet(exIndex, setIndex, otherSide, parsed);
+    }
+  };
+
+  const handleSmartComplete = (exIndex: number, setIndex: number, currentSet: ExerciseSet, ghostSet?: ExerciseSet) => {
     const isNowComplete = !currentSet.isCompleted;
 
-    // 1. Autofill empty values from ghost set if completing
-    if (isNowComplete) {
-      const def = workout?.exercises[exIndex] ? exerciseDefs.get(workout.exercises[exIndex].exerciseId) : undefined;
-      const weightVal = currentSet.weight ?? ghostSet?.weight ?? null;
-      
-      if (currentSet.weight === null && weightVal !== null) {
-        updateSet(exIndex, setIndex, 'weight', weightVal);
-      }
+    // 1. Auto-Fill Logic
+    if (isNowComplete && ghostSet) {
+      const isWeightEmpty = currentSet.weight === null || currentSet.weight === undefined || Number.isNaN(currentSet.weight);
+      const isRepsEmpty = currentSet.reps === null &&
+        (currentSet.repsLeft === null || currentSet.repsLeft === undefined) &&
+        (currentSet.repsRight === null || currentSet.repsRight === undefined);
 
-      if (def?.isUnilateral) {
-        const leftVal = currentSet.repsLeft ?? ghostSet?.repsLeft ?? null;
-        const rightVal = currentSet.repsRight ?? ghostSet?.repsRight ?? null;
-        if (currentSet.repsLeft === null && leftVal !== null) updateSet(exIndex, setIndex, 'repsLeft', leftVal);
-        if (currentSet.repsRight === null && rightVal !== null) updateSet(exIndex, setIndex, 'repsRight', rightVal);
-      } else {
-        const repsVal = currentSet.reps ?? ghostSet?.reps ?? null;
-        if (currentSet.reps === null && repsVal !== null) {
-          updateSet(exIndex, setIndex, 'reps', repsVal);
-        }
+      if (isWeightEmpty && ghostSet.weight !== null && ghostSet.weight !== undefined) {
+        updateSet(exIndex, setIndex, 'weight', ghostSet.weight);
+      }
+      if (isRepsEmpty) {
+        if (ghostSet.reps !== null && ghostSet.reps !== undefined) updateSet(exIndex, setIndex, 'reps', ghostSet.reps);
+        if (ghostSet.repsLeft !== null && ghostSet.repsLeft !== undefined) updateSet(exIndex, setIndex, 'repsLeft', ghostSet.repsLeft);
+        if (ghostSet.repsRight !== null && ghostSet.repsRight !== undefined) updateSet(exIndex, setIndex, 'repsRight', ghostSet.repsRight);
       }
     }
     
@@ -166,443 +249,389 @@ export const WorkoutLogger = () => {
       // Only set a new default duration if the timer is currently closed.
       // If it's open, we let it keep ticking from where it is.
       if (!timerOpen) {
-        let defaultTime = 90;
-        if (currentType === 'warmup') defaultTime = restPrefs.warmup || 60;
-        else if (currentType === 'failure') defaultTime = restPrefs.failure || 180;
-        else if (currentType === 'dropset' || currentType === 'dropset_child') defaultTime = restPrefs.dropset || 60;
-        else defaultTime = restPrefs.normal || 90;
-
-        setTimerDuration(defaultTime);
+          const duration = restPrefs[currentType] || 90; // Pull from memory
+          setTimerDuration(duration);
+          setTimerType(currentType); // Track which type we are resting for
       }
-
-      setTimerType(currentType); // Track category for saving prefs
-      setTimerKey(prev => prev + 1); // Reset countdown
-      setTimerOpen(true); // Popup timer
+      
+      setTimerKey(prev => prev + 1); // Force reset to full time
+      setTimerOpen(true);
     }
   };
 
-  const handleUnilateralChange = (
-    exIndex: number,
-    setIndex: number,
-    setId: string,
-    side: 'repsLeft' | 'repsRight',
-    rawVal: string
-  ) => {
-    const num = parseNumberInputValue(rawVal);
-    updateSet(exIndex, setIndex, side, num);
-
-    const overrideKey = `${setId}_${side}`;
-    const otherSideKey = `${setId}_${side === 'repsLeft' ? 'repsRight' : 'repsLeft'}`;
-
-    if (!manualOverrides.has(otherSideKey)) {
-      const otherSide = side === 'repsLeft' ? 'repsRight' : 'repsLeft';
-      updateSet(exIndex, setIndex, otherSide, num);
-    }
-
-    setManualOverrides(prev => new Set(prev).add(overrideKey));
-  };
-
-  // --- ACTIONS FOR SET TYPES ---
-  const handleAddDropSet = (exIndex: number, parentSetIndex: number) => {
-    const parentSet = workout?.exercises[exIndex].sets[parentSetIndex];
-    if (!parentSet) return;
-
-    if (parentSet.type !== 'dropset' && parentSet.type !== 'dropset_child') {
-      updateSet(exIndex, parentSetIndex, 'type', 'dropset');
-    }
-
-    addSet(exIndex, parentSetIndex + 1);
-    setTimeout(() => {
-      updateSet(exIndex, parentSetIndex + 1, 'type', 'dropset_child');
-      updateSet(exIndex, parentSetIndex + 1, 'parentSetId', parentSet.id);
-    }, 0);
-    setTypeSheetOpen(null);
-  };
-
-  const handleSetTypeSelect = (exIndex: number, setIndex: number, type: ExerciseSet['type']) => {
-    updateSet(exIndex, setIndex, 'type', type);
-    setTypeSheetOpen(null);
-  };
-
-  const handleDeleteSet = (exIndex: number, setIndex: number) => {
-    removeSet(exIndex, setIndex);
-  };
-
-  const formatTime = (sec: number) => {
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${m}:${s < 10 ? '0' : ''}${s}`;
-  };
-
-  const getTypeIcon = (type: ExerciseSet['type']) => {
-    switch(type) {
-      case 'warmup': return <Flame size={12} className="text-yellow-500 fill-yellow-500/20" />;
-      case 'dropset': 
-      case 'dropset_child': return <ArrowDown size={12} className="text-zinc-400" />;
-      case 'failure': return <Skull size={12} className="text-red-500" />;
-      default: return null;
-    }
-  };
-
-  if (!isActive) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[80vh] px-4 animate-in fade-in zoom-in-95 duration-300">
-        <div className="w-20 h-20 bg-brand-orange/10 border border-brand-orange/20 rounded-full flex items-center justify-center mb-6 text-brand-orange shadow-lg shadow-brand-orange/10">
-          <Dumbbell size={40} />
-        </div>
-        <h1 className="text-3xl font-black text-white italic tracking-tight mb-2 text-center">TIME TO TRAIN</h1>
-        <p className="text-zinc-500 mb-8 text-center text-sm max-w-xs">Start a blank canvas or jump into your routine.</p>
-        
-        <div className="w-full max-w-xs space-y-4">
-          <input 
-            type="text" 
-            placeholder="Workout Name (e.g. Push Day)" 
-            value={workoutName}
-            onChange={(e) => setWorkoutName(e.target.value)}
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-center font-bold text-white placeholder:text-zinc-600 focus:border-brand-orange outline-none transition-all shadow-inner"
-          />
-          <Button 
-            size="lg" 
-            className="w-full py-6 text-base font-bold shadow-xl shadow-brand-orange/20"
-            onClick={() => startWorkout(workoutName)}
-          >
-            <Play size={18} className="mr-2 fill-current" /> Start Empty Workout
-          </Button>
-        </div>
-      </div>
-    );
+  // --- RENDER: SETUP SCREEN ---
+  if (!isActive || !workout) {
+    return <SetupScreen onStart={startWorkout} onRestDay={async () => {
+      await logRestDay();
+      navigate('/profile?tab=activity');
+    }} onCancel={() => navigate(-1)} />;
   }
 
+  // --- RENDER: ACTIVE LOGGER ---
   return (
-    <div className="min-h-screen pb-32 animate-in fade-in duration-300">
+    <div className="min-h-screen pb-48 animate-in fade-in duration-500 bg-black">
       
-      {/* 1. STICKY TOP BAR */}
-      <div className="sticky top-0 z-40 bg-iron-950/90 backdrop-blur border-b border-white/5 px-4 py-3 flex justify-between items-center">
-        <div>
-          <h1 className="font-black text-lg text-white leading-tight">{workout?.name}</h1>
-          <div className="flex items-center gap-2 text-xs font-mono text-brand-orange font-bold">
-            <span className="w-2 h-2 rounded-full bg-brand-orange animate-ping" />
-            {formatTime(elapsed)}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={handleCancel} className="text-zinc-400 hover:text-white">
-            <X size={18} />
-          </Button>
-          <Button size="sm" onClick={handleFinish} className="bg-brand-orange hover:bg-brand-orange/90 text-white font-bold">
-            <Save size={16} className="mr-1.5" /> Finish
-          </Button>
-        </div>
-      </div>
+      {/* HEADER */}
+      <header className="sticky top-0 z-50 bg-iron-950/90 backdrop-blur-md border-b border-white/5 px-4 h-16 flex justify-between items-center shadow-2xl">
+        <button onClick={handleCancel} className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 text-zinc-400 hover:text-red-500 transition-colors">
+            <X size={20} />
+        </button>
 
-      {/* 2. EXERCISES LIST */}
-      <div className="p-4 space-y-4 max-w-lg mx-auto">
-        {workout?.exercises.map((ex, exIndex) => {
-          const def = exerciseDefs.get(ex.exerciseId);
-          const isBodyweightMovement = isBodyweightExercise(def);
-          const isAssistedMovement = isAssistedExercise(def);
-          const weightLabel = isAssistedMovement ? 'Assistance' : isBodyweightMovement ? 'Extra LBS' : 'LBS';
-          const ghostSets = historyCache.get(ex.exerciseId);
-          const prWeight = prCache.get(ex.exerciseId);
-          const isCollapsed = collapsed.has(ex.id);
-          const isEditing = editingExercises.has(ex.id);
-
-          return (
-            <div 
-              key={ex.id} 
-              className={cn(
-                "bg-zinc-900/50 rounded-2xl border transition-all duration-200 overflow-hidden",
-                isEditing ? "border-brand-orange/30 bg-zinc-900/80" : "border-white/10"
-              )}
-            >
-              
-              {/* HEADER */}
-              <div 
-                className="p-4 flex justify-between items-center cursor-pointer select-none"
-                onClick={() => toggleCollapse(ex.id)}
-              >
-                <div className="flex items-center gap-3 flex-1 min-w-0 pr-2">
-                  <ChevronDown 
-                    size={18} 
-                    className={cn("text-zinc-400 transition-transform duration-200 shrink-0", isCollapsed && "-rotate-90")} 
-                  />
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-black text-white text-base truncate">{def?.name}</h3>
-                      {def?.isUnilateral && (
-                        <span className="text-[10px] bg-brand-orange/20 text-brand-orange px-1.5 py-0.5 rounded uppercase tracking-wider font-bold shrink-0">
-                          Uni
-                        </span>
-                      )}
-                    </div>
-                    {prWeight !== undefined && prWeight > 0 && (
-                      <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
-                        PR: <span className="text-zinc-300">{prWeight} lbs</span>
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1 shrink-0">
-                  <Button 
-                    size="icon" 
-                    variant="ghost" 
-                    className={cn("w-8 h-8 rounded-lg", isEditing ? "bg-brand-orange/20 text-brand-orange" : "text-zinc-500 hover:text-white")}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleExerciseEdit(ex.id);
-                    }}
-                  >
-                    <Pencil size={14} />
-                  </Button>
-                  
-                  {isEditing && (
-                    <Button 
-                      size="icon" 
-                      variant="ghost" 
-                      className="w-8 h-8 rounded-lg text-red-500 hover:bg-red-500/10"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeExercise(exIndex);
-                      }}
-                    >
-                      <Trash2 size={14} />
-                    </Button>
-                  )}
-                </div>
-              </div>
-
-              {/* CONTENT */}
-              <div className={cn("grid transition-[grid-template-rows] duration-300 ease-out", isCollapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]")}>
-                <div className="overflow-hidden">
-                  <div className="px-3 pb-3">
-                      
-                      <div className="grid grid-cols-10 gap-2 text-[10px] font-bold text-zinc-500 uppercase tracking-wider text-center mb-2 px-2">
-                          <div className="col-span-1">#</div>
-                          <div className="col-span-3">{weightLabel}</div>
-                          <div className="col-span-3">Reps</div>
-                          <div className="col-span-3">{isEditing ? "Delete" : "Done"}</div>
-                      </div>
-
-                      <div className="space-y-2">
-                      {ex.sets.map((set, setIndex) => {
-                          const isDropChild = set.type === 'dropset_child';
-                          const ghostSet = ghostSets ? ghostSets[setIndex] : undefined;
-                          
-                          return (
-                              <div key={set.id} className="relative">
-                                  {isDropChild && (
-                                      <div className="absolute -top-3 left-[-6px] w-4 h-8 border-l-2 border-b-2 border-zinc-700 rounded-bl-xl z-0 pointer-events-none" />
-                                  )}
-
-                                  <div className={cn(
-                                      "grid grid-cols-10 gap-2 items-center p-2 rounded-xl border transition-all relative z-10",
-                                      set.isCompleted ? "opacity-50 border-brand-orange/20 bg-black/40" : "bg-black/40 border-white/5",
-                                      isDropChild ? "ml-4 border-l-2 border-l-zinc-700" : ""
-                                  )}>
-                                    
-                                    <div className="col-span-1 flex justify-center">
-                                        {isDropChild ? (
-                                          <div className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 bg-zinc-900/50">
-                                            <ArrowDown size={14} />
-                                          </div>
-                                        ) : (
-                                          <button
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setTypeSheetOpen({ exIndex, setIndex });
-                                            }}
-                                            disabled={isEditing}
-                                            className={cn(
-                                              "w-7 h-7 rounded-lg flex items-center justify-center gap-0.5 text-xs font-bold transition-all active:scale-90",
-                                              "bg-white/5 text-zinc-400 hover:bg-white/10 border border-white/10"
-                                            )}
-                                          >
-                                            <span className="text-[11px]">{setIndex + 1}</span>
-                                            {getTypeIcon(set.type)}
-                                          </button>
-                                        )}
-                                    </div>
-                                    
-                                    <div className="col-span-3">
-                                        <motion.input
-                                            type="number"
-                                            min={0}
-                                            placeholder={getNumberPlaceholder(ghostSet?.weight, "-")}
-                                            value={formatNumberInputValue(set.weight)}
-                                            disabled={isEditing}
-                                            onChange={(e) => updateSet(exIndex, setIndex, 'weight', parseNumberInputValue(e.target.value))}
-                                            whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
-                                            transition={{ type: "spring", stiffness: 300 }}
-                                            className="w-full bg-transparent text-center font-bold text-white text-lg outline-none placeholder:text-zinc-700 focus:text-brand-orange disabled:opacity-50"
-                                        />
-                                    </div>
-                                    
-                                    <div className="col-span-3 flex justify-center">
-                                        {def?.isUnilateral ? (
-                                        <div className="flex gap-1 w-full">
-                                            <motion.input
-                                              type="number"
-                                              min={0}
-                                              placeholder={getNumberPlaceholder(ghostSet?.repsLeft, "L")}
-                                              value={formatNumberInputValue(set.repsLeft)}
-                                              onChange={(e) => handleUnilateralChange(exIndex, setIndex, set.id, 'repsLeft', e.target.value)}
-                                              disabled={isEditing}
-                                              whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
-                                              transition={{ type: "spring", stiffness: 300 }}
-                                              className="w-1/2 bg-white/5 rounded-lg py-2 text-center font-bold text-white text-sm outline-none focus:bg-white/10 disabled:opacity-50"
-                                            />
-                                            <motion.input
-                                              type="number"
-                                              min={0}
-                                              placeholder={getNumberPlaceholder(ghostSet?.repsRight, "R")}
-                                              value={formatNumberInputValue(set.repsRight)}
-                                              onChange={(e) => handleUnilateralChange(exIndex, setIndex, set.id, 'repsRight', e.target.value)}
-                                              disabled={isEditing}
-                                              whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
-                                              transition={{ type: "spring", stiffness: 300 }}
-                                              className="w-1/2 bg-white/5 rounded-lg py-2 text-center font-bold text-white text-sm outline-none focus:bg-white/10 disabled:opacity-50"
-                                            />
-                                        </div>
-                                        ) : (
-                                        <motion.input
-                                            type="number"
-                                            min={0}
-                                            placeholder={getNumberPlaceholder(ghostSet?.reps, "-")}
-                                            value={formatNumberInputValue(set.reps)}
-                                            onChange={(e) => updateSet(exIndex, setIndex, 'reps', parseNumberInputValue(e.target.value))}
-                                            disabled={isEditing}
-                                            whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
-                                            transition={{ type: "spring", stiffness: 300 }}
-                                            className="w-full bg-white/5 rounded-lg py-2 text-center font-bold text-white text-lg outline-none focus:bg-white/10 disabled:opacity-50"
-                                        />
-                                        )}
-                                    </div>
-
-                                    <div className="col-span-3 flex items-center gap-2">
-                                      {isEditing ? (
-                                        <motion.button
-                                          onClick={() => handleDeleteSet(exIndex, setIndex)}
-                                          whileHover={{ scale: 1.03 }}
-                                          whileTap={{ scale: 0.97 }}
-                                          transition={{ type: "spring", stiffness: 300 }}
-                                          className="flex-1 h-10 rounded-lg flex items-center justify-center bg-red-500/10 text-red-500 border border-red-500/50 hover:bg-red-500 hover:text-white"
-                                        >
-                                          <Trash2 size={18} />
-                                        </motion.button>
-                                      ) : (
-                                        <button 
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleSmartComplete(exIndex, setIndex, set, ghostSet);
-                                            }}
-                                            className={cn(
-                                                "flex-1 h-10 rounded-lg flex items-center justify-center transition-all active:scale-95", 
-                                                set.isCompleted ? "bg-brand-orange text-white" : "bg-white/5 text-zinc-600 hover:bg-white/10"
-                                            )}
-                                        >
-                                            <Check size={20} strokeWidth={4} />
-                                        </button>
-                                      )}
-                                    </div>
-
-                                  </div>
-                              </div>
-                          );
-                      })}
-                      </div>
-
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="w-full mt-3 py-2 text-xs text-zinc-400 bg-white/5 hover:bg-white/10 hover:text-white border border-white/5"
-                        onClick={() => addSet(exIndex)}
-                      >
-                        <Plus size={14} className="mr-1" /> Add Set
-                      </Button>
-                  </div>
-                </div>
-              </div>
-
+        <div className="flex flex-col items-center">
+            <h1 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{workout.name}</h1>
+            <div className="font-mono text-xl font-black text-brand-orange tabular-nums leading-none">
+                {formatTime(elapsed)}
             </div>
-          );
-        })}
+        </div>
 
-        {/* 3. ADD EXERCISE CTA */}
-        <Button 
-          variant="outline" 
-          className="w-full py-6 border-dashed border-zinc-700 hover:border-brand-orange text-zinc-300 hover:text-brand-orange rounded-2xl bg-zinc-900/30"
-          onClick={() => setIsSelectorOpen(true)}
-        >
-          <Plus size={20} className="mr-2" /> Add Exercise
-        </Button>
+        <button onClick={handleFinish} className="w-10 h-10 flex items-center justify-center rounded-full bg-brand-orange text-white shadow-lg shadow-brand-orange/20 hover:scale-105 transition-transform">
+            <Save size={20} />
+        </button>
+      </header>
+
+      {/* WORKOUT LIST */}
+      <div className="p-4 space-y-4 max-w-3xl mx-auto">
+        
+        {/* EMPTY STATE */}
+        {workout.exercises.length === 0 ? (
+          <button 
+            onClick={() => setIsSelectorOpen(true)}
+            className="w-full text-center py-20 opacity-50 space-y-4 hover:opacity-80 active:scale-95 transition-all"
+          >
+            <div className="w-20 h-20 mx-auto bg-zinc-900 rounded-full flex items-center justify-center border border-zinc-800">
+                <Plus className="text-zinc-500" size={32} />
+            </div>
+            <p className="text-zinc-500 font-bold">Tap to add first exercise</p>
+          </button>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+          >
+            {workout.exercises.map((ex, exIndex) => {
+              const def = exerciseDefs.get(ex.exerciseId);
+              const isCollapsed = collapsed.has(ex.id);
+              const isEditing = editingExercises.has(ex.id);
+              const isBodyweightMovement = isBodyweightExercise(def);
+              const isAssisted = isAssistedExercise(def);
+              
+              const ghostSets = historyCache.get(ex.exerciseId);
+              const historicPR = prCache.get(ex.exerciseId) || 0;
+
+              // Calculate Best Set (Current Session)
+              const currentBestLoad = ex.sets.reduce((best, current) => {
+                  if (!shouldCountSetForPR(current, def, undefined, userWeight)) return best;
+
+                  const load = getSetLoad(current, def, undefined, userWeight);
+                  return load > best ? load : best;
+              }, 0);
+              
+              // DISPLAY PR LOGIC: Max of Historic vs Current
+              const displayPR = Math.max(historicPR, currentBestLoad);
+              const isNewPR = currentBestLoad > historicPR && currentBestLoad > 0;
+
+              return (
+                <div key={ex.id} className="relative overflow-hidden">
+                  <div className="bg-iron-950 border border-white/5 rounded-2xl overflow-hidden transition-all duration-300">
+                      
+                      {/* EXERCISE HEADER */}
+                      <div 
+                        className="flex justify-between items-center p-4 cursor-pointer hover:bg-white/5 active:bg-white/10 transition-colors"
+                        onClick={() => toggleCollapse(ex.id)}
+                      >
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          <div className={cn("transition-transform duration-300 text-zinc-500", isCollapsed ? "-rotate-90" : "rotate-0")}>
+                              <ChevronDown size={20} />
+                          </div>
+                          <div>
+                              <h3 className="text-white font-bold text-lg flex items-center gap-2 truncate">
+                                  {def?.name || 'Loading...'}
+                                  {def?.isUnilateral && <span className="text-[10px] bg-brand-orange/20 text-brand-orange px-1.5 py-0.5 rounded uppercase">Uni</span>}
+                              </h3>
+                              <p className={cn(
+                                  "text-xs font-mono mt-1 transition-colors",
+                                  isNewPR ? "text-brand-orange font-bold" : "text-zinc-500"
+                              )}>
+                                  {isNewPR ? '🏆 NEW PR ' : 'PR '} 
+                                  {displayPR} lbs
+                              </p>
+                          </div>
+                        </div>
+
+                        <motion.button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleEditMode(ex.id);
+                          }}
+                          whileHover={{ scale: 1.03 }}
+                          whileTap={{ scale: 0.97 }}
+                          transition={{ type: "spring", stiffness: 300 }}
+                          className={cn(
+                            "w-9 h-9 flex items-center justify-center rounded-full",
+                            isEditing ? "bg-red-500/20 text-red-500" : "bg-white/5 text-zinc-500 hover:text-white"
+                          )}
+                        >
+                          {isEditing ? <Check size={18} /> : <Pencil size={16} />}
+                        </motion.button>
+                      </div>
+
+                      {/* CONTENT */}
+                      <div className={cn("grid transition-[grid-template-rows] duration-300 ease-out", isCollapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]")}>
+                        <div className="overflow-hidden">
+                          <div className="px-3 pb-3">
+                              
+                              <div className="grid grid-cols-10 gap-2 text-[10px] font-bold text-zinc-500 uppercase tracking-wider text-center mb-2 px-2">
+                                  <div className="col-span-1">#</div>
+                                  <div className="col-span-3">
+                                    {isAssisted ? 'Assistance' : isBodyweightMovement ? 'Extra LBS' : 'LBS'}
+                                  </div>
+                                  <div className="col-span-3">Reps</div>
+                                  <div className="col-span-3">{isEditing ? "Delete" : "Done"}</div>
+                              </div>
+
+                              <div className="space-y-2">
+                              {ex.sets.map((set, setIndex) => {
+                                  const isDropChild = set.type === 'dropset_child';
+                                  const ghostSet = ghostSets ? ghostSets[setIndex] : undefined;
+                                  
+                                  return (
+                                      <div key={set.id} className="relative">
+                                          {isDropChild && (
+                                              <div className="absolute -top-3 left-[-6px] w-4 h-8 border-l-2 border-b-2 border-zinc-700 rounded-bl-xl z-0 pointer-events-none" />
+                                          )}
+
+                                          <div className={cn(
+                                              "grid grid-cols-10 gap-2 items-center p-2 rounded-xl border transition-all relative z-10",
+                                              set.isCompleted ? "opacity-50 border-brand-orange/20 bg-black/40" : "bg-black/40 border-white/5",
+                                              isDropChild ? "ml-4 border-l-2 border-l-zinc-700" : ""
+                                          )}>
+                                            
+                                            <div className="col-span-1 flex justify-center">
+                                                {isDropChild ? (
+                                                  <div className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 bg-zinc-900/50">
+                                                    <ArrowDown size={14} />
+                                                  </div>
+                                                ) : (
+                                                  <button
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      setTypeSheetOpen({ exIndex, setIndex });
+                                                    }}
+                                                    disabled={isEditing}
+                                                    className={cn(
+                                                      "w-7 h-7 rounded-lg flex items-center justify-center gap-0.5 text-xs font-bold transition-all active:scale-90",
+                                                      "bg-white/5 text-zinc-400 hover:bg-white/10 border border-white/10"
+                                                    )}
+                                                  >
+                                                    <span className="text-[11px]">{setIndex + 1}</span>
+                                                    {getTypeIcon(set.type)}
+                                                  </button>
+                                                )}
+                                            </div>
+                                            
+                                            <div className="col-span-3">
+                                                <motion.input
+                                                    type="number"
+                                                min={0}
+                                                placeholder={getNumberPlaceholder(ghostSet?.weight, "-")}
+                                                value={formatNumberInputValue(set.weight)}
+                                                    disabled={isEditing}
+                                                onChange={(e) => updateSet(exIndex, setIndex, 'weight', parseNumberInputValue(e.target.value))}
+                                                    whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
+                                                    transition={{ type: "spring", stiffness: 300 }}
+                                                    className="w-full bg-transparent text-center font-bold text-white text-lg outline-none placeholder:text-zinc-700 focus:text-brand-orange disabled:opacity-50"
+                                                />
+                                            </div>
+                                            
+                                            <div className="col-span-3 flex justify-center">
+                                                {def?.isUnilateral ? (
+                                                <div className="flex gap-1 w-full">
+                                                    <motion.input
+                                                      type="number"
+                                                      min={0}
+                                                      placeholder={getNumberPlaceholder(ghostSet?.repsLeft, "L")}
+                                                      value={formatNumberInputValue(set.repsLeft)}
+                                                      onChange={(e) => handleUnilateralChange(exIndex, setIndex, set.id, 'repsLeft', e.target.value)}
+                                                      disabled={isEditing}
+                                                      whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
+                                                      transition={{ type: "spring", stiffness: 300 }}
+                                                      className="w-1/2 bg-white/5 rounded-lg py-2 text-center font-bold text-white text-sm outline-none focus:bg-white/10 disabled:opacity-50"
+                                                    />
+                                                    <motion.input
+                                                      type="number"
+                                                      min={0}
+                                                      placeholder={getNumberPlaceholder(ghostSet?.repsRight, "R")}
+                                                      value={formatNumberInputValue(set.repsRight)}
+                                                      onChange={(e) => handleUnilateralChange(exIndex, setIndex, set.id, 'repsRight', e.target.value)}
+                                                      disabled={isEditing}
+                                                      whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
+                                                      transition={{ type: "spring", stiffness: 300 }}
+                                                      className="w-1/2 bg-white/5 rounded-lg py-2 text-center font-bold text-white text-sm outline-none focus:bg-white/10 disabled:opacity-50"
+                                                    />
+                                                </div>
+                                                ) : (
+                                                <motion.input
+                                                    type="number"
+                                                min={0}
+                                                  placeholder={getNumberPlaceholder(ghostSet?.reps, "-")}
+                                                  value={formatNumberInputValue(set.reps)}
+                                                  onChange={(e) => updateSet(exIndex, setIndex, 'reps', parseNumberInputValue(e.target.value))}
+                                                    disabled={isEditing}
+                                                    whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
+                                                    transition={{ type: "spring", stiffness: 300 }}
+                                                    className="w-full bg-white/5 rounded-lg py-2 text-center font-bold text-white text-lg outline-none focus:bg-white/10 disabled:opacity-50"
+                                                />
+                                                )}
+                                            </div>
+
+                                            <div className="col-span-3 flex items-center gap-2">
+                                              {isEditing ? (
+                                                <motion.button
+                                                  onClick={() => handleDeleteSet(exIndex, setIndex)}
+                                                  whileHover={{ scale: 1.03 }}
+                                                  whileTap={{ scale: 0.97 }}
+                                                  transition={{ type: "spring", stiffness: 300 }}
+                                                  className="flex-1 h-10 rounded-lg flex items-center justify-center bg-red-500/10 text-red-500 border border-red-500/50 hover:bg-red-500 hover:text-white"
+                                                >
+                                                  <Trash2 size={18} />
+                                                </motion.button>
+                                              ) : (
+                                                <button 
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      handleSmartComplete(exIndex, setIndex, set, ghostSet);
+                                                    }}
+                                                    className={cn(
+                                                        "flex-1 h-10 rounded-lg flex items-center justify-center transition-all active:scale-95", 
+                                                        set.isCompleted ? "bg-brand-orange text-white" : "bg-white/5 text-zinc-600 hover:bg-white/10"
+                                                    )}
+                                                >
+                                                    <Check size={20} strokeWidth={4} />
+                                                </button>
+                                              )}
+                                            </div>
+                                          </div>
+                                      </div>
+                                  );
+                              })}
+                              </div>
+                              
+                              <div className="flex gap-2 mt-2">
+                                {isEditing ? (
+                                  <motion.button
+                                      whileHover={{ scale: 1.03 }}
+                                      whileTap={{ scale: 0.97 }}
+                                      transition={{ type: "spring", stiffness: 300 }}
+                                      onClick={() => removeExercise(exIndex)}
+                                      className="w-full py-3 bg-red-500/10 text-red-500 border border-red-500/50 hover:bg-red-500 hover:text-white"
+                                  >
+                                      Delete Exercise
+                                  </motion.button>
+                                ) : (
+                                  <motion.button
+                                      whileHover={{ scale: 1.03 }}
+                                      whileTap={{ scale: 0.97 }}
+                                      transition={{ type: "spring", stiffness: 300 }}
+                                      onClick={() => addSet(exIndex)}
+                                      className="w-full bg-white/5 hover:bg-white/10 text-zinc-400 py-3"
+                                  >
+                                      <Plus size={16} className="mr-2" /> Add Set
+                                  </motion.button>
+                                )}
+                              </div>
+                          </div>
+                        </div>
+                      </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* --- ADD EXERCISE BUTTON --- */}
+            <Button 
+              className="w-full py-8 text-lg font-bold bg-zinc-900/50 border border-white/10 text-zinc-400 hover:text-white hover:bg-zinc-900 active:scale-[0.98] transition-all rounded-2xl"
+              onClick={() => setIsSelectorOpen(true)}
+            >
+              <Plus className="mr-2" size={24} /> Add Another Exercise
+            </Button>
+          </motion.div>
+        )}
       </div>
 
-      {/* 4. REST TIMER POPUP */}
+      {/* Set Type Sheet */}
+      {typeSheetOpen && (() => {
+        const currentSet = workout.exercises[typeSheetOpen.exIndex].sets[typeSheetOpen.setIndex];
+        const currentType = currentSet?.type || 'normal';
+        
+        const availableTypes = [
+          { type: 'normal' as const, icon: <Circle size={32} className="text-zinc-400" />, label: 'Normal' },
+          { type: 'warmup' as const, icon: <Flame size={32} className="text-yellow-500" />, label: 'Warmup' },
+          { type: 'dropset' as const, icon: <ArrowDown size={32} className="text-zinc-400" />, label: 'Drop' },
+          { type: 'failure' as const, icon: <Skull size={32} className="text-red-500" />, label: 'Failure' },
+        ].filter(t => t.type !== currentType);
+
+        return (
+          <>
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[60] animate-in fade-in duration-200" onClick={() => setTypeSheetOpen(null)} />
+            <div className="fixed inset-0 z-[70] flex items-center justify-center p-6 pointer-events-none">
+              <div className="bg-iron-950 border border-white/10 rounded-3xl p-6 shadow-2xl pointer-events-auto animate-in zoom-in-95 duration-200 max-w-xs w-full">
+                <h3 className="text-center text-sm font-bold text-zinc-400 uppercase tracking-wider mb-6">Set Type</h3>
+                <div className="flex flex-col gap-3">
+                  {availableTypes.map(({ type, icon, label }) => (
+                    <button
+                      key={type}
+                      onClick={() => handleSetType(typeSheetOpen.exIndex, typeSheetOpen.setIndex, type)}
+                      className="flex items-center gap-4 p-4 rounded-xl bg-black/40 border border-white/10 hover:border-white/30 hover:bg-white/5 active:scale-98 transition-all"
+                    >
+                      <div className="shrink-0">{icon}</div>
+                      <span className="text-white font-bold text-lg">{label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </>
+        );
+      })()}
+
+      <ExerciseSelector isOpen={isSelectorOpen} onClose={() => setIsSelectorOpen(false)} onSelect={handleAddExercise} />
+      
+      {/* REST TIMER */}
       <RestTimer 
-        isOpen={timerOpen}
+        isOpen={timerOpen} 
+        onClose={() => setTimerOpen(false)} 
         initialSeconds={timerDuration}
         resetKey={timerKey}
-        onClose={() => setTimerOpen(false)}
         onUpdateDefault={handleUpdateRestDefault}
         isSelectorOpen={isSelectorOpen}
       />
 
-      {/* 5. EXERCISE PICKER OVERLAY */}
-      <ExerciseSelector 
-        isOpen={isSelectorOpen} 
-        onClose={() => setIsSelectorOpen(false)} 
-        onSelect={handleAddExercise}
-      />
-
-      {/* 6. SET TYPE BOTTOM SHEET */}
-      {typeSheetOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end justify-center animate-in fade-in duration-200">
-          <div className="bg-iron-950 border border-white/10 rounded-t-3xl p-6 w-full max-w-md space-y-4 animate-in slide-in-from-bottom-5 duration-300">
-            <div className="flex justify-between items-center border-b border-white/10 pb-3">
-              <h3 className="font-bold text-white text-base">Select Set Type</h3>
-              <Button size="icon" variant="ghost" onClick={() => setTypeSheetOpen(null)} className="rounded-full">
-                <X size={18} />
-              </Button>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-2">
-              <button 
-                onClick={() => handleSetTypeSelect(typeSheetOpen.exIndex, typeSheetOpen.setIndex, 'normal')}
-                className="p-4 rounded-xl border border-white/5 bg-white/5 hover:border-brand-orange flex flex-col items-center gap-2 text-zinc-300 hover:text-white"
-              >
-                <Circle size={20} className="text-zinc-500" />
-                <span className="text-xs font-bold uppercase">Normal Set</span>
-              </button>
-
-              <button 
-                onClick={() => handleSetTypeSelect(typeSheetOpen.exIndex, typeSheetOpen.setIndex, 'warmup')}
-                className="p-4 rounded-xl border border-white/5 bg-white/5 hover:border-yellow-500 flex flex-col items-center gap-2 text-yellow-500/80 hover:text-yellow-400"
-              >
-                <Flame size={20} />
-                <span className="text-xs font-bold uppercase">Warm-up Set</span>
-              </button>
-
-              <button 
-                onClick={() => handleAddDropSet(typeSheetOpen.exIndex, typeSheetOpen.setIndex)}
-                className="p-4 rounded-xl border border-white/5 bg-white/5 hover:border-zinc-400 flex flex-col items-center gap-2 text-zinc-400 hover:text-white"
-              >
-                <ArrowDown size={20} />
-                <span className="text-xs font-bold uppercase">Add Drop Set</span>
-              </button>
-
-              <button 
-                onClick={() => handleSetTypeSelect(typeSheetOpen.exIndex, typeSheetOpen.setIndex, 'failure')}
-                className="p-4 rounded-xl border border-white/5 bg-white/5 hover:border-red-500 flex flex-col items-center gap-2 text-red-500/80 hover:text-red-400"
-              >
-                <Skull size={20} />
-                <span className="text-xs font-bold uppercase">Failure Set</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 };
+
+const SetupScreen = ({ onStart, onCancel, onRestDay }: { onStart: (name: string) => void, onCancel: () => void, onRestDay: () => void }) => {
+  const [name, setName] = useState('');
+  return (
+    <div className="min-h-screen bg-black flex items-center justify-center p-6 animate-in fade-in">
+      <div className="w-full max-w-sm bg-iron-950 border border-white/10 rounded-3xl p-6 space-y-6">
+        <div className="text-center"><div className="inline-flex w-12 h-12 bg-white/5 rounded-full items-center justify-center mb-4 text-zinc-500"><Dumbbell size={24} /></div><h2 className="text-xl font-bold text-white">Start Workout</h2></div>
+        <input autoFocus type="text" placeholder={`Workout ${new Date().toLocaleDateString()}`} value={name} onChange={e => setName(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl p-4 text-white text-center font-bold focus:border-brand-orange outline-none" />
+        <div className="space-y-3">
+          <Button className="w-full py-4" onClick={() => onStart(name)}><Play size={18} className="mr-2" /> Start Session</Button>
+          <Button
+            onClick={onRestDay}
+            className="w-full py-4 bg-blue-950/90 border border-blue-400/20 text-blue-100 hover:bg-blue-900/90 hover:text-white shadow-lg shadow-blue-950/30"
+          >
+            🌙 Log Rest Day
+          </Button>
+          <Button variant="ghost" className="w-full text-zinc-500 hover:text-white" onClick={onCancel}>Cancel</Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const formatTime = (sec: number) => { const m = Math.floor(sec / 60); const s = sec % 60; return `${m}:${s.toString().padStart(2, '0')}`; };

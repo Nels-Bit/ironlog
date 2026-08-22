@@ -395,9 +395,14 @@ export const History = () => {
                   )}
                 </div>
 
-                <div className="pt-4">
-                  <Link to={`/history/${workout.id}`} className="block">
-                    <Button className="w-full bg-green-600 hover:bg-green-700 text-white">
+                <div className="pt-4 flex gap-2">
+                  <Link to={`/summary/${workout.id}`} className="flex-1">
+                    <Button className="w-full bg-brand-orange hover:bg-brand-orange/90 text-white">
+                      Summary
+                    </Button>
+                  </Link>
+                  <Link to={`/history/${workout.id}`} className="flex-1">
+                    <Button variant="ghost" className="w-full border border-white/10 hover:bg-white/5 text-zinc-300">
                       Edit
                     </Button>
                   </Link>

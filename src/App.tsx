@@ -10,7 +10,6 @@ import { authService } from './services/authService';
 import { Auth } from './pages/Auth';
 import { WorkoutLogger } from './pages/WorkoutLogger';
 import { Profile } from './pages/Profile';
-import { FriendProfile } from './pages/FriendProfile';
 import { EditWorkout } from './pages/EditWorkout';
 import { Notifications } from './pages/Notifications';
 import { WorkoutSummary } from './pages/WorkoutSummary';
@@ -23,7 +22,7 @@ import { cn } from './lib/utils';
 const ScrollToTop = () => {
   const { pathname } = useLocation();
   useEffect(() => {
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
   }, [pathname]);
   return null;
 };
@@ -34,14 +33,11 @@ const AppContent = () => {
   const [missingWeight, setMissingWeight] = useState(false);
   
   // Define which paths should be "Full Screen" (No padding/container)
-  const isFullScreen = 
-    location.pathname === '/workout' || 
+  const isFullScreen = location.pathname === '/workout' || 
     location.pathname.startsWith('/history/') ||
-    location.pathname.startsWith('/summary/') ||
-    location.pathname.startsWith('/workout/summary/') ||
-    location.pathname === '/summary';
-
-  const showWeightBanner = missingWeight && location.pathname !== '/profile' && !location.pathname.startsWith('/profile/');
+    location.pathname.startsWith('/summary') ||
+    location.pathname.startsWith('/workout/summary');
+  const showWeightBanner = missingWeight && location.pathname !== '/profile';
 
   useEffect(() => {
     const loadWeight = async () => {
@@ -85,8 +81,6 @@ const AppContent = () => {
             <Route path="/workout/summary/:id" element={<WorkoutSummary />} />
             <Route path="/summary" element={<WorkoutSummary />} />
             <Route path="/profile" element={<Profile />} />
-            <Route path="/profile/:userId" element={<FriendProfile />} />
-            <Route path="/friends/:userId" element={<FriendProfile />} />
             <Route path="/friends" element={<Navigate to="/profile?tab=friends" replace />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="*" element={<Navigate to="/profile" replace />} />

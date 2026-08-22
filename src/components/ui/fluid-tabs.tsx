@@ -1,50 +1,54 @@
 import { motion } from 'framer-motion';
 import { cn } from '../../lib/utils';
 
-export interface TabOption<T extends string = string> {
-  id: T;
+export interface FluidTab {
+  id: string;
   label: string;
 }
 
-export interface FluidTabsProps<T extends string = string> {
-  tabs: TabOption<T>[];
-  activeTab: T;
-  onTabChange: (tabId: T) => void;
+interface FluidTabsProps {
+  tabs: FluidTab[];
+  activeTab: string;
+  onChange: (id: string) => void;
+  layoutId?: string;
   className?: string;
 }
 
-export const FluidTabs = <T extends string = string>({
+export const FluidTabs = ({
   tabs,
   activeTab,
-  onTabChange,
-  className
-}: FluidTabsProps<T>) => {
+  onChange,
+  layoutId = 'fluid-tab-indicator',
+  className,
+}: FluidTabsProps) => {
   return (
     <div
       className={cn(
-        "grid grid-flow-col auto-cols-fr rounded-2xl border border-white/10 bg-zinc-950/70 p-1 relative",
+        'flex gap-1 rounded-2xl border border-white/10 bg-zinc-950/70 p-1',
         className
       )}
     >
       {tabs.map((tab) => {
-        const isActive = activeTab === tab.id;
+        const isActive = tab.id === activeTab;
         return (
           <button
             key={tab.id}
             type="button"
-            onClick={() => onTabChange(tab.id)}
+            onClick={() => onChange(tab.id)}
             className={cn(
-              "relative rounded-xl py-2.5 text-xs font-bold uppercase tracking-widest transition-colors duration-200 z-10 select-none",
-              isActive ? "text-white" : "text-zinc-400 hover:text-white"
+              'relative flex-1 rounded-xl py-2 text-xs font-bold uppercase tracking-widest transition-colors duration-200 focus-visible:outline-none',
+              isActive ? 'text-white' : 'text-zinc-400 hover:text-zinc-200'
             )}
           >
+            {/* Animated sliding pill */}
             {isActive && (
               <motion.div
-                layoutId="fluid-tab-pill"
-                className="absolute inset-0 rounded-xl bg-brand-orange shadow-lg shadow-brand-orange/20"
-                transition={{ type: "spring", stiffness: 450, damping: 35 }}
+                layoutId={layoutId}
+                className="absolute inset-0 rounded-xl bg-brand-orange"
+                transition={{ type: 'spring', bounce: 0.18, duration: 0.4 }}
               />
             )}
+            {/* Label sits above the pill */}
             <span className="relative z-10">{tab.label}</span>
           </button>
         );
@@ -52,3 +56,4 @@ export const FluidTabs = <T extends string = string>({
     </div>
   );
 };
+

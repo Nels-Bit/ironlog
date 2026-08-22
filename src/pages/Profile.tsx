@@ -1,7 +1,7 @@
 import { useState, useEffect, type ReactNode } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { 
-  User, Ruler, Weight, Activity, Edit2, Award, Trophy, Zap, Save, X, Loader2, Globe, Lock, Search, Users, UserPlus, LogOut, ChevronRight
+  User, Ruler, Weight, Activity, Edit2, Award, Trophy, Zap, Save, X, Loader2, Globe, Lock, Search, Users, UserPlus, Calendar, LogOut
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { cn } from '../lib/utils';
@@ -49,6 +49,8 @@ export const Profile = () => {
   const environmentOptions: NonNullable<UserProfile['environment']>[] = ['Gym', 'Home'];
   const levelOptions: NonNullable<UserProfile['level']>[] = ['Beginner', 'Intermediate', 'Pro'];
   const levelMilestones = [5, 10, 15, 20, 30, 40, 50];
+
+
 
   useEffect(() => {
     const tab = searchParams.get('tab');
@@ -111,13 +113,13 @@ export const Profile = () => {
       }
 
       const history = await workoutService.getHistory();
-      const activeWorkoutsList = history.filter(session => !isRestDaySession(session));
+      const activeWorkouts = history.filter(session => !isRestDaySession(session));
       setWorkoutHistory(history);
-      const activeWorkoutsAscending = [...activeWorkoutsList].sort((a, b) => a.startTime - b.startTime);
-      const volume = activeWorkoutsList.reduce((acc, curr) => acc + (curr.volumeLoad || 0), 0);
-      const prs = await statsUtils.calculatePRs(activeWorkoutsList);
+      const activeWorkoutsAscending = [...activeWorkouts].sort((a, b) => a.startTime - b.startTime);
+      const volume = activeWorkouts.reduce((acc, curr) => acc + (curr.volumeLoad || 0), 0);
+      const prs = await statsUtils.calculatePRs(activeWorkouts);
       setStats({
-        totalWorkouts: activeWorkoutsList.length,
+        totalWorkouts: activeWorkouts.length,
         totalVolume: volume
       });
       setPrCount(prs.length);
@@ -133,8 +135,9 @@ export const Profile = () => {
         setFriends(friendsData);
         setIncomingRequests(incoming);
         setOutgoingRequests(outgoing);
-      } catch (socialErr) {
-        console.warn('Social features could not be loaded:', socialErr);
+        setSocialError(null);
+      } catch (error) {
+        setSocialError(error instanceof Error ? error.message : 'Social features are unavailable.');
       }
     } catch (error) {
       console.error(error);
@@ -146,27 +149,31 @@ export const Profile = () => {
   const handleSignOut = async () => {
     try {
       await authService.signOut();
-      navigate('/');
+      navigate('/auth');
     } catch (error) {
       console.error('Error signing out:', error);
     }
   };
 
   const setTab = (tab: 'overview' | 'activity' | 'friends') => {
-    setActiveTab(tab);
-    setIsEditing(false);
     setSearchParams(tab === 'overview' ? {} : { tab });
   };
 
-  const handleSendFriendRequest = async (targetUserId: string) => {
-    setSendingRequest(targetUserId);
+  const handleSendFriendRequest = async (userId: string) => {
+    setSendingRequest(userId);
     setSocialError(null);
     try {
-      await socialService.sendFriendRequest(targetUserId);
-      const outgoing = await socialService.getOutgoingFriendRequests();
-      setOutgoingRequests(outgoing);
+      await socialService.sendFriendRequest(userId);
       setSearchTerm('');
       setSearchResults([]);
+      const [friendsData, incoming, outgoing] = await Promise.all([
+        socialService.getFriendsWithStats(),
+        socialService.getIncomingFriendRequests(),
+        socialService.getOutgoingFriendRequests()
+      ]);
+      setFriends(friendsData);
+      setIncomingRequests(incoming);
+      setOutgoingRequests(outgoing);
     } catch (error) {
       setSocialError(error instanceof Error ? error.message : 'Failed to send friend request.');
     } finally {
@@ -232,7 +239,18 @@ export const Profile = () => {
     return null;
   };
 
-  const baseMedals: AchievementItem[] = [
+  type MedalCard = {
+    id: string;
+    title: string;
+    description: string;
+    unlocked: boolean;
+    earnedAt: number | null;
+    icon: ReactNode;
+    category: 'achievement' | 'level';
+    sortOrder: number;
+  };
+
+  const baseMedals: MedalCard[] = [
     { id: 'first-rep', title: 'First Rep', description: 'Complete 1 workout', unlocked: stats.totalWorkouts >= 1, earnedAt: getWorkoutDate(0), icon: <Trophy size={18} />, category: 'achievement', sortOrder: 1 },
     { id: 'consistent', title: 'Consistent', description: 'Complete 10 workouts', unlocked: stats.totalWorkouts >= 10, earnedAt: getWorkoutDate(9), icon: <Activity size={18} />, category: 'achievement', sortOrder: 2 },
     { id: 'volume-builder', title: 'Volume Builder', description: 'Move 50,000 lbs', unlocked: stats.totalVolume >= 50000, earnedAt: getVolumeMilestoneDate(50000), icon: <Weight size={18} />, category: 'achievement', sortOrder: 3 },
@@ -240,7 +258,7 @@ export const Profile = () => {
     { id: 'pr-hunter', title: 'PR Hunter', description: 'Set 5 personal records', unlocked: prCount >= 5, earnedAt: prRecords[4]?.date ?? null, icon: <Award size={18} />, category: 'achievement', sortOrder: 5 }
   ];
 
-  const levelMedals: AchievementItem[] = levelMilestones.map((level, index) => {
+  const levelMedals: MedalCard[] = levelMilestones.map((level, index) => {
     const requiredXP = getLevelRequirementXP(level);
     const requiredWorkouts = Math.max(1, Math.ceil(requiredXP / XP_PER_WORKOUT));
     return {
@@ -255,302 +273,330 @@ export const Profile = () => {
     };
   });
 
-  const achievementItems = [...baseMedals, ...levelMedals];
+  const mergedMedals = [...baseMedals, ...levelMedals].sort((a, b) => {
+    if (a.unlocked !== b.unlocked) return a.unlocked ? -1 : 1;
+    const aTime = a.earnedAt ?? 0;
+    const bTime = b.earnedAt ?? 0;
+    if (aTime !== bTime) return bTime - aTime;
+    return a.sortOrder - b.sortOrder;
+  });
 
-  const tabs = [
-    { id: 'overview' as const, label: 'Overview' },
-    { id: 'activity' as const, label: 'Activity' },
-    { id: 'friends' as const, label: 'Friends' },
-  ];
+
 
   return (
     <div className="min-h-screen bg-black pb-32 animate-in fade-in duration-500">
-      
+
       <div className="p-4 space-y-4 max-w-lg mx-auto mt-2">
         <FluidTabs
-          tabs={tabs}
+          tabs={[
+            { id: 'overview', label: 'Overview' },
+            { id: 'activity', label: 'Activity' },
+            { id: 'friends', label: 'Friends' },
+          ]}
           activeTab={activeTab}
-          onTabChange={(tabId) => setTab(tabId as 'overview' | 'activity' | 'friends')}
+          onChange={(id) => setTab(id as 'overview' | 'activity' | 'friends')}
         />
 
         {activeTab === 'overview' && (
           <>
-            {!isEditing ? (
-              <div className="relative overflow-hidden bg-zinc-900/50 border border-white/10 rounded-3xl p-6">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-brand-orange/20 blur-[100px] rounded-full pointer-events-none" />
+        
+        {!isEditing ? (
+          <div className="relative overflow-hidden bg-zinc-900/50 border border-white/10 rounded-3xl p-6">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-brand-orange/20 blur-[100px] rounded-full pointer-events-none" />
 
-                {/* Top-Right Edit Button */}
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/5 hover:bg-brand-orange/20 border border-white/10 hover:border-brand-orange/30 text-zinc-400 hover:text-brand-orange flex items-center justify-center transition-all"
-                  aria-label="Edit Profile"
+            {/* Edit button — top-right of card */}
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setIsEditing(true)}
+              className="absolute top-4 right-4 z-20 rounded-full text-brand-orange bg-brand-orange/10 hover:bg-brand-orange/20"
+            >
+              <Edit2 size={16} />
+            </Button>
+
+            <div className="relative z-10 flex items-center gap-5 mb-6">
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-red-600 to-orange-500 flex items-center justify-center shadow-lg shadow-orange-500/20 text-3xl font-black text-white">
+                {profile?.name?.charAt(0) || 'U'}
+              </div>
+              
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <h2 className="text-2xl font-bold text-white">{profile?.name || 'Athlete'}</h2>
+                  {currentLevel >= 5 && <Award className="text-yellow-500" size={20} fill="currentColor" />}
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <MiniStat label="Weight" value={profile?.weight ? `${profile.weight} lbs` : '-'} />
+                  <MiniStat label="Height" value={formatHeight(profile?.height)} />
+                  <MiniStat label="Age" value={profile?.age ? `${profile.age}` : '-'} />
+                  <MiniStat label="Goal" value={profile?.goal || '-'} />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                <span>XP Progress</span>
+                <span>{Math.round(xpInCurrentLevel)} / {levelProgress.xpForNextLevel} XP</span>
+              </div>
+              <div className="h-4 bg-black/50 rounded-full overflow-hidden border border-white/5 relative">
+                <div 
+                  className="h-full bg-gradient-to-r from-red-600 to-orange-500 shadow-[0_0_15px_rgba(234,88,12,0.6)] transition-all duration-1000 ease-out relative"
+                  style={{ width: `${progressPercent}%` }}
                 >
-                  <Edit2 size={16} />
+                  <div className="absolute inset-0 bg-white/20 animate-[shimmer_2s_infinite]" />
+                </div>
+              </div>
+              <p className="text-right text-[10px] font-bold text-brand-orange mt-1">
+                Current Level: {currentLevel}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-8 space-y-4 animate-in zoom-in-95 duration-300">
+            <div className="w-24 h-24 mx-auto rounded-full bg-zinc-900 border-2 border-dashed border-zinc-700 flex items-center justify-center text-zinc-500">
+               <User size={32} />
+            </div>
+            <p className="text-zinc-500 text-sm">Tap to change photo</p>
+          </div>
+        )}
+
+        {isEditing && (
+          <div className="space-y-5 animate-in slide-in-from-bottom-4 duration-500">
+            {/* Edit form header */}
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-white">Edit Profile</h2>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setIsEditing(false)}
+                className="rounded-full text-zinc-500 hover:text-white"
+              >
+                <X size={20} />
+              </Button>
+            </div>
+            <InputGroup label="Full Name" icon={<User size={16} />}>
+              <input 
+                value={formData.name || ''} 
+                onChange={e => setFormData({...formData, name: e.target.value})}
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 pl-10 text-white focus:border-brand-orange outline-none transition-all"
+                placeholder="John Doe"
+              />
+            </InputGroup>
+
+            <div className="space-y-3">
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Profile Privacy</label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, isPublic: true })}
+                  className={cn(
+                    "p-3 rounded-xl border font-bold text-sm transition-all inline-flex items-center justify-center gap-2",
+                    formData.isPublic
+                      ? "bg-brand-orange text-white border-brand-orange shadow-lg shadow-brand-orange/20"
+                      : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700"
+                  )}
+                >
+                  <Globe size={14} /> Public
                 </button>
-
-                <div className="relative z-10 flex items-center gap-5 mb-6">
-                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-red-600 to-orange-500 flex items-center justify-center shadow-lg shadow-orange-500/20 text-3xl font-black text-white shrink-0">
-                    {profile?.name?.charAt(0) || 'U'}
-                  </div>
-                  
-                  <div className="flex-1 min-w-0 pr-8">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h2 className="text-2xl font-bold text-white truncate">{profile?.name || 'Athlete'}</h2>
-                    </div>
-                    <div className="inline-flex items-center gap-1.5">
-                      <span className={cn(
-                        "inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-lg border",
-                        profile?.isPublic ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-300" : "border-white/10 bg-black/30 text-zinc-400"
-                      )}>
-                        {profile?.isPublic ? <Globe size={11} /> : <Lock size={11} />}
-                        {profile?.isPublic ? 'Public' : 'Private'}
-                      </span>
-                    </div>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <MiniStat label="Weight" value={profile?.weight ? `${profile.weight} lbs` : '-'} />
-                      <MiniStat label="Height" value={formatHeight(profile?.height)} />
-                      <MiniStat label="Age" value={profile?.age ? `${profile.age}` : '-'} />
-                      <MiniStat label="Goal" value={profile?.goal || '-'} />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-zinc-500">
-                    <span>XP Progress</span>
-                    <span>{Math.round(xpInCurrentLevel)} / {levelProgress.xpForNextLevel} XP</span>
-                  </div>
-                  <div className="h-4 bg-black/50 rounded-full overflow-hidden border border-white/5 relative">
-                    <div 
-                      className="h-full bg-gradient-to-r from-red-600 to-orange-500 shadow-[0_0_15px_rgba(234,88,12,0.6)] transition-all duration-1000 ease-out relative"
-                      style={{ width: `${progressPercent}%` }}
-                    >
-                      <div className="absolute inset-0 bg-white/20 animate-[shimmer_2s_infinite]" />
-                    </div>
-                  </div>
-                  <p className="text-right text-[10px] font-bold text-brand-orange mt-1">
-                    Current Level: {currentLevel}
-                  </p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, isPublic: false })}
+                  className={cn(
+                    "p-3 rounded-xl border font-bold text-sm transition-all inline-flex items-center justify-center gap-2",
+                    formData.isPublic === false
+                      ? "bg-white text-black border-white"
+                      : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700"
+                  )}
+                >
+                  <Lock size={14} /> Private
+                </button>
               </div>
-            ) : (
-              <div className="space-y-5 animate-in slide-in-from-bottom-4 duration-500 bg-zinc-900/30 border border-white/10 rounded-3xl p-6">
-                <div className="flex items-center justify-between pb-2 border-b border-white/5">
-                  <h3 className="font-bold text-white text-lg">Edit Profile</h3>
-                  <Button size="icon" variant="ghost" onClick={() => setIsEditing(false)}>
-                    <X size={18} />
-                  </Button>
-                </div>
+              <p className="text-xs text-zinc-500 px-1">
+                Public profiles can send and receive friend requests. Private profiles keep your user-id but disable friend requests.
+              </p>
+            </div>
 
-                <InputGroup label="Full Name" icon={<User size={16} />}>
-                  <input 
-                    value={formData.name || ''} 
-                    onChange={e => setFormData({...formData, name: e.target.value})}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 pl-10 text-white focus:border-brand-orange outline-none transition-all"
-                    placeholder="John Doe"
-                  />
-                </InputGroup>
+              <div className="grid grid-cols-2 gap-4">
+              <InputGroup label="Weight (lbs)" icon={<Weight size={16} />}>
+                <input 
+                  type="number"
+                  min={0}
+                  value={formData.weight ?? ''} 
+                  onChange={e => setFormData({...formData, weight: e.target.value === '' ? undefined : parseFloat(e.target.value)})}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 pl-10 text-white focus:border-brand-orange outline-none transition-all"
+                />
+              </InputGroup>
+              <InputGroup label="Age" icon={<User size={16} />}>
+                <input 
+                  type="number"
+                  min={0}
+                  value={formData.age ?? ''} 
+                  onChange={e => setFormData({...formData, age: e.target.value === '' ? undefined : parseInt(e.target.value, 10)})}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 pl-10 text-white focus:border-brand-orange outline-none transition-all"
+                />
+              </InputGroup>
+            </div>
 
-                <div className="space-y-3">
-                  <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Profile Privacy</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, isPublic: true })}
-                      className={cn(
-                        "p-3 rounded-xl border font-bold text-sm transition-all inline-flex items-center justify-center gap-2",
-                        formData.isPublic
-                          ? "bg-brand-orange text-white border-brand-orange shadow-lg shadow-brand-orange/20"
-                          : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700"
-                      )}
-                    >
-                      <Globe size={14} /> Public
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, isPublic: false })}
-                      className={cn(
-                        "p-3 rounded-xl border font-bold text-sm transition-all inline-flex items-center justify-center gap-2",
-                        formData.isPublic === false
-                          ? "bg-white text-black border-white"
-                          : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700"
-                      )}
-                    >
-                      <Lock size={14} /> Private
-                    </button>
-                  </div>
-                </div>
+            <div className="grid grid-cols-2 gap-4">
+              <InputGroup label="Height (ft)" icon={<Ruler size={16} />}>
+                <input 
+                  type="number"
+                  min={0}
+                  value={heightFeet}
+                  onChange={e => setHeightFeet(e.target.value)}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 pl-10 text-white focus:border-brand-orange outline-none transition-all"
+                  placeholder="5"
+                />
+              </InputGroup>
+              <InputGroup label="Height (in)" icon={<Ruler size={16} />}>
+                <input 
+                  type="number"
+                  min={0}
+                  max={11}
+                  value={heightInches}
+                  onChange={e => setHeightInches(e.target.value)}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 pl-10 text-white focus:border-brand-orange outline-none transition-all"
+                  placeholder="10"
+                />
+              </InputGroup>
+            </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <InputGroup label="Weight (lbs)" icon={<Weight size={16} />}>
-                    <input 
-                      type="number" 
-                      value={formData.weight || ''} 
-                      onChange={e => setFormData({...formData, weight: parseFloat(e.target.value) || undefined})}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 pl-10 text-white focus:border-brand-orange outline-none transition-all"
-                      placeholder="175"
-                    />
-                  </InputGroup>
-
-                  <InputGroup label="Age" icon={<Activity size={16} />}>
-                    <input 
-                      type="number" 
-                      value={formData.age || ''} 
-                      onChange={e => setFormData({...formData, age: parseInt(e.target.value) || undefined})}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 pl-10 text-white focus:border-brand-orange outline-none transition-all"
-                      placeholder="25"
-                    />
-                  </InputGroup>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <InputGroup label="Height (Ft)" icon={<Ruler size={16} />}>
-                    <input 
-                      type="number" 
-                      value={heightFeet} 
-                      onChange={e => setHeightFeet(e.target.value)}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 pl-10 text-white focus:border-brand-orange outline-none transition-all"
-                      placeholder="5"
-                    />
-                  </InputGroup>
-
-                  <InputGroup label="Height (In)" icon={<Ruler size={16} />}>
-                    <input 
-                      type="number" 
-                      value={heightInches} 
-                      onChange={e => setHeightInches(e.target.value)}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl p-3 pl-10 text-white focus:border-brand-orange outline-none transition-all"
-                      placeholder="10"
-                    />
-                  </InputGroup>
-                </div>
-
-                <div className="space-y-3">
-                  <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Goal</label>
-                  <div className="grid grid-cols-2 gap-2">
-                     {goalOptions.map(goal => (
-                       <button
-                         key={goal}
-                         onClick={() => setFormData({...formData, goal})}
-                         className={cn(
-                           "p-3 rounded-xl border font-bold text-xs transition-all",
-                           formData.goal === goal 
-                             ? "bg-white text-black border-white" 
-                             : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700"
-                         )}
-                       >
-                         {goal}
-                       </button>
-                     ))}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Environment</label>
-                  <div className="grid grid-cols-2 gap-3">
-                     {environmentOptions.map(env => (
-                       <button
-                         key={env}
-                         onClick={() => setFormData({...formData, environment: env})}
-                         className={cn(
-                           "p-3 rounded-xl border font-bold text-sm transition-all",
-                           formData.environment === env 
-                             ? "bg-brand-orange text-white border-brand-orange shadow-lg shadow-brand-orange/20" 
-                             : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700"
-                         )}
-                       >
-                         {env}
-                       </button>
-                     ))}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Experience Level</label>
-                  <div className="grid grid-cols-3 gap-2">
-                     {levelOptions.map(lvl => (
-                       <button
-                         key={lvl}
-                         onClick={() => setFormData({...formData, level: lvl})}
-                         className={cn(
-                           "p-3 rounded-xl border font-bold text-xs transition-all",
-                           formData.level === lvl 
-                             ? "bg-white text-black border-white" 
-                             : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700"
-                         )}
-                       >
-                         {lvl}
-                       </button>
-                     ))}
-                  </div>
-                </div>
-
-                <Button className="w-full py-6 mt-4 text-lg" onClick={handleSave}>
-                  <Save size={20} className="mr-2" /> Save Profile
-                </Button>
+            <div className="space-y-3">
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Goal</label>
+              <div className="grid grid-cols-2 gap-2">
+                 {goalOptions.map(goal => (
+                   <button
+                     key={goal}
+                     onClick={() => setFormData({...formData, goal})}
+                     className={cn(
+                       "p-3 rounded-xl border font-bold text-xs transition-all",
+                       formData.goal === goal 
+                         ? "bg-white text-black border-white" 
+                         : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700"
+                     )}
+                   >
+                     {goal}
+                   </button>
+                 ))}
               </div>
-            )}
+            </div>
 
-            {!isEditing && (
-              <>
-                <AchievementList items={achievementItems} />
+            <div className="space-y-3">
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Environment</label>
+              <div className="grid grid-cols-2 gap-3">
+                 {environmentOptions.map(env => (
+                   <button
+                     key={env}
+                     onClick={() => setFormData({...formData, environment: env})}
+                     className={cn(
+                       "p-3 rounded-xl border font-bold text-sm transition-all",
+                       formData.environment === env 
+                         ? "bg-brand-orange text-white border-brand-orange shadow-lg shadow-brand-orange/20" 
+                         : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700"
+                     )}
+                   >
+                     {env}
+                   </button>
+                 ))}
+              </div>
+            </div>
 
-                <div className="mt-6">
-                  <Button
-                    variant="destructive"
-                    className="w-full py-6"
-                    onClick={handleSignOut}
-                  >
-                    <LogOut size={16} className="mr-2" />
-                    Sign Out
-                  </Button>
-                </div>
-              </>
-            )}
+            <div className="space-y-3">
+              <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider ml-1">Experience Level</label>
+              <div className="grid grid-cols-3 gap-2">
+                 {levelOptions.map(lvl => (
+                   <button
+                     key={lvl}
+                     onClick={() => setFormData({...formData, level: lvl})}
+                     className={cn(
+                       "p-3 rounded-xl border font-bold text-xs transition-all",
+                       formData.level === lvl 
+                         ? "bg-white text-black border-white" 
+                         : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700"
+                     )}
+                   >
+                     {lvl}
+                   </button>
+                 ))}
+              </div>
+            </div>
+
+            <Button className="w-full py-6 mt-4 text-lg" onClick={handleSave}>
+              <Save size={20} className="mr-2" /> Save Profile
+            </Button>
+          </div>
+        )}
+
+        {!isEditing && (
+          <AchievementList
+            items={mergedMedals.map((medal): AchievementItem => ({
+              id: medal.id,
+              title: medal.title,
+              description: medal.description,
+              sublabel: medal.unlocked
+                ? medal.earnedAt
+                  ? `${medal.title} earned (${new Date(medal.earnedAt).toLocaleDateString()})`
+                  : `${medal.title} earned`
+                : `Unlocks when ${medal.description.toLowerCase()}`,
+              unlocked: medal.unlocked,
+              category: medal.category,
+              icon: medal.icon,
+              accentColor: medal.category === 'level' ? 'blue' : 'orange',
+            }))}
+            initialVisible={5}
+          />
+        )}
+
+        {!isEditing && (
+          <div className="mt-6">
+            <Button
+              variant="destructive"
+              className="w-full"
+              onClick={handleSignOut}
+            >
+              <LogOut size={16} className="mr-2" />
+              Sign Out
+            </Button>
+          </div>
+        )}
           </>
         )}
 
         {activeTab === 'activity' && (
-          <div className="space-y-3 animate-in fade-in duration-300">
+          <div className="space-y-3">
+            <div className="rounded-2xl border border-white/10 bg-zinc-900/40 p-4">
+              <p className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-1">Activity</p>
+              <p className="text-sm text-zinc-400">Your logged workout sessions and history.</p>
+            </div>
+
             {workoutHistory.length === 0 ? (
-              <div className="rounded-3xl border border-white/10 bg-zinc-900/30 p-8 text-center text-zinc-500 text-sm">
+              <div className="rounded-2xl border border-white/10 bg-zinc-900/30 p-6 text-center text-sm text-zinc-500">
                 No workouts logged yet.
               </div>
             ) : (
               workoutHistory.map((workout) => {
-                const dateStr = new Date(workout.startTime).toLocaleDateString(undefined, {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric'
-                });
-
+                const isRest = isRestDaySession(workout);
                 return (
-                  <div
-                    key={workout.id}
-                    className="rounded-2xl border border-white/10 bg-zinc-900/40 p-4 flex items-center justify-between gap-3"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <h4 className="font-bold text-white truncate text-base">{workout.name}</h4>
-                      <p className="text-xs text-zinc-500 mt-0.5">{dateStr}</p>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => navigate(`/summary/${workout.id}`)}
-                        className="bg-white/5 hover:bg-white/10 text-white border border-white/10 text-xs px-3 py-1.5 h-auto rounded-xl"
-                      >
-                        Summary
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => navigate(`/history/${workout.id}`)}
-                        className="bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white border border-white/10 text-xs px-3 py-1.5 h-auto rounded-xl"
-                      >
-                        Edit
-                      </Button>
+                  <div key={workout.id} className="rounded-2xl border border-white/10 bg-zinc-900/30 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="font-bold text-white truncate">{isRest ? 'Rest Day 🌙' : workout.name}</h3>
+                        <p className="mt-1 text-xs text-zinc-500 inline-flex items-center gap-1">
+                          <Calendar size={12} /> {new Date(workout.startTime).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Link to={`/summary/${workout.id}`}>
+                          <Button size="sm" variant="ghost" className="border border-white/10 hover:bg-white/5 text-zinc-300">
+                            Summary
+                          </Button>
+                        </Link>
+                        <Link to={`/history/${workout.id}`}>
+                          <Button size="sm">
+                            Edit
+                          </Button>
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 );
@@ -559,8 +605,9 @@ export const Profile = () => {
           </div>
         )}
 
+
         {activeTab === 'friends' && (
-          <div className="space-y-3 animate-in fade-in duration-300">
+          <div className="space-y-3">
             {socialError && (
               <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-3 text-sm text-amber-200">
                 {socialError}
@@ -654,52 +701,22 @@ export const Profile = () => {
               )}
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-zinc-900/30 p-4 space-y-2">
-              <p className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Friends ({friends.length})</p>
+            <div className="rounded-2xl border border-white/10 bg-zinc-900/30 p-4">
+              <p className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Friends</p>
               {friends.length === 0 ? (
                 <p className="text-sm text-zinc-500">No friends yet.</p>
               ) : (
                 <div className="space-y-2">
                   {friends.map((friend) => (
-                    <div
-                      key={friend.authUserId}
-                      onClick={() => navigate(`/profile/${friend.userId}`)}
-                      className="rounded-2xl border border-white/10 bg-black/25 hover:bg-white/5 hover:border-white/20 p-3.5 flex items-center justify-between gap-3 cursor-pointer transition-all group"
-                    >
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-600 to-orange-500 flex items-center justify-center font-bold text-white shrink-0 shadow-md shadow-orange-500/10">
-                          {friend.name.charAt(0).toUpperCase()}
+                    <div key={friend.authUserId} className="rounded-xl border border-white/10 bg-black/20 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <p className="font-bold text-white">{friend.name}</p>
+                          <p className="text-xs text-zinc-500">@{friend.userId}</p>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className="font-bold text-white truncate text-sm">{friend.name}</p>
-                            <span className={cn(
-                              "text-[9px] font-bold uppercase px-1.5 py-0.2 rounded border shrink-0",
-                              friend.isPublic ? "border-emerald-500/30 text-emerald-400 bg-emerald-500/10" : "border-zinc-700 text-zinc-500 bg-zinc-800"
-                            )}>
-                              {friend.isPublic ? 'Public' : 'Private'}
-                            </span>
-                          </div>
-                          <p className="text-xs text-zinc-500 truncate">
-                            {friend.totalWorkouts} {friend.totalWorkouts === 1 ? 'workout' : 'workouts'} • {Math.round(friend.totalVolume).toLocaleString()} lbs
-                          </p>
-                        </div>
+                        <span className="text-[10px] text-zinc-500 uppercase tracking-widest">{friend.totalWorkouts} workouts</span>
                       </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/profile/${friend.userId}`);
-                          }}
-                          className="bg-white/5 hover:bg-white/10 text-zinc-300 hover:text-white border border-white/10 text-xs px-3 py-1.5 h-auto rounded-xl"
-                        >
-                          View Profile
-                        </Button>
-                        <ChevronRight size={16} className="text-zinc-600 group-hover:text-zinc-300 transition-colors" />
-                      </div>
+                      <p className="text-xs text-zinc-400 mt-1">{friend.totalVolume.toLocaleString()} lbs total volume</p>
                     </div>
                   ))}
                 </div>
@@ -737,6 +754,9 @@ const MiniStat = ({ label, value }: { label: string; value: string }) => (
     <div className="text-sm font-bold text-white truncate">{value}</div>
   </div>
 );
+
+
+
 
 const formatHeight = (cm?: number) => {
   if (!cm) return '-';
