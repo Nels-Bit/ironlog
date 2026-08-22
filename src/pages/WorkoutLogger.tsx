@@ -309,6 +309,7 @@ export const WorkoutLogger = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.3 }}
+            className="space-y-6"
           >
             {workout.exercises.map((ex, exIndex) => {
               const def = exerciseDefs.get(ex.exerciseId);
@@ -333,8 +334,8 @@ export const WorkoutLogger = () => {
               const isNewPR = currentBestLoad > historicPR && currentBestLoad > 0;
 
               return (
-                <div key={ex.id} className="relative overflow-hidden">
-                  <div className="bg-iron-950 border border-white/5 rounded-2xl overflow-hidden transition-all duration-300">
+                <div key={ex.id} className="relative">
+                  <div className="bg-iron-950/90 border border-white/10 rounded-2xl overflow-hidden shadow-xl shadow-black/40 transition-all duration-300">
                       
                       {/* EXERCISE HEADER */}
                       <div 
@@ -380,7 +381,7 @@ export const WorkoutLogger = () => {
                       {/* CONTENT */}
                       <div className={cn("grid transition-[grid-template-rows] duration-300 ease-out", isCollapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]")}>
                         <div className="overflow-hidden">
-                          <div className="px-3 pb-3">
+                          <div className="px-4 pb-4">
                               
                               <div className="grid grid-cols-10 gap-2 text-[10px] font-bold text-zinc-500 uppercase tracking-wider text-center mb-2 px-2">
                                   <div className="col-span-1">#</div>
@@ -518,26 +519,28 @@ export const WorkoutLogger = () => {
                               })}
                               </div>
                               
-                              <div className="flex gap-2 mt-2">
+                              <div className="mt-3">
                                 {isEditing ? (
                                   <motion.button
-                                      whileHover={{ scale: 1.03 }}
-                                      whileTap={{ scale: 0.97 }}
-                                      transition={{ type: "spring", stiffness: 300 }}
+                                      whileHover={{ scale: 1.01 }}
+                                      whileTap={{ scale: 0.98 }}
+                                      transition={{ type: "spring", stiffness: 400, damping: 25 }}
                                       onClick={() => removeExercise(exIndex)}
-                                      className="w-full py-3 bg-red-500/10 text-red-500 border border-red-500/50 hover:bg-red-500 hover:text-white"
+                                      className="w-full py-3 px-4 rounded-xl bg-red-500/10 hover:bg-red-500/20 active:bg-red-500/30 border border-red-500/30 text-red-400 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all duration-200"
                                   >
-                                      Delete Exercise
+                                      <Trash2 size={15} />
+                                      <span>Delete Exercise</span>
                                   </motion.button>
                                 ) : (
                                   <motion.button
-                                      whileHover={{ scale: 1.03 }}
-                                      whileTap={{ scale: 0.97 }}
-                                      transition={{ type: "spring", stiffness: 300 }}
+                                      whileHover={{ scale: 1.01 }}
+                                      whileTap={{ scale: 0.98 }}
+                                      transition={{ type: "spring", stiffness: 400, damping: 25 }}
                                       onClick={() => addSet(exIndex)}
-                                      className="w-full bg-white/5 hover:bg-white/10 text-zinc-400 py-3"
+                                      className="w-full py-3 px-4 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] active:bg-white/[0.12] border border-white/[0.08] hover:border-white/20 text-zinc-400 hover:text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all duration-200 shadow-sm"
                                   >
-                                      <Plus size={16} className="mr-2" /> Add Set
+                                      <Plus size={15} className="text-brand-orange" strokeWidth={2.5} />
+                                      <span>Add Set</span>
                                   </motion.button>
                                 )}
                               </div>
@@ -551,10 +554,10 @@ export const WorkoutLogger = () => {
 
             {/* --- ADD EXERCISE BUTTON --- */}
             <Button 
-              className="w-full py-8 text-lg font-bold bg-zinc-900/50 border border-white/10 text-zinc-400 hover:text-white hover:bg-zinc-900 active:scale-[0.98] transition-all rounded-2xl"
+              className="w-full py-6 text-sm font-bold bg-white/[0.03] hover:bg-white/[0.07] border border-dashed border-white/20 hover:border-brand-orange/50 text-zinc-400 hover:text-white active:scale-[0.98] transition-all rounded-2xl flex items-center justify-center gap-2"
               onClick={() => setIsSelectorOpen(true)}
             >
-              <Plus className="mr-2" size={24} /> Add Another Exercise
+              <Plus className="mr-2" size={20} /> Add Another Exercise
             </Button>
           </motion.div>
         )}
