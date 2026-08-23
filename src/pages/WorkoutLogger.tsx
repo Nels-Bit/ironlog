@@ -6,7 +6,6 @@ import {
 import { Button } from '../components/ui/Button';
 import { motion } from 'framer-motion';
 import { ExerciseSelector } from '../components/ExerciseSelector';
-import { RestTimer } from '../components/RestTimer';
 import { cn } from '../lib/utils';
 import { useWorkout } from '../context/useWorkout';
 import { authService } from '../services/authService';
@@ -28,6 +27,13 @@ import type { Exercise, ExerciseSet } from '../types';
 
 export const WorkoutLogger = () => {
   const navigate = useNavigate();
+  
+  const blockInvalidNumberChars = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (['e', 'E', '+', '-'].includes(e.key)) {
+      e.preventDefault();
+    }
+  };
+
   const { 
     workout, elapsed, isActive, historyCache, prCache,
     startWorkout, logRestDay, cancelWorkout, finishWorkout, 
@@ -46,18 +52,9 @@ export const WorkoutLogger = () => {
   // Key format: `${setId}-left` or `${setId}-right`
   const [manualOverrides, setManualOverrides] = useState<Set<string>>(new Set());
 
-  // --- TIMER STATE & PREFERENCES ---
-  const [timerOpen, setTimerOpen] = useState(false);
-  const [timerDuration, setTimerDuration] = useState(90);
-  const [timerKey, setTimerKey] = useState(0); 
-  const [timerType, setTimerType] = useState<string>('normal'); // Tracks which set type triggered it
+  // Use global Rest Timer
+  const { openRestTimer } = useWorkout();
 
-  // Load user's preferred rest times from storage
-  const [restPrefs, setRestPrefs] = useState<Record<string, number>>(() => {
-    const saved = localStorage.getItem('ironlog_rest_prefs');
-    if (saved) return JSON.parse(saved);
-    return { normal: 90, warmup: 60, dropset: 60, failure: 180 }; // Factory defaults
-  });
   const [userWeight, setUserWeight] = useState<number | null>(null);
 
   useEffect(() => {
@@ -67,14 +64,6 @@ export const WorkoutLogger = () => {
     };
     loadUserWeight();
   }, []);
-
-  // Function to save new defaults forever
-  const handleUpdateRestDefault = (newDuration: number) => {
-    setTimerDuration(newDuration); // Update current UI
-    const updatedPrefs = { ...restPrefs, [timerType]: newDuration };
-    setRestPrefs(updatedPrefs); // Update state
-    localStorage.setItem('ironlog_rest_prefs', JSON.stringify(updatedPrefs)); // Save to memory
-  };
 
   // Listen for Navbar signal
   useEffect(() => {
@@ -245,17 +234,7 @@ export const WorkoutLogger = () => {
 
       // 3. Trigger Rest Timer
       const currentType = currentSet.type || 'normal';
-      
-      // Only set a new default duration if the timer is currently closed.
-      // If it's open, we let it keep ticking from where it is.
-      if (!timerOpen) {
-          const duration = restPrefs[currentType] || 90; // Pull from memory
-          setTimerDuration(duration);
-          setTimerType(currentType); // Track which type we are resting for
-      }
-      
-      setTimerKey(prev => prev + 1); // Force reset to full time
-      setTimerOpen(true);
+      openRestTimer(currentType);
     }
   };
 
@@ -434,7 +413,7 @@ export const WorkoutLogger = () => {
                                             
                                             <div className="col-span-3">
                                                 <motion.input
-                                                    type="number"
+                                                    type="number" onKeyDown={blockInvalidNumberChars}
                                                 min={0}
                                                 placeholder={getNumberPlaceholder(ghostSet?.weight, "-")}
                                                 value={formatNumberInputValue(set.weight)}
@@ -450,7 +429,7 @@ export const WorkoutLogger = () => {
                                                 {def?.isUnilateral ? (
                                                 <div className="flex gap-1 w-full">
                                                     <motion.input
-                                                      type="number"
+                                                      type="number" onKeyDown={blockInvalidNumberChars}
                                                       min={0}
                                                       placeholder={getNumberPlaceholder(ghostSet?.repsLeft, "L")}
                                                       value={formatNumberInputValue(set.repsLeft)}
@@ -461,7 +440,7 @@ export const WorkoutLogger = () => {
                                                       className="w-1/2 bg-white/5 rounded-lg py-2 text-center font-bold text-white text-sm outline-none focus:bg-white/10 disabled:opacity-50"
                                                     />
                                                     <motion.input
-                                                      type="number"
+                                                      type="number" onKeyDown={blockInvalidNumberChars}
                                                       min={0}
                                                       placeholder={getNumberPlaceholder(ghostSet?.repsRight, "R")}
                                                       value={formatNumberInputValue(set.repsRight)}
@@ -474,7 +453,7 @@ export const WorkoutLogger = () => {
                                                 </div>
                                                 ) : (
                                                 <motion.input
-                                                    type="number"
+                                                    type="number" onKeyDown={blockInvalidNumberChars}
                                                 min={0}
                                                   placeholder={getNumberPlaceholder(ghostSet?.reps, "-")}
                                                   value={formatNumberInputValue(set.reps)}
@@ -600,20 +579,9 @@ export const WorkoutLogger = () => {
       })()}
 
       <ExerciseSelector isOpen={isSelectorOpen} onClose={() => setIsSelectorOpen(false)} onSelect={handleAddExercise} />
-      
-      {/* REST TIMER */}
-      <RestTimer 
-        isOpen={timerOpen} 
-        onClose={() => setTimerOpen(false)} 
-        initialSeconds={timerDuration}
-        resetKey={timerKey}
-        onUpdateDefault={handleUpdateRestDefault}
-        isSelectorOpen={isSelectorOpen}
-      />
-
-    </div>
-  );
-};
+      </div>
+    );
+  };
 
 const SetupScreen = ({ onStart, onCancel, onRestDay }: { onStart: (name: string) => void, onCancel: () => void, onRestDay: () => void }) => {
   const [name, setName] = useState('');

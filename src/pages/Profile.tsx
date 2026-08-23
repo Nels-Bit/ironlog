@@ -735,25 +735,22 @@ export const Profile = () => {
               ) : (
                 <div className="space-y-2">
                   {friends.map((friend) => (
-                    <div key={friend.authUserId} className="rounded-xl border border-white/10 bg-black/20 p-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <div>
-                          <p className="font-bold text-white">{friend.name}</p>
-                          <p className="text-xs text-zinc-500">@{friend.userId}</p>
+                    <div key={friend.authUserId} className="rounded-xl border border-white/5 bg-zinc-900/40 p-3 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 flex-1 min-w-0 pr-3">
+                        <div className="w-10 h-10 shrink-0 rounded-full bg-brand-orange/20 text-brand-orange flex items-center justify-center font-bold">
+                          {friend.name.charAt(0).toUpperCase()}
                         </div>
-                        <div className="flex flex-col items-end gap-2">
-                          <span className="text-[10px] text-zinc-500 uppercase tracking-widest">{friend.totalWorkouts} workouts</span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => navigate(`/friends/${friend.userId}`)}
-                            className="h-7 text-xs bg-white/5 hover:bg-white/10 text-brand-orange border border-white/5"
-                          >
-                            View Profile
-                          </Button>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-white text-sm truncate">{friend.name}</p>
+                          <p className="text-xs text-zinc-500 truncate">@{friend.userId}</p>
                         </div>
                       </div>
-                      <p className="text-xs text-zinc-400 mt-2">{friend.totalVolume.toLocaleString()} lbs total volume</p>
+                      <Button 
+                        onClick={() => navigate(`/friends/${friend.authUserId}`)}
+                        className="w-[130px] h-[48px] min-w-[130px] shrink-0 flex items-center justify-center text-sm tracking-normal font-bold"
+                      >
+                        View Profile
+                      </Button>
                     </div>
                   ))}
                 </div>

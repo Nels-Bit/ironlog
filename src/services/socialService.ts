@@ -380,15 +380,15 @@ export const socialService = {
     return count ?? 0;
   },
 
-  async getFriendProfile(friendUserCode: string): Promise<FriendProfileData> {
-    console.log('[getFriendProfile] Requested user code:', friendUserCode);
+  async getFriendProfile(friendIdOrCode: string): Promise<FriendProfileData> {
+    console.log('[getFriendProfile] Requested ID/Code:', friendIdOrCode);
     
     // 1. Fetch friend's profile
     const { data: profileData, error: profileError } = await supabase
       .from('user_profiles')
       .select('*')
-      .eq('user_code', friendUserCode)
-      .single();
+      .or(`user_id.eq.${friendIdOrCode},user_code.eq.${friendIdOrCode}`)
+      .maybeSingle();
 
     if (profileError) throw profileError;
     if (!profileData) throw new Error('Profile not found.');

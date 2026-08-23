@@ -16,6 +16,7 @@ import { WorkoutSummary } from './pages/WorkoutSummary';
 import { FriendProfile } from './pages/FriendProfile';
 // Components
 import { Navbar } from './components/Navbar';
+import { RestTimer } from './components/RestTimer';
 import { cn } from './lib/utils';
 
 // Resets scroll position to top on every route change (fixes PWA scroll retention)
@@ -52,6 +53,7 @@ const AppContent = () => {
   return (
     <WorkoutProvider>
       <ScrollToTop />
+      <RestTimer />
       <div className="min-h-screen bg-black text-white font-sans selection:bg-brand-orange selection:text-white pb-20 md:pb-0 md:pl-64">
         
         <Navbar />
