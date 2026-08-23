@@ -16,13 +16,16 @@ export const FriendProfile = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log('[FriendProfile] Route param userId:', userId);
     const loadProfile = async () => {
       setLoading(true);
       setError(null);
       try {
         const profileData = await socialService.getFriendProfile(userId!);
+        console.log('[FriendProfile] Loaded profile data:', profileData);
         setData(profileData);
       } catch (err) {
+        console.error('[FriendProfile] Error loading profile:', err);
         setError(err instanceof Error ? err.message : 'Unable to load profile.');
       } finally {
         setLoading(false);
@@ -70,7 +73,7 @@ export const FriendProfile = () => {
       <div className="p-4 max-w-2xl mx-auto space-y-6">
         
         {/* Profile Identity Card */}
-        <div className="rounded-2xl border border-white/10 bg-iron-950 p-6 flex flex-col items-center gap-4 relative overflow-hidden text-center">
+        <div className="rounded-2xl border border-white/5 bg-zinc-900/40 backdrop-blur-md p-6 flex flex-col items-center gap-4 relative overflow-hidden text-center">
           <div className="w-24 h-24 rounded-full bg-brand-orange/20 border-2 border-brand-orange/50 flex items-center justify-center shrink-0">
             <User size={40} className="text-brand-orange" />
           </div>
@@ -78,7 +81,7 @@ export const FriendProfile = () => {
             <h2 className="text-xl font-black text-white">{profile.name}</h2>
             <p className="text-sm font-medium text-zinc-400 mt-1">@{profile.userId}</p>
             {profile.goal && (
-              <span className="inline-block mt-3 bg-white/5 border border-white/10 text-xs px-2.5 py-1 rounded-full text-zinc-300">
+              <span className="inline-block mt-3 bg-white/5 border border-white/5 text-xs px-2.5 py-1 rounded-full text-zinc-300">
                 Goal: <span className="font-bold text-white">{profile.goal}</span>
               </span>
             )}
@@ -87,7 +90,7 @@ export const FriendProfile = () => {
 
         {/* Privacy Guard */}
         {isPrivate ? (
-          <div className="rounded-2xl border border-white/10 bg-iron-950/50 p-10 flex flex-col items-center justify-center gap-4 text-center">
+          <div className="rounded-2xl border border-white/5 bg-zinc-900/30 backdrop-blur-md p-10 flex flex-col items-center justify-center gap-4 text-center">
             <div className="w-16 h-16 rounded-full bg-zinc-800/50 flex items-center justify-center">
               <Lock size={28} className="text-zinc-400" />
             </div>
@@ -107,7 +110,7 @@ export const FriendProfile = () => {
                 <span className="text-[10px] uppercase tracking-widest font-bold text-brand-orange/80">Current Level</span>
                 <span className="text-3xl font-black text-brand-orange">{levelProgress.currentLevel}</span>
               </div>
-              <div className="rounded-2xl border border-white/10 bg-iron-950 p-4 flex flex-col items-center gap-2">
+              <div className="rounded-2xl border border-white/5 bg-zinc-900/40 backdrop-blur-md p-4 flex flex-col items-center gap-2">
                 <span className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">Active Streak</span>
                 <div className="flex items-center gap-1.5 text-3xl font-black text-white">
                   {streak > 0 ? (
@@ -124,7 +127,7 @@ export const FriendProfile = () => {
 
             {/* Overview Stats */}
             {stats && (
-              <div className="rounded-2xl border border-white/10 bg-iron-950 p-5 space-y-4">
+              <div className="rounded-2xl border border-white/5 bg-zinc-900/40 backdrop-blur-md p-5 space-y-4">
                 <h3 className="text-[10px] uppercase tracking-widest font-bold text-zinc-500 mb-2">Overview</h3>
                 <div className="grid grid-cols-3 gap-2">
                   <div className="flex flex-col gap-1">
@@ -147,7 +150,7 @@ export const FriendProfile = () => {
 
             {/* Achievements */}
             {achievements.length > 0 && (
-              <div className="rounded-2xl border border-white/10 bg-iron-950 p-5 space-y-4">
+              <div className="rounded-2xl border border-white/5 bg-zinc-900/40 backdrop-blur-md p-5 space-y-4">
                 <h3 className="text-[10px] uppercase tracking-widest font-bold text-zinc-500">Earned Medals</h3>
                 <div className="flex flex-wrap gap-2">
                   {achievements.map((ach, idx: number) => (
@@ -174,13 +177,23 @@ export const FriendProfile = () => {
                   const setMap = workout.exercises.reduce((acc, ex) => acc + ex.sets.filter(s => s.isCompleted).length, 0);
                   const duration = workout.endTime ? Math.floor((workout.endTime - workout.startTime) / 60000) : 0;
                   return (
-                    <div key={workout.id} className="rounded-2xl border border-white/10 bg-iron-950 p-4 space-y-3">
-                      <div className="flex justify-between items-start">
+                    <div key={workout.id} className="rounded-2xl border border-white/5 bg-zinc-900/40 backdrop-blur-md p-4 space-y-3">
+                      <div className="flex justify-between items-start gap-3">
                         <div>
                           <h4 className="font-bold text-white text-base">{workout.name}</h4>
                           <p className="text-xs text-zinc-400 mt-0.5">
                             {new Date(workout.startTime).toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
                           </p>
+                        </div>
+                        <div className="shrink-0">
+                          <Button 
+                            size="sm" 
+                            variant="ghost" 
+                            onClick={() => navigate(`/summary/${workout.id}?returnTo=/friends/${userId}`)}
+                            className="h-8 text-xs border border-white/5 hover:bg-white/5 text-zinc-300"
+                          >
+                            Summary
+                          </Button>
                         </div>
                       </div>
                       
