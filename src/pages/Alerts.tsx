@@ -131,7 +131,7 @@ export const Alerts = () => {
           <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">{error}</div>
         )}
         {notifications.length === 0 ? (
-          <div className="rounded-2xl border border-white/10 bg-iron-950 p-10 text-center">
+          <div className="rounded-2xl border border-white/5 bg-zinc-900/40 backdrop-blur-md p-10 text-center">
             <Bell className="mx-auto text-zinc-500 mb-3" />
             <p className="text-zinc-400">No alerts yet.</p>
           </div>
@@ -141,7 +141,7 @@ export const Alerts = () => {
               key={notification.id}
               className={cn(
                 "rounded-2xl border p-4 transition-colors",
-                notification.readAt ? 'border-white/5 bg-iron-950/40' : 'border-brand-orange/30 bg-brand-orange/10'
+                notification.readAt ? 'border-white/5 bg-zinc-900/40 backdrop-blur-md' : 'border-brand-orange/30 bg-brand-orange/10'
               )}
             >
               <div className="flex gap-4">

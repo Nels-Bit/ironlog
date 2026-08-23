@@ -381,6 +381,8 @@ export const socialService = {
   },
 
   async getFriendProfile(friendUserCode: string): Promise<FriendProfileData> {
+    console.log('[getFriendProfile] Requested user code:', friendUserCode);
+    
     // 1. Fetch friend's profile
     const { data: profileData, error: profileError } = await supabase
       .from('user_profiles')
@@ -390,6 +392,8 @@ export const socialService = {
 
     if (profileError) throw profileError;
     if (!profileData) throw new Error('Profile not found.');
+
+    console.log('[getFriendProfile] Profile data retrieved:', profileData);
 
     const userProfile: UserProfile = {
       id: profileData.user_id,
@@ -406,6 +410,7 @@ export const socialService = {
     };
 
     if (!userProfile.isPublic) {
+      console.log('[getFriendProfile] Profile is private. Returning early.');
       return { profile: userProfile, isPrivate: true };
     }
 
@@ -418,21 +423,42 @@ export const socialService = {
 
     if (workoutsError) throw workoutsError;
 
-    const history: WorkoutSession[] = (workouts ?? []).map(w => ({
-      id: w.id,
-      name: w.name,
-      startTime: w.start_time,
-      endTime: w.end_time || undefined,
-      volumeLoad: w.volume_load,
-      exercises: Array.isArray(w.exercises) ? (w.exercises as import('../types').WorkoutExercise[]) : [],
-      bodyWeight: w.body_weight || undefined
-    }));
+    console.log('[getFriendProfile] Raw workouts fetched for user', profileData.user_id, ':', workouts);
 
-    history.sort((a, b) => a.startTime - b.startTime);
+    const history: WorkoutSession[] = (workouts ?? []).map(w => {
+      let parsedExercises = w.exercises;
+      if (typeof parsedExercises === 'string') {
+        try { parsedExercises = JSON.parse(parsedExercises); } catch (e) { parsedExercises = []; }
+      }
+      return {
+        id: w.id,
+        name: w.name,
+        startTime: Number(w.start_time),
+        endTime: w.end_time ? Number(w.end_time) : undefined,
+        volumeLoad: w.volume_load,
+        exercises: Array.isArray(parsedExercises) ? (parsedExercises as import('../types').WorkoutExercise[]) : [],
+        bodyWeight: w.body_weight || undefined
+      };
+    });
+
+    history.sort((a, b) => b.startTime - a.startTime); // sort descending as requested by user
 
     // 3. Compute stats
-    const allExercises = await exerciseService.getAllExercises();
-    const defMap = new Map<string, Exercise>(allExercises.map(e => [e.id, e]));
+    const { data: exercisesData } = await supabase
+      .from('exercises')
+      .select('*')
+      .or(`user_id.is.null,user_id.eq.${profileData.user_id}`);
+      
+    const allExercises: import('../types').Exercise[] = (exercisesData ?? []).map(ex => ({
+      id: ex.id,
+      name: ex.name,
+      category: ex.category,
+      target: ex.target_muscle,
+      isCustom: ex.user_id === profileData.user_id,
+      isUnilateral: ex.is_unilateral ?? undefined
+    }));
+    
+    const defMap = new Map<string, import('../types').Exercise>(allExercises.map(e => [e.id, e]));
     
     const userWeight = parseUserWeight(userProfile.weight);
     const xp = replayAllXP(history, defMap, userWeight);
