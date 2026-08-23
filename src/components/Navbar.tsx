@@ -63,10 +63,10 @@ export const Navbar = () => {
         />
 
         <NavItem
-          to="/notifications"
+          to="/alerts"
           icon={<Bell size={28} />}
           label="Alerts"
-          active={isActiveRoute('/notifications')}
+          active={isActiveRoute('/alerts')}
           badgeCount={unreadCount}
         />
       </div>

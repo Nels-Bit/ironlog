@@ -272,16 +272,16 @@ export const WorkoutLogger = () => {
       <div className="p-4 space-y-4 max-w-3xl mx-auto">
         
         {/* EMPTY STATE */}
-        {workout.exercises.length === 0 ? (
-          <button 
-            onClick={() => setIsSelectorOpen(true)}
-            className="w-full text-center py-20 opacity-50 space-y-4 hover:opacity-80 active:scale-95 transition-all"
-          >
-            <div className="w-20 h-20 mx-auto bg-zinc-900 rounded-full flex items-center justify-center border border-zinc-800">
-                <Plus className="text-zinc-500" size={32} />
-            </div>
-            <p className="text-zinc-500 font-bold">Tap to add first exercise</p>
-          </button>
+          {workout.exercises.length === 0 ? (
+            <button 
+              onClick={() => setIsSelectorOpen(true)}
+              className="w-full text-center py-16 px-6 rounded-3xl border-2 border-dashed border-white/10 bg-white/[0.02] space-y-4 hover:bg-white/[0.05] hover:border-white/20 active:scale-[0.98] transition-all duration-300"
+            >
+              <div className="w-16 h-16 mx-auto bg-brand-orange/10 rounded-full flex items-center justify-center">
+                  <Plus className="text-brand-orange" size={28} />
+              </div>
+              <p className="text-zinc-400 font-medium">Tap to add your first exercise</p>
+            </button>
         ) : (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -314,7 +314,7 @@ export const WorkoutLogger = () => {
 
               return (
                 <div key={ex.id} className="relative">
-                  <div className="bg-iron-950/90 border border-white/10 rounded-2xl overflow-hidden shadow-xl shadow-black/40 transition-all duration-300">
+                  <div className="bg-zinc-900/60 backdrop-blur-lg border border-white/5 rounded-2xl overflow-hidden shadow-2xl shadow-black/50 transition-all duration-300">
                       
                       {/* EXERCISE HEADER */}
                       <div 

@@ -597,14 +597,14 @@ export const Profile = () => {
             </div>
 
             {workoutHistory.length === 0 ? (
-              <div className="rounded-2xl border border-white/10 bg-zinc-900/30 p-6 text-center text-sm text-zinc-500">
+              <div className="rounded-2xl border border-white/10 bg-zinc-900/40 backdrop-blur-md p-6 text-center text-sm text-zinc-500">
                 No workouts logged yet.
               </div>
             ) : (
               workoutHistory.map((workout) => {
                 const isRest = isRestDaySession(workout);
                 return (
-                  <div key={workout.id} className="rounded-2xl border border-white/10 bg-zinc-900/30 p-4">
+                  <div key={workout.id} className="rounded-2xl border border-white/10 bg-zinc-900/40 backdrop-blur-md p-4">
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
                         <h3 className="font-bold text-white truncate">{isRest ? 'Rest Day 🌙' : workout.name}</h3>
@@ -657,7 +657,7 @@ export const Profile = () => {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-zinc-900/30 p-4">
+            <div className="rounded-2xl border border-white/10 bg-zinc-900/40 backdrop-blur-md p-4">
               <div className="flex items-center gap-2 mb-2">
                 <Search size={14} className="text-zinc-400" />
                 <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">Find Friends</p>
@@ -689,7 +689,7 @@ export const Profile = () => {
               )}
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-zinc-900/30 p-4">
+            <div className="rounded-2xl border border-white/10 bg-zinc-900/40 backdrop-blur-md p-4">
               <div className="flex items-center gap-2 mb-2">
                 <Users size={14} className="text-zinc-400" />
                 <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">Incoming Requests</p>
@@ -712,7 +712,7 @@ export const Profile = () => {
               )}
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-zinc-900/30 p-4">
+            <div className="rounded-2xl border border-white/10 bg-zinc-900/40 backdrop-blur-md p-4">
               <p className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Outgoing Requests</p>
               {outgoingRequests.length === 0 ? (
                 <p className="text-sm text-zinc-500">No pending outgoing requests.</p>
@@ -728,7 +728,7 @@ export const Profile = () => {
               )}
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-zinc-900/30 p-4">
+            <div className="rounded-2xl border border-white/10 bg-zinc-900/40 backdrop-blur-md p-4">
               <p className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">Friends</p>
               {friends.length === 0 ? (
                 <p className="text-sm text-zinc-500">No friends yet.</p>

@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { workoutService } from '../services/workoutService';
 import { exerciseService } from '../services/exerciseService';
 import { authService } from '../services/authService';
+import { socialService } from '../services/socialService';
 import {
   applyBodyWeightToExercises,
   getSetLoad,
@@ -179,6 +180,11 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
     };
     const saved = await workoutService.saveWorkout(final);
     setWorkout(null);
+    if (saved?.id) {
+      socialService.dispatchFriendMilestones(saved.id).catch(err => {
+        console.error('Failed to dispatch friend milestones:', err);
+      });
+    }
     return saved?.id ?? null;
   };
 
