@@ -11,11 +11,12 @@ import { Auth } from './pages/Auth';
 import { WorkoutLogger } from './pages/WorkoutLogger';
 import { Profile } from './pages/Profile';
 import { EditWorkout } from './pages/EditWorkout';
-import { Notifications } from './pages/Notifications';
+import { Alerts } from './pages/Alerts';
 import { WorkoutSummary } from './pages/WorkoutSummary';
-
+import { FriendProfile } from './pages/FriendProfile';
 // Components
 import { Navbar } from './components/Navbar';
+import { RestTimer } from './components/RestTimer';
 import { cn } from './lib/utils';
 
 // Resets scroll position to top on every route change (fixes PWA scroll retention)
@@ -52,6 +53,7 @@ const AppContent = () => {
   return (
     <WorkoutProvider>
       <ScrollToTop />
+      <RestTimer />
       <div className="min-h-screen bg-black text-white font-sans selection:bg-brand-orange selection:text-white pb-20 md:pb-0 md:pl-64">
         
         <Navbar />
@@ -82,7 +84,9 @@ const AppContent = () => {
             <Route path="/summary" element={<WorkoutSummary />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/friends" element={<Navigate to="/profile?tab=friends" replace />} />
-            <Route path="/notifications" element={<Notifications />} />
+            <Route path="/friends/:userId" element={<FriendProfile />} />
+            <Route path="/alerts" element={<Alerts />} />
+            <Route path="/notifications" element={<Navigate to="/alerts" replace />} />
             <Route path="*" element={<Navigate to="/profile" replace />} />
           </Routes>
         </main>

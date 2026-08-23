@@ -17,6 +17,21 @@ export interface WorkoutContextType {
   removeSet: (exIndex: number, setIndex: number) => void;
   updateSet: <K extends keyof ExerciseSet>(exIndex: number, setIndex: number, field: K, value: ExerciseSet[K]) => void;
   exerciseDefs: Map<string, Exercise>;
+
+  // Global Rest Timer State
+  restTimer: {
+    isOpen: boolean;
+    isDocked: boolean;
+    duration: number;
+    resetKey: number;
+    type: string;
+    prefs: Record<string, number>;
+  };
+  openRestTimer: (type: string) => void;
+  closeRestTimer: () => void;
+  dockRestTimer: () => void;
+  undockRestTimer: () => void;
+  updateRestTimerPref: (newDuration: number) => void;
 }
 
 export const WorkoutContext = createContext<WorkoutContextType | undefined>(undefined);

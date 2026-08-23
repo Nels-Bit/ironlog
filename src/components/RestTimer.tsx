@@ -1,17 +1,9 @@
-import { useEffect, useReducer } from 'react';
-import { X, Plus, Minus, Timer } from 'lucide-react';
+import { useEffect, useReducer, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
+import { X, Plus, Minus, Timer, Minimize2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion } from 'framer-motion';
-
-interface RestTimerProps {
-  initialSeconds: number;
-  isOpen: boolean;
-  resetKey: number;
-  onClose: () => void;
-  onUpdateDefault: (newSeconds: number) => void;
-  /** When true, hides the timer behind the exercise picker overlay */
-  isSelectorOpen?: boolean;
-}
+import { useWorkout } from '../context/useWorkout';
 
 interface RestTimerState {
   timeLeft: number;
@@ -76,16 +68,27 @@ const restTimerReducer = (state: RestTimerState, action: RestTimerAction): RestT
   }
 };
 
-export const RestTimer = ({
-  initialSeconds,
-  isOpen,
-  resetKey,
-  onClose,
-  onUpdateDefault,
-  isSelectorOpen = false,
-}: RestTimerProps) => {
+export const RestTimer = () => {
+  const location = useLocation();
+  const { restTimer, closeRestTimer, dockRestTimer, undockRestTimer, updateRestTimerPref } = useWorkout();
+
+  if (!restTimer) return null;
+  const { isOpen, isDocked, duration: initialSeconds, resetKey, type } = restTimer;
+
   const [timerState, dispatch] = useReducer(restTimerReducer, initialSeconds, createTimerState);
   const { timeLeft, endTime, overtime, isOvertime } = timerState;
+
+  const prevPathRef = useRef(location.pathname);
+
+  // 0. Auto-minimize on navigation away from Workout Logger
+  useEffect(() => {
+    if (location.pathname !== prevPathRef.current) {
+      if (location.pathname !== '/workout' && isOpen && !isDocked) {
+        dockRestTimer();
+      }
+      prevPathRef.current = location.pathname;
+    }
+  }, [location.pathname, isOpen, isDocked, dockRestTimer]);
 
   // 1. Initialize timestamp when timer opens/resets
   useEffect(() => {
@@ -105,112 +108,121 @@ export const RestTimer = ({
     return () => clearInterval(interval);
   }, [isOpen, endTime]);
 
-  // 3. Adjust time ±15s
+  // 3. Adjust time
   const adjustTime = (seconds: number) => {
     dispatch({ type: 'adjust', seconds });
     if (isOvertime) {
-      onUpdateDefault(Math.max(15, seconds));
+      updateRestTimerPref(Math.max(15, seconds));
     } else {
-      onUpdateDefault(initialSeconds + seconds);
+      updateRestTimerPref(initialSeconds + seconds);
     }
   };
 
   const formatTime = (sec: number) => {
     const m = Math.floor(sec / 60);
     const s = sec % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
+    return "" + m + ":" + s.toString().padStart(2, '0');
   };
 
   if (!isOpen) return null;
 
   const progressPct = isOvertime ? 0 : Math.min(100, (timeLeft / initialSeconds) * 100);
 
+  // --- MINIMIZED DOCKED BUBBLE ---
+  if (isDocked) {
+    return (
+      <div className="fixed left-0 bottom-28 md:bottom-6 z-[90] transition-all duration-300">
+        <motion.button
+          initial={{ x: -50, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          onClick={undockRestTimer}
+          className={cn(
+            "flex items-center gap-3 px-4 py-3 rounded-r-full shadow-2xl backdrop-blur-md active:scale-95 transition-all",
+            isOvertime ? "bg-red-950/90 border-y border-r border-red-500/30 text-red-400" : "bg-zinc-900/90 border-y border-r border-white/10 text-brand-orange"
+          )}
+        >
+          <Timer size={18} className={cn(isOvertime && "animate-pulse")} />
+          <span className="font-mono font-bold text-lg tabular-nums">
+            {isOvertime ? "-" + formatTime(overtime) : formatTime(timeLeft)}
+          </span>
+        </motion.button>
+      </div>
+    );
+  }
+
+  // --- FULL REST TIMER ---
   return (
-    <div
-      className={cn(
-        'fixed left-4 right-4 z-[150] transition-all duration-300 ease-out',
-        // bottom-28 on mobile clears the ~96px bottom nav bar with extra breathing room
-        'bottom-28 md:bottom-6 md:left-auto md:right-6 md:w-96',
-        // Hide behind exercise selector (keep mounted to preserve timer state)
-        isSelectorOpen ? 'opacity-0 pointer-events-none' : 'opacity-100 pointer-events-auto'
-      )}
-    >
+    <div className="fixed left-4 right-4 z-[90] bottom-28 md:bottom-6 md:left-auto md:right-6 md:w-96 transition-all duration-300 ease-out">
       <div
         className={cn(
-          'backdrop-blur-xl border rounded-2xl p-4 shadow-2xl shadow-black/50 animate-in slide-in-from-bottom-10 fade-in duration-300',
-          isOvertime
-            ? 'bg-red-950/95 border-red-500/40'
-            : 'bg-iron-950/95 border-white/10'
+          'backdrop-blur-xl border rounded-3xl p-5 shadow-2xl shadow-black/50 animate-in slide-in-from-bottom-10 fade-in duration-300',
+          isOvertime ? 'bg-red-950/95 border-red-500/40' : 'bg-zinc-900/80 border-white/10'
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-4 w-full px-2">
+          {/* Minimize / Hide (Left) */}
+          <button
+            onClick={dockRestTimer}
+            className="btn btn-circle btn-ghost btn-sm text-zinc-400 hover:text-white"
+          >
+            <Minimize2 size={18} />
+          </button>
+          
+          {/* Label (Center) */}
           <div className={cn('flex items-center gap-2', isOvertime ? 'text-red-400' : 'text-brand-orange')}>
             <Timer size={18} className="animate-pulse" />
-            <span className="text-xs font-bold uppercase tracking-widest">
-              {isOvertime ? 'Overtime' : 'Rest Timer'}
+            <span className="text-[10px] font-bold uppercase tracking-widest badge badge-ghost border-white/10 opacity-80">
+              {isOvertime ? 'Overtime' : type + ' Rest'}
             </span>
           </div>
-          <motion.button
-            onClick={onClose}
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
-            transition={{ type: 'spring', stiffness: 300 }}
-            className="text-zinc-500 hover:text-white"
+
+          {/* Close / X (Right) */}
+          <button
+            onClick={closeRestTimer}
+            className="btn btn-circle btn-ghost btn-sm text-zinc-400 hover:text-white"
           >
-            <X size={18} />
-          </motion.button>
+            <X size={20} />
+          </button>
         </div>
 
         {/* Time display + controls */}
-        <div className="flex items-center justify-between gap-4">
-          <motion.button
+        <div className="flex items-center justify-between gap-4 mt-2">
+          <button
             onClick={() => adjustTime(-15)}
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
-            transition={{ type: 'spring', stiffness: 300 }}
-            className="w-12 h-12 flex items-center justify-center rounded-xl bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white active:scale-95 transition-all border border-white/5"
+            className="btn btn-circle btn-ghost bg-white/5 border-white/5 text-zinc-400 hover:bg-white/10 hover:text-white"
           >
-            <div className="flex flex-col items-center leading-none">
-              <Minus size={16} />
-              <span className="text-[9px] font-bold mt-0.5">15s</span>
-            </div>
-          </motion.button>
+            <Minus size={20} />
+          </button>
 
           <div className="flex-1 text-center">
             {isOvertime ? (
-              <span className="text-4xl font-black tabular-nums tracking-tight text-red-400 animate-pulse">
+              <span className="text-5xl font-black tabular-nums tracking-tight text-red-400 animate-pulse">
                 -{formatTime(overtime)}
               </span>
             ) : (
-              <span className="text-4xl font-black text-white tabular-nums tracking-tight">
+              <span className="text-5xl font-black text-white tabular-nums tracking-tight">
                 {formatTime(timeLeft)}
               </span>
             )}
           </div>
 
-          <motion.button
+          <button
             onClick={() => adjustTime(15)}
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
-            transition={{ type: 'spring', stiffness: 300 }}
-            className="w-12 h-12 flex items-center justify-center rounded-xl bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-white active:scale-95 transition-all border border-white/5"
+            className="btn btn-circle btn-ghost bg-white/5 border-white/5 text-zinc-400 hover:bg-white/10 hover:text-white"
           >
-            <div className="flex flex-col items-center leading-none">
-              <Plus size={16} />
-              <span className="text-[9px] font-bold mt-0.5">15s</span>
-            </div>
-          </motion.button>
+            <Plus size={20} />
+          </button>
         </div>
 
         {/* Progress bar */}
-        <div className="w-full h-1 bg-white/5 rounded-full mt-4 overflow-hidden">
+        <div className="w-full h-1.5 bg-black/40 rounded-full mt-6 overflow-hidden">
           <div
             className={cn(
               'h-full rounded-full transition-all duration-1000 ease-linear',
               isOvertime ? 'w-full bg-red-500 animate-pulse' : 'bg-brand-orange'
             )}
-            style={isOvertime ? undefined : { width: `${progressPct}%` }}
+            style={isOvertime ? undefined : { width: progressPct + '%' }}
           />
         </div>
       </div>

@@ -171,6 +171,7 @@ export const WorkoutSummary = () => {
   const params = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const id = params.id || searchParams.get('id');
+  const returnTo = searchParams.get('returnTo') || '/profile';
   const navigate = useNavigate();
 
   const [workout, setWorkout] = useState<WorkoutSession | null>(null);
@@ -524,7 +525,7 @@ export const WorkoutSummary = () => {
         >
           <Button
             className="w-full py-5 text-base font-bold bg-brand-orange hover:bg-brand-orange/90 text-white rounded-2xl flex items-center justify-center gap-2"
-            onClick={() => navigate('/profile')}
+            onClick={() => navigate(returnTo)}
           >
             Done
             <ChevronRight size={18} />

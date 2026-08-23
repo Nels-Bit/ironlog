@@ -41,6 +41,12 @@ export const EditWorkout = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   
+  const blockInvalidNumberChars = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (['e', 'E', '+', '-'].includes(e.key)) {
+      e.preventDefault();
+    }
+  };
+
   const [loading, setLoading] = useState(true);
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [exerciseDefs, setExerciseDefs] = useState<Map<string, Exercise>>(new Map());
@@ -246,7 +252,7 @@ export const EditWorkout = () => {
                         <Clock size={12}/> Duration (Mins)
                     </label>
                     <input 
-                        type="number"
+                        type="number" onKeyDown={blockInvalidNumberChars}
                         value={durationMinutes}
                         onChange={e => setDurationMinutes(parseInt(e.target.value) || 0)}
                         className="w-full bg-black/20 text-white font-mono rounded-lg p-2 mt-1 border border-white/10 focus:border-brand-orange outline-none"
@@ -317,7 +323,7 @@ export const EditWorkout = () => {
                                 
                                 <div className="col-span-3">
                                     <input 
-                                        type="number" 
+                                        type="number" onKeyDown={blockInvalidNumberChars} 
                                         min={0}
                                         placeholder="-"
                                         value={formatNumberInputValue(set.weight)} 
@@ -329,12 +335,12 @@ export const EditWorkout = () => {
                                 <div className="col-span-3">
                                     {def?.isUnilateral ? (
                                         <div className="flex gap-1">
-                                          <input type="number" min={0} placeholder="L" className="w-1/2 bg-white/5 rounded-lg py-2 text-center text-white text-xs font-bold outline-none focus:bg-white/10" value={formatNumberInputValue(set.repsLeft)} onChange={e => updateSet(exIndex, setIndex, 'repsLeft', parseNumberInputValue(e.target.value))}/>
-                                          <input type="number" min={0} placeholder="R" className="w-1/2 bg-white/5 rounded-lg py-2 text-center text-white text-xs font-bold outline-none focus:bg-white/10" value={formatNumberInputValue(set.repsRight)} onChange={e => updateSet(exIndex, setIndex, 'repsRight', parseNumberInputValue(e.target.value))}/>
+                                          <input type="number" onKeyDown={blockInvalidNumberChars} min={0} placeholder="L" className="w-1/2 bg-white/5 rounded-lg py-2 text-center text-white text-xs font-bold outline-none focus:bg-white/10" value={formatNumberInputValue(set.repsLeft)} onChange={e => updateSet(exIndex, setIndex, 'repsLeft', parseNumberInputValue(e.target.value))}/>
+                                          <input type="number" onKeyDown={blockInvalidNumberChars} min={0} placeholder="R" className="w-1/2 bg-white/5 rounded-lg py-2 text-center text-white text-xs font-bold outline-none focus:bg-white/10" value={formatNumberInputValue(set.repsRight)} onChange={e => updateSet(exIndex, setIndex, 'repsRight', parseNumberInputValue(e.target.value))}/>
                                         </div>
                                     ) : (
                                         <input 
-                                            type="number" 
+                                            type="number" onKeyDown={blockInvalidNumberChars} 
                                             min={0}
                                             placeholder="-"
                                             value={formatNumberInputValue(set.reps)} 

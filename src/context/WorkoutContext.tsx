@@ -24,6 +24,47 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
     return saved ? Math.floor((Date.now() - parseInt(saved)) / 1000) : 0;
   });
 
+  // --- REST TIMER STATE ---
+  const [restTimerPrefs, setRestTimerPrefs] = useState<Record<string, number>>(() => {
+    const savedPrefs = localStorage.getItem('ironlog_rest_prefs');
+    return savedPrefs ? JSON.parse(savedPrefs) : { normal: 90, warmup: 60, dropset: 45 };
+  });
+  const [restTimerState, setRestTimerState] = useState({
+    isOpen: false,
+    isDocked: false,
+    duration: 90,
+    resetKey: 0,
+    type: 'normal'
+  });
+
+  const openRestTimer = (type: string) => {
+    setRestTimerState(prev => {
+      // If docked, stay docked. If not, open it fully.
+      // Update the duration from prefs ONLY if it was not already open, or just force the new type?
+      // Actually, standard behavior: reset the timer for the new set.
+      const duration = restTimerPrefs[type] || 90;
+      return {
+        ...prev,
+        isOpen: true,
+        duration: prev.isOpen ? prev.duration : duration,
+        resetKey: prev.resetKey + 1,
+        type
+      };
+    });
+  };
+
+  const closeRestTimer = () => setRestTimerState(prev => ({ ...prev, isOpen: false, isDocked: false }));
+  const dockRestTimer = () => setRestTimerState(prev => ({ ...prev, isDocked: true }));
+  const undockRestTimer = () => setRestTimerState(prev => ({ ...prev, isDocked: false }));
+  const updateRestTimerPref = (newDuration: number) => {
+    setRestTimerState(prev => ({ ...prev, duration: newDuration }));
+    setRestTimerPrefs(prev => {
+      const updated = { ...prev, [restTimerState.type]: newDuration };
+      localStorage.setItem('ironlog_rest_prefs', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
   const [exerciseDefs, setExerciseDefs] = useState<Map<string, Exercise>>(new Map<string, Exercise>());
   const [historyCache, setHistoryCache] = useState<Map<string, ExerciseSet[]>>(new Map());
   const [prCache, setPrCache] = useState<Map<string, number>>(new Map());
@@ -105,10 +146,12 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
   const cancelWorkout = () => {
     setWorkout(null);
     setElapsed(0);
+    closeRestTimer();
   };
 
   const finishWorkout = async (): Promise<string | null> => {
     if (!resolvedWorkout) return null;
+    closeRestTimer();
     const workoutBodyWeight = resolvedWorkout.bodyWeight ?? userWeight ?? undefined;
     let totalVolume = 0;
     resolvedWorkout.exercises.forEach(ex => {
@@ -249,7 +292,9 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
       historyCache, prCache,
       startWorkout, logRestDay, cancelWorkout, finishWorkout,
       addExercise, removeExercise, addSet, removeSet, updateSet,
-      exerciseDefs
+      exerciseDefs,
+      restTimer: { ...restTimerState, prefs: restTimerPrefs },
+      openRestTimer, closeRestTimer, dockRestTimer, undockRestTimer, updateRestTimerPref
     }}>
       {children}
     </WorkoutContext.Provider>
