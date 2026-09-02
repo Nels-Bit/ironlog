@@ -73,7 +73,7 @@ export const RestTimer = () => {
   const { restTimer, closeRestTimer, dockRestTimer, undockRestTimer, updateRestTimerPref } = useWorkout();
 
   if (!restTimer) return null;
-  const { isOpen, isDocked, duration: initialSeconds, resetKey, type } = restTimer;
+  const { isOpen, isDocked, duration: initialSeconds, resetKey } = restTimer;
 
   const [timerState, dispatch] = useReducer(restTimerReducer, initialSeconds, createTimerState);
   const { timeLeft, endTime, overtime, isOvertime } = timerState;
@@ -131,14 +131,14 @@ export const RestTimer = () => {
   // --- MINIMIZED DOCKED BUBBLE ---
   if (isDocked) {
     return (
-      <div className="fixed left-0 bottom-28 md:bottom-6 z-[90] transition-all duration-300">
+      <div className="fixed left-4 bottom-[calc(6.5rem+env(safe-area-inset-bottom,0px))] md:bottom-6 z-40 transition-all duration-300">
         <motion.button
           initial={{ x: -50, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           onClick={undockRestTimer}
           className={cn(
-            "flex items-center gap-3 px-4 py-3 rounded-r-full shadow-2xl backdrop-blur-md active:scale-95 transition-all",
-            isOvertime ? "bg-red-950/90 border-y border-r border-red-500/30 text-red-400" : "bg-zinc-900/90 border-y border-r border-white/10 text-brand-orange"
+            "flex items-center gap-3 px-4 py-3 rounded-full shadow-2xl backdrop-blur-md active:scale-95 transition-all",
+            isOvertime ? "bg-red-950/90 border border-red-500/30 text-red-400" : "bg-zinc-900/90 border border-white/10 text-brand-orange"
           )}
         >
           <Timer size={18} className={cn(isOvertime && "animate-pulse")} />
@@ -152,7 +152,7 @@ export const RestTimer = () => {
 
   // --- FULL REST TIMER ---
   return (
-    <div className="fixed left-4 right-4 z-[90] bottom-28 md:bottom-6 md:left-auto md:right-6 md:w-96 transition-all duration-300 ease-out">
+    <div className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom,0px))] left-0 right-0 z-40 px-4 md:bottom-6 md:left-auto md:right-6 md:w-96 md:px-0 transition-all duration-300 ease-out">
       <div
         className={cn(
           'backdrop-blur-xl border rounded-3xl p-5 shadow-2xl shadow-black/50 animate-in slide-in-from-bottom-10 fade-in duration-300',
@@ -173,7 +173,7 @@ export const RestTimer = () => {
           <div className={cn('flex items-center gap-2', isOvertime ? 'text-red-400' : 'text-brand-orange')}>
             <Timer size={18} className="animate-pulse" />
             <span className="text-[10px] font-bold uppercase tracking-widest badge badge-ghost border-white/10 opacity-80">
-              {isOvertime ? 'Overtime' : type + ' Rest'}
+              {isOvertime ? 'Overtime' : 'Rest Timer'}
             </span>
           </div>
 
