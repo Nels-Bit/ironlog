@@ -69,22 +69,31 @@ export interface FriendProfileData {
   recentWorkouts?: WorkoutSession[];
 }
 
+export type SetType = 'normal' | 'warmup' | 'dropset' | 'dropset_child' | 'failure';
+export type ExerciseCategory = 'strength' | 'cardio' | 'mobility';
+
 export interface Exercise {
   id: string;
   name: string;
   category: string;
-  target: string;
+  exerciseCategory?: ExerciseCategory;
+  target?: string | null;
   isCustom?: boolean;
-  isUnilateral?: boolean;
+  isUnilateral?: boolean | null;
 }
 
 export interface ExerciseSet {
   id: string;
-  type: 'normal' | 'warmup' | 'dropset' | 'dropset_child' | 'failure';
+  type: SetType;
   weight: number | null;
   reps: number | null;
   repsLeft?: number | null;
   repsRight?: number | null;
+  distance?: number | null;
+  durationSeconds?: number | null;
+  pace?: number | null;
+  caloriesBurned?: number | null;
+  incline?: number | null;
   isCompleted: boolean;
   previousBest?: number;
   parentSetId?: string;

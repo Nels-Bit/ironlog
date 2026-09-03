@@ -453,7 +453,8 @@ export const socialService = {
       id: ex.id,
       name: ex.name,
       category: ex.category,
-      target: ex.target_muscle,
+      exerciseCategory: ex.exercise_category || ((ex.category || '').toLowerCase() === 'cardio' ? 'cardio' : 'strength'),
+      target: ex.target_muscle || null,
       isCustom: ex.user_id === profileData.user_id,
       isUnilateral: ex.is_unilateral ?? undefined
     }));
@@ -473,8 +474,11 @@ export const socialService = {
       w.exercises.forEach(ex => {
         const def = defMap.get(ex.exerciseId);
         if (def && ex.sets.some(s => s.isCompleted && s.type !== 'warmup')) {
-          const m = def.target || def.category || 'Unknown';
-          muscleCounts.set(m, (muscleCounts.get(m) || 0) + 1);
+          const isCardio = (def.category || '').toLowerCase() === 'cardio' || def.exerciseCategory === 'cardio';
+          const m = def.target?.trim() || (!isCardio ? (def.category?.trim() || null) : null);
+          if (m) {
+            muscleCounts.set(m, (muscleCounts.get(m) || 0) + 1);
+          }
         }
       });
     });

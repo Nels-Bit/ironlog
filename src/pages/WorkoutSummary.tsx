@@ -232,7 +232,9 @@ export const WorkoutSummary = () => {
     const counts = new Map<string, number>();
     workout.exercises.forEach(ex => {
       const def = exerciseDefs.get(ex.exerciseId);
-      const muscle = def?.target || def?.category || 'Unknown';
+      const isCardio = (def?.category || '').toLowerCase() === 'cardio' || def?.exerciseCategory === 'cardio';
+      const muscle = def?.target?.trim() || (!isCardio ? (def?.category?.trim() || null) : null);
+      if (!muscle) return;
       const done = ex.sets.filter(s => s.isCompleted).length;
       counts.set(muscle, (counts.get(muscle) ?? 0) + done);
     });

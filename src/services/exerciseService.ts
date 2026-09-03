@@ -5,7 +5,8 @@ interface ExerciseRow {
   id: string;
   name: string;
   category: string;
-  target_muscle: string;
+  exercise_category?: 'strength' | 'cardio' | 'mobility' | null;
+  target_muscle: string | null;
   user_id: string | null;
   is_unilateral: boolean | null;
 }
@@ -28,19 +29,27 @@ export const exerciseService = {
       return [];
     }
 
-    return (data as ExerciseRow[]).map(ex => ({
-      id: ex.id,
-      name: ex.name,
-      category: ex.category,
-      target: ex.target_muscle,
-      isCustom: ex.user_id === user.id, // If it has a user_id, it's custom
-      isUnilateral: ex.is_unilateral ?? undefined // <--- Map from DB column
-    }));
+    return (data as ExerciseRow[]).map(ex => {
+      const categoryLower = (ex.category || '').toLowerCase();
+      const exerciseCategory = ex.exercise_category || (categoryLower === 'cardio' ? 'cardio' : 'strength');
+      return {
+        id: ex.id,
+        name: ex.name,
+        category: ex.category,
+        exerciseCategory,
+        target: ex.target_muscle || null,
+        isCustom: ex.user_id === user.id, // If it has a user_id, it's custom
+        isUnilateral: ex.is_unilateral ?? undefined // <--- Map from DB column
+      };
+    });
   },
 
   async createExercise(ex: Partial<Exercise>): Promise<Exercise | null> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
+
+    const isCardio = ex.exerciseCategory === 'cardio' || (ex.category || '').toLowerCase() === 'cardio';
+    const exerciseCategory = isCardio ? 'cardio' : (ex.exerciseCategory || 'strength');
 
     const { data, error } = await supabase
       .from('exercises')
@@ -48,8 +57,9 @@ export const exerciseService = {
         user_id: user.id, // Link to user
         name: ex.name,
         category: ex.category,
-        target_muscle: ex.target,
-        is_unilateral: ex.isUnilateral // <--- Save this field
+        exercise_category: exerciseCategory,
+        target_muscle: isCardio ? null : (ex.target || null),
+        is_unilateral: isCardio ? false : (ex.isUnilateral ?? false)
       })
       .select()
       .single();
@@ -65,7 +75,8 @@ export const exerciseService = {
       id: row.id,
       name: row.name,
       category: row.category,
-      target: row.target_muscle,
+      exerciseCategory: row.exercise_category || (row.category.toLowerCase() === 'cardio' ? 'cardio' : 'strength'),
+      target: row.target_muscle || null,
       isCustom: true,
       isUnilateral: row.is_unilateral ?? undefined
     };

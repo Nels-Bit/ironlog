@@ -1,6 +1,6 @@
 import type { WorkoutSession, Exercise } from '../types';
 import { isRestDaySession } from './achievementUtils';
-import { getSetLoad } from './workoutMath';
+import { getSetLoad, isEligibleForPR } from './workoutMath';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 export const BASE_XP = 85;
@@ -108,7 +108,7 @@ export const calculateWorkoutXP = (
 
     let currentBest = 0;
     for (const set of ex.sets) {
-      if (set.type !== 'normal' || !set.isCompleted) continue;
+      if (!isEligibleForPR(set.type) || !set.isCompleted) continue;
       const load = getSetLoad(set, def, workout.bodyWeight, userWeight);
       if (load > currentBest) currentBest = load;
     }
@@ -207,7 +207,7 @@ export const replayAllXP = (
 
       const def = exerciseDefs.get(ex.exerciseId);
       for (const set of ex.sets) {
-        if (set.type !== 'normal' || !set.isCompleted) continue;
+        if (!isEligibleForPR(set.type) || !set.isCompleted) continue;
         const load = getSetLoad(set, def, workout.bodyWeight, userWeight);
         const prev = bestWeights.get(ex.exerciseId) || 0;
         if (load > prev) bestWeights.set(ex.exerciseId, load);
