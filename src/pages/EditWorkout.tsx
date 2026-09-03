@@ -28,6 +28,7 @@ import {
   getTotalReps,
   isAssistedExercise,
   isBodyweightExercise,
+  isCardioExercise,
   parseUserWeight,
   shouldCountSetForVolume
 } from '../utils/workoutMath';
@@ -264,11 +265,14 @@ export const EditWorkout = () => {
         {/* EXERCISES */}
         {workout.exercises.map((ex, exIndex) => {
             const def = exerciseDefs.get(ex.exerciseId);
-            const weightLabel = isAssistedExercise(def)
-              ? 'Assistance'
-              : isBodyweightExercise(def)
-                ? 'Extra LBS'
-                : 'LBS';
+            const isCardio = isCardioExercise(def);
+            const weightLabel = isCardio
+              ? 'Miles'
+              : isAssistedExercise(def)
+                ? 'Assistance'
+                : isBodyweightExercise(def)
+                  ? 'Extra LBS'
+                  : 'LBS';
             return (
               <div key={ex.id} className="bg-iron-950/90 border border-white/10 rounded-2xl p-4 space-y-3 shadow-lg shadow-black/40">
                 <div className="flex justify-between items-center px-1">
@@ -287,7 +291,7 @@ export const EditWorkout = () => {
                 <div className="grid grid-cols-10 gap-2 text-[10px] text-zinc-500 uppercase font-bold text-center px-2">
                     <div className="col-span-1">#</div>
                     <div className="col-span-3">{weightLabel}</div>
-                    <div className="col-span-3">Reps</div>
+                    <div className="col-span-3">{isCardio ? 'Time (min)' : 'Reps'}</div>
                     <div className="col-span-3">Done</div>
                 </div>
 
@@ -321,34 +325,64 @@ export const EditWorkout = () => {
                                      </div>
                                 </div>
                                 
-                                <div className="col-span-3">
-                                    <input 
-                                        type="number" onKeyDown={blockInvalidNumberChars} 
-                                        min={0}
-                                        placeholder="-"
-                                        value={formatNumberInputValue(set.weight)} 
-                                        onChange={e => updateSet(exIndex, setIndex, 'weight', parseNumberInputValue(e.target.value))}
-                                        className="w-full bg-white/5 rounded-lg py-2 text-center text-white font-bold outline-none focus:bg-white/10"
-                                    />
-                                </div>
-
-                                <div className="col-span-3">
-                                    {def?.isUnilateral ? (
-                                        <div className="flex gap-1">
-                                          <input type="number" onKeyDown={blockInvalidNumberChars} min={0} placeholder="L" className="w-1/2 bg-white/5 rounded-lg py-2 text-center text-white text-xs font-bold outline-none focus:bg-white/10" value={formatNumberInputValue(set.repsLeft)} onChange={e => updateSet(exIndex, setIndex, 'repsLeft', parseNumberInputValue(e.target.value))}/>
-                                          <input type="number" onKeyDown={blockInvalidNumberChars} min={0} placeholder="R" className="w-1/2 bg-white/5 rounded-lg py-2 text-center text-white text-xs font-bold outline-none focus:bg-white/10" value={formatNumberInputValue(set.repsRight)} onChange={e => updateSet(exIndex, setIndex, 'repsRight', parseNumberInputValue(e.target.value))}/>
-                                        </div>
-                                    ) : (
+                                {isCardio ? (
+                                  <>
+                                    <div className="col-span-3">
+                                        <input 
+                                            type="number" step="any" onKeyDown={blockInvalidNumberChars} 
+                                            min={0}
+                                            placeholder="-"
+                                            value={formatNumberInputValue(set.distance)} 
+                                            onChange={e => updateSet(exIndex, setIndex, 'distance', parseNumberInputValue(e.target.value))}
+                                            className="w-full bg-white/5 rounded-lg py-2 text-center text-white font-bold outline-none focus:bg-white/10"
+                                        />
+                                    </div>
+                                    <div className="col-span-3">
+                                        <input 
+                                            type="number" step="any" onKeyDown={blockInvalidNumberChars} 
+                                            min={0}
+                                            placeholder="-"
+                                            value={formatNumberInputValue(set.durationSeconds ? Math.round((set.durationSeconds / 60) * 10) / 10 : null)} 
+                                            onChange={e => {
+                                                const val = parseNumberInputValue(e.target.value);
+                                                updateSet(exIndex, setIndex, 'durationSeconds', val !== null ? Math.round(val * 60) : null);
+                                            }}
+                                            className="w-full bg-white/5 rounded-lg py-2 text-center text-white font-bold outline-none focus:bg-white/10"
+                                        />
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="col-span-3">
                                         <input 
                                             type="number" onKeyDown={blockInvalidNumberChars} 
                                             min={0}
                                             placeholder="-"
-                                            value={formatNumberInputValue(set.reps)} 
-                                            onChange={e => updateSet(exIndex, setIndex, 'reps', parseNumberInputValue(e.target.value))}
+                                            value={formatNumberInputValue(set.weight)} 
+                                            onChange={e => updateSet(exIndex, setIndex, 'weight', parseNumberInputValue(e.target.value))}
                                             className="w-full bg-white/5 rounded-lg py-2 text-center text-white font-bold outline-none focus:bg-white/10"
                                         />
-                                    )}
-                                </div>
+                                    </div>
+
+                                    <div className="col-span-3">
+                                        {def?.isUnilateral ? (
+                                            <div className="flex gap-1">
+                                              <input type="number" onKeyDown={blockInvalidNumberChars} min={0} placeholder="L" className="w-1/2 bg-white/5 rounded-lg py-2 text-center text-white text-xs font-bold outline-none focus:bg-white/10" value={formatNumberInputValue(set.repsLeft)} onChange={e => updateSet(exIndex, setIndex, 'repsLeft', parseNumberInputValue(e.target.value))}/>
+                                              <input type="number" onKeyDown={blockInvalidNumberChars} min={0} placeholder="R" className="w-1/2 bg-white/5 rounded-lg py-2 text-center text-white text-xs font-bold outline-none focus:bg-white/10" value={formatNumberInputValue(set.repsRight)} onChange={e => updateSet(exIndex, setIndex, 'repsRight', parseNumberInputValue(e.target.value))}/>
+                                            </div>
+                                        ) : (
+                                            <input 
+                                                type="number" onKeyDown={blockInvalidNumberChars} 
+                                                min={0}
+                                                placeholder="-"
+                                                value={formatNumberInputValue(set.reps)} 
+                                                onChange={e => updateSet(exIndex, setIndex, 'reps', parseNumberInputValue(e.target.value))}
+                                                className="w-full bg-white/5 rounded-lg py-2 text-center text-white font-bold outline-none focus:bg-white/10"
+                                            />
+                                        )}
+                                    </div>
+                                  </>
+                                )}
 
                                 <div className="col-span-3 flex justify-center items-center gap-2">
                                     <button 

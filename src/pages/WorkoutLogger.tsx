@@ -15,6 +15,7 @@ import {
   getSetLoad,
   isAssistedExercise,
   isBodyweightExercise,
+  isCardioExercise,
   parseUserWeight,
   shouldCountSetForPR
 } from '../utils/workoutMath';
@@ -223,6 +224,12 @@ export const WorkoutLogger = () => {
         if (ghostSet.repsLeft !== null && ghostSet.repsLeft !== undefined) updateSet(exIndex, setIndex, 'repsLeft', ghostSet.repsLeft);
         if (ghostSet.repsRight !== null && ghostSet.repsRight !== undefined) updateSet(exIndex, setIndex, 'repsRight', ghostSet.repsRight);
       }
+      if ((currentSet.distance === null || currentSet.distance === undefined) && ghostSet.distance !== null && ghostSet.distance !== undefined) {
+        updateSet(exIndex, setIndex, 'distance', ghostSet.distance);
+      }
+      if ((currentSet.durationSeconds === null || currentSet.durationSeconds === undefined) && ghostSet.durationSeconds !== null && ghostSet.durationSeconds !== undefined) {
+        updateSet(exIndex, setIndex, 'durationSeconds', ghostSet.durationSeconds);
+      }
     }
     
     // 2. Toggle Completion
@@ -294,6 +301,7 @@ export const WorkoutLogger = () => {
               const def = exerciseDefs.get(ex.exerciseId);
               const isCollapsed = collapsed.has(ex.id);
               const isEditing = editingExercises.has(ex.id);
+              const isCardio = isCardioExercise(def);
               const isBodyweightMovement = isBodyweightExercise(def);
               const isAssisted = isAssistedExercise(def);
               
@@ -330,13 +338,19 @@ export const WorkoutLogger = () => {
                                   {def?.name || 'Loading...'}
                                   {def?.isUnilateral && <span className="text-[10px] bg-brand-orange/20 text-brand-orange px-1.5 py-0.5 rounded uppercase">Uni</span>}
                               </h3>
-                              <p className={cn(
-                                  "text-xs font-mono mt-1 transition-colors",
-                                  isNewPR ? "text-brand-orange font-bold" : "text-zinc-500"
-                              )}>
-                                  {isNewPR ? '🏆 NEW PR ' : 'PR '} 
-                                  {displayPR} lbs
-                              </p>
+                              {isCardio ? (
+                                <p className="text-xs font-mono mt-1 text-brand-orange/80 font-bold">
+                                  Cardio Session
+                                </p>
+                              ) : (
+                                <p className={cn(
+                                    "text-xs font-mono mt-1 transition-colors",
+                                    isNewPR ? "text-brand-orange font-bold" : "text-zinc-500"
+                                )}>
+                                    {isNewPR ? '🏆 NEW PR ' : 'PR '} 
+                                    {displayPR} lbs
+                                </p>
+                              )}
                           </div>
                         </div>
 
@@ -365,9 +379,9 @@ export const WorkoutLogger = () => {
                               <div className="grid grid-cols-10 gap-2 text-[10px] font-bold text-zinc-500 uppercase tracking-wider text-center mb-2 px-2">
                                   <div className="col-span-1">#</div>
                                   <div className="col-span-3">
-                                    {isAssisted ? 'Assistance' : isBodyweightMovement ? 'Extra LBS' : 'LBS'}
+                                    {isCardio ? 'Miles' : isAssisted ? 'Assistance' : isBodyweightMovement ? 'Extra LBS' : 'LBS'}
                                   </div>
-                                  <div className="col-span-3">Reps</div>
+                                  <div className="col-span-3">{isCardio ? 'Time (min)' : 'Reps'}</div>
                                   <div className="col-span-3">{isEditing ? "Delete" : "Done"}</div>
                               </div>
 
@@ -411,60 +425,96 @@ export const WorkoutLogger = () => {
                                                 )}
                                             </div>
                                             
-                                            <div className="col-span-3">
-                                                <motion.input
-                                                    type="number" onKeyDown={blockInvalidNumberChars}
-                                                min={0}
-                                                placeholder={getNumberPlaceholder(ghostSet?.weight, "-")}
-                                                value={formatNumberInputValue(set.weight)}
-                                                    disabled={isEditing}
-                                                onChange={(e) => updateSet(exIndex, setIndex, 'weight', parseNumberInputValue(e.target.value))}
-                                                    whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
-                                                    transition={{ type: "spring", stiffness: 300 }}
-                                                    className="w-full bg-white/5 rounded-lg py-2 text-center font-bold text-white text-lg outline-none focus:bg-white/10 disabled:opacity-50"
-                                                />
-                                            </div>
-                                            
-                                            <div className="col-span-3 flex justify-center">
-                                                {def?.isUnilateral ? (
-                                                <div className="flex gap-1 w-full">
+                                            {isCardio ? (
+                                              <>
+                                                <div className="col-span-3">
                                                     <motion.input
-                                                      type="number" onKeyDown={blockInvalidNumberChars}
-                                                      min={0}
-                                                      placeholder={getNumberPlaceholder(ghostSet?.repsLeft, "L")}
-                                                      value={formatNumberInputValue(set.repsLeft)}
-                                                      onChange={(e) => handleUnilateralChange(exIndex, setIndex, set.id, 'repsLeft', e.target.value)}
-                                                      disabled={isEditing}
-                                                      whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
-                                                      transition={{ type: "spring", stiffness: 300 }}
-                                                      className="w-1/2 bg-white/5 rounded-lg py-2 text-center font-bold text-white text-sm outline-none focus:bg-white/10 disabled:opacity-50"
-                                                    />
-                                                    <motion.input
-                                                      type="number" onKeyDown={blockInvalidNumberChars}
-                                                      min={0}
-                                                      placeholder={getNumberPlaceholder(ghostSet?.repsRight, "R")}
-                                                      value={formatNumberInputValue(set.repsRight)}
-                                                      onChange={(e) => handleUnilateralChange(exIndex, setIndex, set.id, 'repsRight', e.target.value)}
-                                                      disabled={isEditing}
-                                                      whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
-                                                      transition={{ type: "spring", stiffness: 300 }}
-                                                      className="w-1/2 bg-white/5 rounded-lg py-2 text-center font-bold text-white text-sm outline-none focus:bg-white/10 disabled:opacity-50"
+                                                        type="number" step="any" onKeyDown={blockInvalidNumberChars}
+                                                        min={0}
+                                                        placeholder={getNumberPlaceholder(ghostSet?.distance, "-")}
+                                                        value={formatNumberInputValue(set.distance)}
+                                                        disabled={isEditing}
+                                                        onChange={(e) => updateSet(exIndex, setIndex, 'distance', parseNumberInputValue(e.target.value))}
+                                                        whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
+                                                        transition={{ type: "spring", stiffness: 300 }}
+                                                        className="w-full bg-white/5 rounded-lg py-2 text-center font-bold text-white text-lg outline-none focus:bg-white/10 disabled:opacity-50"
                                                     />
                                                 </div>
-                                                ) : (
-                                                <motion.input
-                                                    type="number" onKeyDown={blockInvalidNumberChars}
-                                                min={0}
-                                                  placeholder={getNumberPlaceholder(ghostSet?.reps, "-")}
-                                                  value={formatNumberInputValue(set.reps)}
-                                                  onChange={(e) => updateSet(exIndex, setIndex, 'reps', parseNumberInputValue(e.target.value))}
-                                                    disabled={isEditing}
-                                                    whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
-                                                    transition={{ type: "spring", stiffness: 300 }}
-                                                    className="w-full bg-white/5 rounded-lg py-2 text-center font-bold text-white text-lg outline-none focus:bg-white/10 disabled:opacity-50"
-                                                />
-                                                )}
-                                            </div>
+                                                <div className="col-span-3 flex justify-center">
+                                                    <motion.input
+                                                        type="number" step="any" onKeyDown={blockInvalidNumberChars}
+                                                        min={0}
+                                                        placeholder={getNumberPlaceholder(ghostSet?.durationSeconds ? Math.round((ghostSet.durationSeconds / 60) * 10) / 10 : null, "-")}
+                                                        value={formatNumberInputValue(set.durationSeconds ? Math.round((set.durationSeconds / 60) * 10) / 10 : null)}
+                                                        disabled={isEditing}
+                                                        onChange={(e) => {
+                                                            const val = parseNumberInputValue(e.target.value);
+                                                            updateSet(exIndex, setIndex, 'durationSeconds', val !== null ? Math.round(val * 60) : null);
+                                                        }}
+                                                        whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
+                                                        transition={{ type: "spring", stiffness: 300 }}
+                                                        className="w-full bg-white/5 rounded-lg py-2 text-center font-bold text-white text-lg outline-none focus:bg-white/10 disabled:opacity-50"
+                                                    />
+                                                </div>
+                                              </>
+                                            ) : (
+                                              <>
+                                                <div className="col-span-3">
+                                                    <motion.input
+                                                        type="number" onKeyDown={blockInvalidNumberChars}
+                                                    min={0}
+                                                    placeholder={getNumberPlaceholder(ghostSet?.weight, "-")}
+                                                    value={formatNumberInputValue(set.weight)}
+                                                        disabled={isEditing}
+                                                    onChange={(e) => updateSet(exIndex, setIndex, 'weight', parseNumberInputValue(e.target.value))}
+                                                        whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
+                                                        transition={{ type: "spring", stiffness: 300 }}
+                                                        className="w-full bg-white/5 rounded-lg py-2 text-center font-bold text-white text-lg outline-none focus:bg-white/10 disabled:opacity-50"
+                                                    />
+                                                </div>
+                                                
+                                                <div className="col-span-3 flex justify-center">
+                                                    {def?.isUnilateral ? (
+                                                    <div className="flex gap-1 w-full">
+                                                        <motion.input
+                                                          type="number" onKeyDown={blockInvalidNumberChars}
+                                                          min={0}
+                                                          placeholder={getNumberPlaceholder(ghostSet?.repsLeft, "L")}
+                                                          value={formatNumberInputValue(set.repsLeft)}
+                                                          onChange={(e) => handleUnilateralChange(exIndex, setIndex, set.id, 'repsLeft', e.target.value)}
+                                                          disabled={isEditing}
+                                                          whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
+                                                          transition={{ type: "spring", stiffness: 300 }}
+                                                          className="w-1/2 bg-white/5 rounded-lg py-2 text-center font-bold text-white text-sm outline-none focus:bg-white/10 disabled:opacity-50"
+                                                        />
+                                                        <motion.input
+                                                          type="number" onKeyDown={blockInvalidNumberChars}
+                                                          min={0}
+                                                          placeholder={getNumberPlaceholder(ghostSet?.repsRight, "R")}
+                                                          value={formatNumberInputValue(set.repsRight)}
+                                                          onChange={(e) => handleUnilateralChange(exIndex, setIndex, set.id, 'repsRight', e.target.value)}
+                                                          disabled={isEditing}
+                                                          whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
+                                                          transition={{ type: "spring", stiffness: 300 }}
+                                                          className="w-1/2 bg-white/5 rounded-lg py-2 text-center font-bold text-white text-sm outline-none focus:bg-white/10 disabled:opacity-50"
+                                                        />
+                                                    </div>
+                                                    ) : (
+                                                    <motion.input
+                                                        type="number" onKeyDown={blockInvalidNumberChars}
+                                                    min={0}
+                                                      placeholder={getNumberPlaceholder(ghostSet?.reps, "-")}
+                                                      value={formatNumberInputValue(set.reps)}
+                                                      onChange={(e) => updateSet(exIndex, setIndex, 'reps', parseNumberInputValue(e.target.value))}
+                                                        disabled={isEditing}
+                                                        whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
+                                                        transition={{ type: "spring", stiffness: 300 }}
+                                                        className="w-full bg-white/5 rounded-lg py-2 text-center font-bold text-white text-lg outline-none focus:bg-white/10 disabled:opacity-50"
+                                                    />
+                                                    )}
+                                                </div>
+                                              </>
+                                            )}
 
                                             <div className="col-span-3 flex items-center gap-2">
                                               {isEditing ? (

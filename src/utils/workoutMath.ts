@@ -80,13 +80,26 @@ export const shouldCountSetForVolume = (
   return true;
 };
 
+export const isCardioExercise = (def?: Exercise) =>
+  (def?.category || '').toLowerCase() === 'cardio' || def?.exerciseCategory === 'cardio';
+
+export const PR_ELIGIBLE_SET_TYPES = ['normal', 'failure', 'drop', 'dropset'] as const;
+export type PREligibleSetType = typeof PR_ELIGIBLE_SET_TYPES[number];
+
+export const isEligibleForPR = (setType?: string | null): boolean => {
+  // Backward compatibility: If older rows contain set_type = NULL or undefined, default to 'normal'
+  const normalized = (setType || 'normal').toLowerCase();
+  return PR_ELIGIBLE_SET_TYPES.includes(normalized as PREligibleSetType);
+};
+
 export const shouldCountSetForPR = (
   set: ExerciseSet,
   def?: Exercise,
   workoutBodyWeight?: number | null,
   userWeight?: number | null
 ) => {
-  if (set.type !== 'normal') return false;
+  if (isCardioExercise(def)) return false;
+  if (!isEligibleForPR(set.type)) return false;
   return shouldCountSetForVolume(set, def, workoutBodyWeight, userWeight);
 };
 

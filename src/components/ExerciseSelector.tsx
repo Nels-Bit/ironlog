@@ -22,6 +22,7 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
   const [newCategory, setNewCategory] = useState('Free Weights');
   const [newTarget, setNewTarget] = useState('Chest');
   const [isUnilateral, setIsUnilateral] = useState(false);
+  const isCardio = newCategory.toLowerCase() === 'cardio';
 
   const loadExercises = async () => exerciseService.getAllExercises();
 
@@ -62,11 +63,13 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
   const handleCreate = async () => {
     if (!newName) return;
     setLoading(true);
+    const isCardio = newCategory.toLowerCase() === 'cardio';
     const created = await exerciseService.createExercise({
       name: newName,
       category: newCategory,
-      target: newTarget,
-      isUnilateral
+      exerciseCategory: isCardio ? 'cardio' : 'strength',
+      target: isCardio ? null : newTarget,
+      isUnilateral: isCardio ? false : isUnilateral
     });
     
     if (created) {
@@ -205,10 +208,14 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
                           {ex.name}
                         </p>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 bg-white/5 px-2 py-1 rounded">
-                            {ex.target}
-                          </span>
-                          <span className="text-xs text-zinc-600">•</span>
+                          {ex.target && (
+                            <>
+                              <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 bg-white/5 px-2 py-1 rounded">
+                                {ex.target}
+                              </span>
+                              <span className="text-xs text-zinc-600">•</span>
+                            </>
+                          )}
                           <span className="text-xs text-zinc-500 font-medium">{ex.category}</span>
                           {ex.isUnilateral && (
                             <span className="text-[10px] font-bold bg-brand-orange/20 text-brand-orange px-2 py-0.5 rounded uppercase tracking-wide ml-1">
@@ -288,7 +295,7 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
             </div>
 
             {/* Selectors Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className={cn("grid gap-6", isCardio ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2")}>
               <div className="space-y-3">
                 <label className="text-xs font-bold uppercase text-zinc-500 tracking-widest pl-1">Category</label>
                 <div className="relative">
@@ -305,61 +312,73 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <label className="text-xs font-bold uppercase text-zinc-500 tracking-widest pl-1">Target Muscle</label>
-                <div className="relative">
-                  <select 
-                    value={newTarget}
-                    onChange={e => setNewTarget(e.target.value)}
-                    className="w-full bg-iron-950 border border-white/10 rounded-2xl p-4 pr-10 text-white font-medium appearance-none focus:border-brand-orange outline-none"
-                  >
-                    <option value="Chest">Chest</option>
-                    <option value="Back">Back</option>
-                    <option value="Shoulders">Shoulders</option>
-                    <option value="Biceps">Biceps</option>
-                    <option value="Triceps">Triceps</option>
-                    <option value="Forearms">Forearms</option>
-                    <option value="Quads">Quads</option>
-                    <option value="Hamstrings">Hamstrings</option>
-                    <option value="Glutes">Glutes</option>
-                    <option value="Calves">Calves</option>
-                    <option value="Core">Core</option>
-                    <option value="Full Body">Full Body</option>
-                    <option value="Other">Other</option>
-                  </select>
-                  <ChevronLeft className="absolute right-4 top-1/2 -translate-y-1/2 rotate-[-90deg] text-zinc-600 pointer-events-none" size={16} />
+              {!isCardio && (
+                <div className="space-y-3">
+                  <label className="text-xs font-bold uppercase text-zinc-500 tracking-widest pl-1">Target Muscle</label>
+                  <div className="relative">
+                    <select 
+                      value={newTarget}
+                      onChange={e => setNewTarget(e.target.value)}
+                      className="w-full bg-iron-950 border border-white/10 rounded-2xl p-4 pr-10 text-white font-medium appearance-none focus:border-brand-orange outline-none"
+                    >
+                      <option value="Chest">Chest</option>
+                      <option value="Back">Back</option>
+                      <option value="Shoulders">Shoulders</option>
+                      <option value="Biceps">Biceps</option>
+                      <option value="Triceps">Triceps</option>
+                      <option value="Forearms">Forearms</option>
+                      <option value="Quads">Quads</option>
+                      <option value="Hamstrings">Hamstrings</option>
+                      <option value="Glutes">Glutes</option>
+                      <option value="Calves">Calves</option>
+                      <option value="Core">Core</option>
+                      <option value="Full Body">Full Body</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    <ChevronLeft className="absolute right-4 top-1/2 -translate-y-1/2 rotate-[-90deg] text-zinc-600 pointer-events-none" size={16} />
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
-            {/* Unilateral Toggle */}
-            <div 
-              className={cn(
-                "flex items-center gap-5 p-5 rounded-2xl border-2 transition-all cursor-pointer select-none active:scale-[0.99]",
-                isUnilateral 
-                  ? "bg-brand-orange/10 border-brand-orange shadow-lg shadow-brand-orange/10" 
-                  : "bg-iron-950 border-white/10 hover:bg-white/5"
-              )}
-              onClick={() => setIsUnilateral(!isUnilateral)}
-            >
-              <div className={cn(
-                "w-8 h-8 rounded-lg flex items-center justify-center border-2 transition-all shrink-0",
-                isUnilateral 
-                  ? "bg-brand-orange border-brand-orange text-white" 
-                  : "border-zinc-700 bg-black/40"
-              )}>
-                {isUnilateral && <Check size={20} strokeWidth={3} />}
-              </div>
-              <div className="flex-1">
-                <p className={cn(
-                  "text-lg font-bold transition-colors", 
-                  isUnilateral ? "text-brand-orange" : "text-white"
-                )}>
-                  Unilateral Exercise
+            {/* When Cardio is selected, display informative note and hide unilateral toggle */}
+            {isCardio ? (
+              <div className="p-4 rounded-2xl bg-brand-orange/10 border border-brand-orange/20 flex items-center gap-3">
+                <div className="w-2.5 h-2.5 rounded-full bg-brand-orange animate-pulse shrink-0" />
+                <p className="text-xs text-brand-orange font-medium">
+                  Cardio exercises track distance, duration, and pace instead of weight, reps, and muscle groups.
                 </p>
-                <p className="text-xs text-zinc-500 font-medium mt-0.5">Logs weight for Left & Right separately</p>
               </div>
-            </div>
+            ) : (
+              /* Unilateral Toggle */
+              <div 
+                className={cn(
+                  "flex items-center gap-5 p-5 rounded-2xl border-2 transition-all cursor-pointer select-none active:scale-[0.99]",
+                  isUnilateral 
+                    ? "bg-brand-orange/10 border-brand-orange shadow-lg shadow-brand-orange/10" 
+                    : "bg-iron-950 border-white/10 hover:bg-white/5"
+                )}
+                onClick={() => setIsUnilateral(!isUnilateral)}
+              >
+                <div className={cn(
+                  "w-8 h-8 rounded-lg flex items-center justify-center border-2 transition-all shrink-0",
+                  isUnilateral 
+                    ? "bg-brand-orange border-brand-orange text-white" 
+                    : "border-zinc-700 bg-black/40"
+                )}>
+                  {isUnilateral && <Check size={20} strokeWidth={3} />}
+                </div>
+                <div className="flex-1">
+                  <p className={cn(
+                    "text-lg font-bold transition-colors", 
+                    isUnilateral ? "text-brand-orange" : "text-white"
+                  )}>
+                    Unilateral Exercise
+                  </p>
+                  <p className="text-xs text-zinc-500 font-medium mt-0.5">Logs weight for Left & Right separately</p>
+                </div>
+              </div>
+            )}
 
             {/* Action Button */}
             <button

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Dumbbell, Calendar, Clock, Flame, Skull, ArrowDown, ChevronDown } from 'lucide-react';
 import { isRestDaySession } from '../utils/achievementUtils';
+import { isCardioExercise } from '../utils/workoutMath';
 import { workoutService } from '../services/workoutService';
 import { exerciseService } from '../services/exerciseService';
 import { Button } from '../components/ui/Button';
@@ -376,11 +377,25 @@ export const History = () => {
                                         {!isDropChild && getTypeIcon(set.type)}
                                       </div>
 
-                                      {/* Weight & Reps */}
+                                      {/* Weight & Reps OR Distance & Time */}
                                       <div className="flex-1 text-zinc-300">
-                                        {set.weight ? `${set.weight} lbs` : '-'}
-                                        <span className="text-zinc-600 mx-1">×</span>
-                                        {def?.isUnilateral ? `${set.repsLeft}L / ${set.repsRight}R` : set.reps}
+                                        {isCardioExercise(def) ? (
+                                          <span>
+                                            {set.distance !== null && set.distance !== undefined ? `${set.distance} mi` : '-'}
+                                            {set.durationSeconds ? (
+                                              <>
+                                                <span className="text-zinc-600 mx-1.5">•</span>
+                                                <span>{Math.floor(set.durationSeconds / 60)}m {set.durationSeconds % 60 ? `${set.durationSeconds % 60}s` : ''}</span>
+                                              </>
+                                            ) : null}
+                                          </span>
+                                        ) : (
+                                          <>
+                                            {set.weight ? `${set.weight} lbs` : '-'}
+                                            <span className="text-zinc-600 mx-1">×</span>
+                                            {def?.isUnilateral ? `${set.repsLeft}L / ${set.repsRight}R` : set.reps}
+                                          </>
+                                        )}
                                       </div>
 
                                     </div>
