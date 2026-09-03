@@ -3,6 +3,8 @@ import { exerciseService } from './exerciseService';
 import { getLevelProgress, calculateWorkoutStreak, calculateStrengthAchievements } from '../utils/achievementUtils';
 import { replayAllXP, getXPForWorkout } from '../utils/xpEngine';
 import { parseUserWeight } from '../utils/workoutMath';
+import { calculateTrophyCabinet } from '../utils/gamification';
+import { statsUtils } from '../utils/statsUtils';
 import type { FriendRequest, FriendSummary, FriendWithStats, NotificationItem, SocialProfile, FriendProfileData, WorkoutSession, UserProfile, Exercise } from '../types';
 
 type UserProfileRow = {
@@ -466,8 +468,23 @@ export const socialService = {
     const streakResult = calculateWorkoutStreak(history);
     const strengthAchievements = calculateStrengthAchievements(history, defMap);
 
+    // Compute total stats
     const totalWorkouts = history.length;
     const totalVolume = history.reduce((sum, w) => sum + w.volumeLoad, 0);
+
+    // Compute PRs count for PR Hunter trophy
+    const prs = await statsUtils.calculatePRs(history);
+    const prCount = prs.length;
+
+    // Compute the Trophy Cabinet
+    const activeHistory = history.filter(w => !w.name.toLowerCase().includes('rest day'));
+    const cabinet = calculateTrophyCabinet({
+      history: activeHistory,
+      exerciseDefs: defMap,
+      totalXP: xp.totalXP,
+      prCount,
+      xpBreakdowns: xp.breakdowns,
+    });
 
     const muscleCounts = new Map<string, number>();
     history.forEach(w => {
@@ -494,6 +511,7 @@ export const socialService = {
       totalXP: xp.totalXP,
       streak: streakResult.currentStreak,
       achievements: strengthAchievements.filter(a => a.unlocked),
+      trophies: cabinet,
       recentWorkouts
     };
   },

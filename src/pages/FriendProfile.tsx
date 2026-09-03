@@ -7,6 +7,7 @@ import { Button } from '../components/ui/Button';
 import { socialService } from '../services/socialService';
 import type { FriendProfileData } from '../types';
 import { getLevelProgress } from '../utils/achievementUtils';
+import { TrophyCabinet } from '../components/TrophyCabinet';
 
 export const FriendProfile = () => {
   const { userId } = useParams<{ userId: string }>();
@@ -57,7 +58,7 @@ export const FriendProfile = () => {
     );
   }
 
-  const { profile, isPrivate, stats, totalXP = 0, streak = 0, achievements = [], recentWorkouts = [] } = data;
+  const { profile, isPrivate, stats, totalXP = 0, streak = 0, trophies = [], recentWorkouts = [] } = data;
   const levelProgress = getLevelProgress(totalXP);
 
   return (
@@ -148,21 +149,9 @@ export const FriendProfile = () => {
               </div>
             )}
 
-            {/* Achievements */}
-            {achievements.length > 0 && (
-              <div className="rounded-2xl border border-white/5 bg-zinc-900/40 backdrop-blur-md p-5 space-y-4">
-                <h3 className="text-[10px] uppercase tracking-widest font-bold text-zinc-500">Earned Medals</h3>
-                <div className="flex flex-wrap gap-2">
-                  {achievements.map((ach, idx: number) => (
-                    <div key={idx} className="bg-amber-500/10 border border-amber-500/30 px-3 py-2 rounded-xl flex items-center gap-2">
-                      <span className="text-lg">🏅</span>
-                      <div className="flex flex-col">
-                        <span className="text-xs font-bold text-amber-500">{ach.currentWeight}lb {ach.label}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            {/* Trophy Cabinet (replaces flat medal chips) */}
+            {trophies.length > 0 && (
+              <TrophyCabinet trophies={trophies} isReadOnly />
             )}
 
             {/* Recent Workouts */}

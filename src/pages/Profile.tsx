@@ -1,7 +1,7 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { 
-  User, Ruler, Weight, Activity, Edit2, Award, Trophy, Zap, Save, X, Loader2, Globe, Lock, Search, Users, UserPlus, Calendar, LogOut
+  User, Ruler, Weight, Edit2, Award, Save, X, Loader2, Globe, Lock, Search, Users, UserPlus, Calendar, LogOut
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { cn } from '../lib/utils';
@@ -10,11 +10,12 @@ import { workoutService } from '../services/workoutService';
 import { exerciseService } from '../services/exerciseService';
 import { socialService } from '../services/socialService';
 import type { UserProfile, WorkoutSession, Exercise, FriendRequest, FriendSummary, FriendWithStats } from '../types';
-import { statsUtils, type PersonalRecord } from '../utils/statsUtils';
-import { getLevelProgress, getLevelRequirementXP, isRestDaySession, formatStreakLabel } from '../utils/achievementUtils';
+import { statsUtils } from '../utils/statsUtils';
+import { getLevelProgress, isRestDaySession, formatStreakLabel } from '../utils/achievementUtils';
 import { replayAllXP, type TotalXPResult } from '../utils/xpEngine';
 import { parseUserWeight } from '../utils/workoutMath';
-import { AchievementList, type AchievementItem } from '../components/ui/achievement-list';
+import { calculateTrophyCabinet, type CategoryTrophy } from '../utils/gamification';
+import { TrophyCabinet } from '../components/TrophyCabinet';
 import { FluidTabs } from '../components/ui/fluid-tabs';
 import { ProfileSkeleton } from '../components/ProfileSkeleton';
 
@@ -25,11 +26,7 @@ export const Profile = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'activity' | 'friends'>('overview');
-  const [stats, setStats] = useState({ totalWorkouts: 0, totalVolume: 0 });
-  const [prCount, setPrCount] = useState(0);
   const [workoutHistory, setWorkoutHistory] = useState<WorkoutSession[]>([]);
-  const [activeWorkouts, setActiveWorkouts] = useState<WorkoutSession[]>([]);
-  const [prRecords, setPrRecords] = useState<PersonalRecord[]>([]);
   const [socialError, setSocialError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<FriendSummary[]>([]);
@@ -43,6 +40,7 @@ export const Profile = () => {
   const [heightFeet, setHeightFeet] = useState('');
   const [heightInches, setHeightInches] = useState('');
   const [xpResult, setXpResult] = useState<TotalXPResult | null>(null);
+  const [trophies, setTrophies] = useState<CategoryTrophy[]>([]);
 
   const totalXP = xpResult?.totalXP ?? 0;
   const levelProgress = getLevelProgress(totalXP);
@@ -53,8 +51,6 @@ export const Profile = () => {
   const goalOptions: NonNullable<UserProfile['goal']>[] = ['Strength', 'Hypertrophy', 'Endurance', 'Weight Loss'];
   const environmentOptions: NonNullable<UserProfile['environment']>[] = ['Gym', 'Home'];
   const levelOptions: NonNullable<UserProfile['level']>[] = ['Beginner', 'Intermediate', 'Pro'];
-  const levelMilestones = [5, 10, 15, 20, 30, 40, 50];
-
 
 
   useEffect(() => {
@@ -121,15 +117,7 @@ export const Profile = () => {
       const activeWorkouts = history.filter(session => !isRestDaySession(session));
       setWorkoutHistory(history);
       const activeWorkoutsAscending = [...activeWorkouts].sort((a, b) => a.startTime - b.startTime);
-      const volume = activeWorkouts.reduce((acc, curr) => acc + (curr.volumeLoad || 0), 0);
       const prs = await statsUtils.calculatePRs(activeWorkouts);
-      setStats({
-        totalWorkouts: activeWorkouts.length,
-        totalVolume: volume
-      });
-      setPrCount(prs.length);
-      setActiveWorkouts(activeWorkoutsAscending);
-      setPrRecords(prs);
 
       // XP replay: load exercise defs and compute total XP from history
       const allExercises = await exerciseService.getAllExercises();
@@ -137,6 +125,16 @@ export const Profile = () => {
       const userWeight = parseUserWeight(user?.weight);
       const xp = replayAllXP(history, defMap, userWeight);
       setXpResult(xp);
+
+      // Compute trophy cabinet using full history + XP data
+      const cabinet = calculateTrophyCabinet({
+        history: activeWorkoutsAscending,
+        exerciseDefs: defMap,
+        totalXP: xp.totalXP,
+        prCount: prs.length,
+        xpBreakdowns: xp.breakdowns,
+      });
+      setTrophies(cabinet);
 
       try {
         const [friendsData, incoming, outgoing] = await Promise.all([
@@ -236,76 +234,8 @@ export const Profile = () => {
 
   if (loading) return <ProfileSkeleton />;
 
-  const workoutsAscending = activeWorkouts;
-
-  const getWorkoutDate = (index: number) => workoutsAscending[index]?.startTime ?? null;
-
-  const getVolumeMilestoneDate = (targetVolume: number) => {
-    let runningVolume = 0;
-    for (const workout of workoutsAscending) {
-      runningVolume += workout.volumeLoad || 0;
-      if (runningVolume >= targetVolume) {
-        return workout.startTime;
-      }
-    }
-    return null;
-  };
-
-  type MedalCard = {
-    id: string;
-    title: string;
-    description: string;
-    unlocked: boolean;
-    earnedAt: number | null;
-    icon: ReactNode;
-    category: 'achievement' | 'level';
-    sortOrder: number;
-  };
-
-  const baseMedals: MedalCard[] = [
-    { id: 'first-rep', title: 'First Rep', description: 'Complete 1 workout', unlocked: stats.totalWorkouts >= 1, earnedAt: getWorkoutDate(0), icon: <Trophy size={18} />, category: 'achievement', sortOrder: 1 },
-    { id: 'consistent', title: 'Consistent', description: 'Complete 10 workouts', unlocked: stats.totalWorkouts >= 10, earnedAt: getWorkoutDate(9), icon: <Activity size={18} />, category: 'achievement', sortOrder: 2 },
-    { id: 'volume-builder', title: 'Volume Builder', description: 'Move 50,000 lbs', unlocked: stats.totalVolume >= 50000, earnedAt: getVolumeMilestoneDate(50000), icon: <Weight size={18} />, category: 'achievement', sortOrder: 3 },
-    { id: 'iron-titan', title: 'Iron Titan', description: 'Move 100,000 lbs', unlocked: stats.totalVolume >= 100000, earnedAt: getVolumeMilestoneDate(100000), icon: <Zap size={18} />, category: 'achievement', sortOrder: 4 },
-    { id: 'pr-hunter', title: 'PR Hunter', description: 'Set 5 personal records', unlocked: prCount >= 5, earnedAt: prRecords[4]?.date ?? null, icon: <Award size={18} />, category: 'achievement', sortOrder: 5 }
-  ];
-
-  // Find the workout date when cumulative XP first crossed a level threshold
-  const getLevelEarnedAt = (targetLevel: number): number | null => {
-    if (!xpResult) return null;
-    const requiredXP = getLevelRequirementXP(targetLevel);
-    let cumulativeXP = 0;
-    const sorted = [...activeWorkouts].sort((a, b) => a.startTime - b.startTime);
-    for (const w of sorted) {
-      const bd = xpResult.breakdowns.get(w.id);
-      if (bd) cumulativeXP += bd.finalXP;
-      if (cumulativeXP >= requiredXP) return w.startTime;
-    }
-    return null;
-  };
-
-  const levelMedals: MedalCard[] = levelMilestones.map((level, index) => {
-    return {
-      id: `level-${level}`,
-      title: `Level ${level}`,
-      description: `Reach level ${level}`,
-      unlocked: currentLevel >= level,
-      earnedAt: getLevelEarnedAt(level),
-      icon: <Award size={18} />,
-      category: 'level',
-      sortOrder: 100 + index
-    };
-  });
-
-  const mergedMedals = [...baseMedals, ...levelMedals].sort((a, b) => {
-    if (a.unlocked !== b.unlocked) return a.unlocked ? -1 : 1;
-    const aTime = a.earnedAt ?? 0;
-    const bTime = b.earnedAt ?? 0;
-    if (aTime !== bTime) return bTime - aTime;
-    return a.sortOrder - b.sortOrder;
-  });
-
-
+  // Trophy cabinet data is computed in loadData via calculateTrophyCabinet
+  // and stored in the `trophies` state variable.
 
   return (
     <div className="min-h-screen bg-black pb-32 animate-in fade-in duration-500">
@@ -554,24 +484,8 @@ export const Profile = () => {
           </div>
         )}
 
-        {!isEditing && (
-          <AchievementList
-            items={mergedMedals.map((medal): AchievementItem => ({
-              id: medal.id,
-              title: medal.title,
-              description: medal.description,
-              sublabel: medal.unlocked
-                ? medal.earnedAt
-                  ? `${medal.title} earned (${new Date(medal.earnedAt).toLocaleDateString()})`
-                  : `${medal.title} earned`
-                : `Unlocks when ${medal.description.toLowerCase()}`,
-              unlocked: medal.unlocked,
-              category: medal.category,
-              icon: medal.icon,
-              accentColor: medal.category === 'level' ? 'blue' : 'orange',
-            }))}
-            initialVisible={2}
-          />
+        {!isEditing && trophies.length > 0 && (
+          <TrophyCabinet trophies={trophies} />
         )}
 
         {!isEditing && (
