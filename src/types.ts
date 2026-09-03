@@ -1,3 +1,6 @@
+// Re-export trophy types from gamification so consumers can import from types.ts
+export type { TrophyCategory, TrophyRank, TrophyTier, CategoryTrophy } from './utils/gamification';
+
 export interface UserProfile {
   id: string;
   userId: string;
@@ -66,6 +69,8 @@ export interface FriendProfileData {
   totalXP?: number;
   streak?: number;
   achievements?: { lift: string; label: string; currentWeight: number; threshold: number }[];
+  /** Pre-computed trophy cabinet for display in the friend profile view. */
+  trophies?: import('./utils/gamification').CategoryTrophy[];
   recentWorkouts?: WorkoutSession[];
 }
 
