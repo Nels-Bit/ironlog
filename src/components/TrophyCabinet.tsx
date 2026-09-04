@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Lock, X, CheckCircle2, Circle } from 'lucide-react';
 import { cn } from '../lib/utils';
 import type { CategoryTrophy, TrophyRank } from '../types';
+import { getTrophyRank } from '../utils/gamification';
 
 // ─── Rank Styling ──────────────────────────────────────────────────────────
 
@@ -35,6 +36,15 @@ const RANK_STYLES: Record<TrophyRank, RankStyle> = {
     progressBar: 'bg-gradient-to-r from-amber-700 to-amber-500',
     rankLabel: 'BRONZE',
   },
+  bronze_max: {
+    cardBg: 'bg-amber-950/40',
+    cardBorder: 'border-brand-orange/40',
+    badgeBg: 'bg-gradient-to-r from-amber-600 to-brand-orange',
+    badgeText: 'text-white',
+    glowShadow: 'shadow-[0_0_20px_rgba(249,115,22,0.3)]',
+    progressBar: 'bg-gradient-to-r from-amber-600 to-brand-orange',
+    rankLabel: 'BRONZE MAX',
+  },
   silver: {
     cardBg: 'bg-slate-800/30',
     cardBorder: 'border-slate-400/25',
@@ -43,6 +53,15 @@ const RANK_STYLES: Record<TrophyRank, RankStyle> = {
     glowShadow: 'shadow-[0_0_18px_rgba(148,163,184,0.2)]',
     progressBar: 'bg-gradient-to-r from-slate-400 to-slate-300',
     rankLabel: 'SILVER',
+  },
+  silver_max: {
+    cardBg: 'bg-slate-800/40',
+    cardBorder: 'border-slate-300/40',
+    badgeBg: 'bg-gradient-to-r from-slate-400 to-white',
+    badgeText: 'text-slate-900 font-extrabold',
+    glowShadow: 'shadow-[0_0_20px_rgba(203,213,225,0.3)]',
+    progressBar: 'bg-gradient-to-r from-slate-400 to-white',
+    rankLabel: 'SILVER MAX',
   },
   gold: {
     cardBg: 'bg-yellow-950/30',
@@ -53,6 +72,15 @@ const RANK_STYLES: Record<TrophyRank, RankStyle> = {
     progressBar: 'bg-gradient-to-r from-yellow-500 to-yellow-300',
     rankLabel: 'GOLD',
   },
+  gold_max: {
+    cardBg: 'bg-yellow-950/40',
+    cardBorder: 'border-yellow-300/50',
+    badgeBg: 'bg-gradient-to-r from-yellow-500 to-amber-300',
+    badgeText: 'text-yellow-950 font-extrabold',
+    glowShadow: 'shadow-[0_0_24px_rgba(253,224,71,0.35)]',
+    progressBar: 'bg-gradient-to-r from-yellow-500 to-amber-300',
+    rankLabel: 'GOLD MAX',
+  },
   platinum: {
     cardBg: 'bg-cyan-950/30',
     cardBorder: 'border-cyan-400/30',
@@ -61,6 +89,15 @@ const RANK_STYLES: Record<TrophyRank, RankStyle> = {
     glowShadow: 'shadow-[0_0_24px_rgba(34,211,238,0.3)]',
     progressBar: 'bg-gradient-to-r from-cyan-500 to-cyan-300',
     rankLabel: 'PLATINUM',
+  },
+  platinum_max: {
+    cardBg: 'bg-cyan-950/40',
+    cardBorder: 'border-cyan-300/50',
+    badgeBg: 'bg-gradient-to-r from-cyan-400 to-blue-300',
+    badgeText: 'text-cyan-950 font-extrabold',
+    glowShadow: 'shadow-[0_0_26px_rgba(103,232,249,0.35)]',
+    progressBar: 'bg-gradient-to-r from-cyan-400 to-blue-300',
+    rankLabel: 'PLATINUM MAX',
   },
   diamond: {
     cardBg: 'bg-violet-950/30',
@@ -198,6 +235,7 @@ interface LadderModalProps {
 
 const LadderModal = ({ trophy, onClose }: LadderModalProps) => {
   const style = RANK_STYLES[trophy.rank];
+  const isLocked = trophy.rank === 'locked';
 
   return (
     <AnimatePresence>
@@ -215,37 +253,60 @@ const LadderModal = ({ trophy, onClose }: LadderModalProps) => {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: '100%', opacity: 0 }}
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-          className="relative w-full max-w-lg bg-zinc-950 border border-white/10 rounded-t-3xl p-6 pb-10 max-h-[85vh] overflow-y-auto"
+          className="relative w-full max-w-lg bg-zinc-950 border border-white/10 rounded-t-3xl max-h-[85dvh] flex flex-col"
           onClick={e => e.stopPropagation()}
         >
-          {/* Close button */}
-          <button
-            type="button"
-            onClick={onClose}
-            className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition-colors"
-          >
-            <X size={16} />
-          </button>
+          {/* Static Header Container */}
+          <div className="p-6 pb-4 shrink-0 border-b border-white/5 relative">
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={onClose}
+              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition-colors"
+            >
+              <X size={16} />
+            </button>
 
-          {/* Header */}
-          <div className="flex items-center gap-3 mb-6 pr-8">
-            <span className="text-3xl">{trophy.emoji}</span>
-            <div>
-              <h3 className="text-xl font-black text-white">{trophy.categoryLabel}</h3>
-              <RankBadge style={style} />
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-5 pr-8">
+              <span className="text-3xl">{trophy.emoji}</span>
+              <div>
+                <h3 className="text-xl font-black text-white">{trophy.categoryLabel}</h3>
+                <RankBadge style={style} />
+              </div>
+            </div>
+
+            {/* Current Best Stat Pill */}
+            <div className="bg-zinc-900/50 rounded-xl p-4 border border-white/5">
+              <p className="text-sm font-bold text-white mb-3">
+                {trophy.currentValueFormatted}
+              </p>
+              
+              <div className="h-1.5 rounded-full bg-black/40 overflow-hidden mb-2">
+                <motion.div
+                  className={cn('h-full rounded-full', style.progressBar)}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${trophy.progressPercent}%` }}
+                  transition={{ duration: 0.8, ease: 'easeOut', delay: 0.1 }}
+                />
+              </div>
+              
+              {trophy.nextDeltaLabel ? (
+                <p className="text-[10px] text-zinc-400 font-medium">
+                  {trophy.nextDeltaLabel}
+                </p>
+              ) : !isLocked ? (
+                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
+                  Maxed ✦
+                </p>
+              ) : null}
             </div>
           </div>
 
-          {/* Ladder */}
-          <div className="space-y-3">
+          {/* Scrollable Ladder List */}
+          <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 p-6 space-y-3">
             {trophy.tiers.map((tier, idx) => {
-              const tierStyle = RANK_STYLES[
-                idx + 1 <= 2 ? 'bronze' :
-                idx + 1 <= 4 ? 'silver' :
-                idx + 1 <= 6 ? 'gold' :
-                idx + 1 <= 8 ? 'platinum' :
-                idx + 1 === 9 ? 'diamond' : 'obsidian'
-              ];
+              const tierStyle = RANK_STYLES[getTrophyRank(idx + 1)];
               const isCurrent = idx === trophy.currentTierIndex && trophy.rank !== 'locked';
 
               return (
@@ -333,7 +394,7 @@ export const TrophyCabinet = ({ trophies, isReadOnly = false }: TrophyCabinetPro
           <div>
             <h3 className="text-lg font-bold text-white">Trophy Cabinet</h3>
             <p className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider">
-              {isReadOnly ? 'Earned trophies' : 'Tap a trophy to view ladder'}
+              Tap a trophy to view ladder
             </p>
           </div>
         </div>
@@ -344,7 +405,7 @@ export const TrophyCabinet = ({ trophies, isReadOnly = false }: TrophyCabinetPro
             <TrophyCard
               key={trophy.category}
               trophy={trophy}
-              onTap={() => !isReadOnly ? setSelectedTrophy(trophy) : setSelectedTrophy(trophy)}
+              onTap={() => setSelectedTrophy(trophy)}
               isReadOnly={isReadOnly}
             />
           ))}
