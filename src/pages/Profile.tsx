@@ -2,7 +2,7 @@ import { useState, useEffect, type ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { 
-  User, Ruler, Weight, Edit2, Award, Save, X, Loader2, Globe, Lock, Search, Users, UserPlus, Calendar, LogOut
+  User, Ruler, Weight, Edit2, Award, X, Loader2, Globe, Lock, Search, Users, UserPlus, Calendar
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { cn } from '../lib/utils';
@@ -24,6 +24,7 @@ export const Profile = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'activity' | 'friends'>('overview');
   const [workoutHistory, setWorkoutHistory] = useState<WorkoutSession[]>([]);
@@ -309,7 +310,7 @@ export const Profile = () => {
                 {/* Action Bar / Top Row */}
                 <div className="flex justify-end mb-4">
                   <button
-                    onClick={() => setIsEditing(true)}
+                    onClick={() => { setIsEditing(true); setShowSignOutConfirm(false); }}
                     className="flex items-center gap-1.5 text-neutral-400 hover:text-white border border-white/10 rounded-full px-3 py-1 text-xs transition-colors bg-transparent"
                   >
                     <Edit2 size={12} />
@@ -548,27 +549,55 @@ export const Profile = () => {
               </div>
             </div>
 
-            <Button className="w-full py-6 mt-4 text-lg" onClick={handleSave}>
-              <Save size={20} className="mr-2" /> Save Profile
-            </Button>
+            {!showSignOutConfirm ? (
+              <div className="grid grid-cols-2 gap-3 mt-6 pt-4 border-t border-white/10">
+                {/* Left Action: Sign Out (Red) */}
+                <button
+                  type="button"
+                  onClick={() => setShowSignOutConfirm(true)}
+                  className="btn btn-error btn-outline hover:bg-error hover:text-white w-full font-semibold"
+                >
+                  Sign Out
+                </button>
+
+                {/* Right Action: Save Profile (Green) */}
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  className="btn btn-success text-white w-full font-semibold"
+                >
+                  Save Profile
+                </button>
+              </div>
+            ) : (
+              <div className="mt-6 pt-4 border-t border-white/10 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                <div>
+                  <h4 className="text-white font-bold mb-1">Are you sure you want to sign out?</h4>
+                  <p className="text-zinc-400 text-sm">You will need to log back in to track workouts and view your trophies.</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowSignOutConfirm(false)}
+                    className="btn btn-neutral w-full font-semibold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    className="btn btn-error text-white w-full font-semibold"
+                  >
+                    Yes, Sign Out
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {!isEditing && trophies.length > 0 && (
           <TrophyCabinet trophies={trophies} />
-        )}
-
-        {!isEditing && (
-          <div className="mt-6">
-            <Button
-              variant="destructive"
-              className="w-full"
-              onClick={handleSignOut}
-            >
-              <LogOut size={16} className="mr-2" />
-              Sign Out
-            </Button>
-          </div>
         )}
           </div>
         )}
