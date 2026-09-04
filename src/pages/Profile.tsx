@@ -1,4 +1,5 @@
 import { useState, useEffect, type ReactNode } from 'react';
+import { motion } from 'framer-motion';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   User, Ruler, Weight, Edit2, Award, Save, X, Loader2, Globe, Lock, Search, Users, UserPlus, Calendar, LogOut
@@ -254,7 +255,11 @@ export const Profile = () => {
             >
               <span>OVERVIEW</span>
               {activeTab === 'overview' && (
-                <span className="absolute bottom-0 h-0.5 w-12 bg-brand-orange rounded-t-full" />
+                <motion.div
+                  layoutId="profileActiveTabIndicator"
+                  className="absolute bottom-0 h-0.5 w-12 bg-brand-orange rounded-t-full"
+                  transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+                />
               )}
             </button>
 
@@ -268,7 +273,11 @@ export const Profile = () => {
             >
               <span>ACTIVITY</span>
               {activeTab === 'activity' && (
-                <span className="absolute bottom-0 h-0.5 w-12 bg-brand-orange rounded-t-full" />
+                <motion.div
+                  layoutId="profileActiveTabIndicator"
+                  className="absolute bottom-0 h-0.5 w-12 bg-brand-orange rounded-t-full"
+                  transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+                />
               )}
             </button>
 
@@ -282,7 +291,11 @@ export const Profile = () => {
             >
               <span>FRIENDS</span>
               {activeTab === 'friends' && (
-                <span className="absolute bottom-0 h-0.5 w-12 bg-brand-orange rounded-t-full" />
+                <motion.div
+                  layoutId="profileActiveTabIndicator"
+                  className="absolute bottom-0 h-0.5 w-12 bg-brand-orange rounded-t-full"
+                  transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+                />
               )}
             </button>
 
