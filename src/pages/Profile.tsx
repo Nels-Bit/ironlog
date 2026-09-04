@@ -1,7 +1,8 @@
 import { useState, useEffect, type ReactNode } from 'react';
+import { motion } from 'framer-motion';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { 
-  User, Ruler, Weight, Edit2, Award, Save, X, Loader2, Globe, Lock, Search, Users, UserPlus, Calendar, LogOut
+  User, Ruler, Weight, Edit2, Award, X, Loader2, Globe, Lock, Search, Users, UserPlus, Calendar
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { cn } from '../lib/utils';
@@ -23,6 +24,7 @@ export const Profile = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'activity' | 'friends'>('overview');
   const [workoutHistory, setWorkoutHistory] = useState<WorkoutSession[]>([]);
@@ -254,7 +256,11 @@ export const Profile = () => {
             >
               <span>OVERVIEW</span>
               {activeTab === 'overview' && (
-                <span className="absolute bottom-0 h-0.5 w-12 bg-brand-orange rounded-t-full" />
+                <motion.div
+                  layoutId="profileActiveTabIndicator"
+                  className="absolute bottom-0 h-0.5 w-12 bg-brand-orange rounded-t-full"
+                  transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+                />
               )}
             </button>
 
@@ -268,7 +274,11 @@ export const Profile = () => {
             >
               <span>ACTIVITY</span>
               {activeTab === 'activity' && (
-                <span className="absolute bottom-0 h-0.5 w-12 bg-brand-orange rounded-t-full" />
+                <motion.div
+                  layoutId="profileActiveTabIndicator"
+                  className="absolute bottom-0 h-0.5 w-12 bg-brand-orange rounded-t-full"
+                  transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+                />
               )}
             </button>
 
@@ -282,7 +292,11 @@ export const Profile = () => {
             >
               <span>FRIENDS</span>
               {activeTab === 'friends' && (
-                <span className="absolute bottom-0 h-0.5 w-12 bg-brand-orange rounded-t-full" />
+                <motion.div
+                  layoutId="profileActiveTabIndicator"
+                  className="absolute bottom-0 h-0.5 w-12 bg-brand-orange rounded-t-full"
+                  transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+                />
               )}
             </button>
 
@@ -296,7 +310,7 @@ export const Profile = () => {
                 {/* Action Bar / Top Row */}
                 <div className="flex justify-end mb-4">
                   <button
-                    onClick={() => setIsEditing(true)}
+                    onClick={() => { setIsEditing(true); setShowSignOutConfirm(false); }}
                     className="flex items-center gap-1.5 text-neutral-400 hover:text-white border border-white/10 rounded-full px-3 py-1 text-xs transition-colors bg-transparent"
                   >
                     <Edit2 size={12} />
@@ -535,27 +549,55 @@ export const Profile = () => {
               </div>
             </div>
 
-            <Button className="w-full py-6 mt-4 text-lg" onClick={handleSave}>
-              <Save size={20} className="mr-2" /> Save Profile
-            </Button>
+            {!showSignOutConfirm ? (
+              <div className="grid grid-cols-2 gap-3 mt-6 pt-4 border-t border-white/10">
+                {/* Left Action: Sign Out (Red) */}
+                <button
+                  type="button"
+                  onClick={() => setShowSignOutConfirm(true)}
+                  className="w-full h-11 rounded-xl font-semibold text-sm transition-colors border border-red-500/30 bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white flex items-center justify-center"
+                >
+                  Sign Out
+                </button>
+
+                {/* Right Action: Save Profile (Green) */}
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  className="w-full h-11 rounded-xl font-semibold text-sm transition-colors bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/30 flex items-center justify-center"
+                >
+                  Save Profile
+                </button>
+              </div>
+            ) : (
+              <div className="mt-6 pt-4 border-t border-white/10 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+                <div>
+                  <h4 className="text-white font-bold mb-1">Are you sure you want to sign out?</h4>
+                  <p className="text-zinc-400 text-sm">You will need to log back in to track workouts and view your trophies.</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowSignOutConfirm(false)}
+                    className="w-full h-11 rounded-xl font-semibold text-sm transition-colors bg-zinc-800 hover:bg-zinc-700 text-white flex items-center justify-center"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    className="w-full h-11 rounded-xl font-semibold text-sm transition-colors bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/30 flex items-center justify-center"
+                  >
+                    Yes, Sign Out
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         {!isEditing && trophies.length > 0 && (
           <TrophyCabinet trophies={trophies} />
-        )}
-
-        {!isEditing && (
-          <div className="mt-6">
-            <Button
-              variant="destructive"
-              className="w-full"
-              onClick={handleSignOut}
-            >
-              <LogOut size={16} className="mr-2" />
-              Sign Out
-            </Button>
-          </div>
         )}
           </div>
         )}
@@ -716,12 +758,13 @@ export const Profile = () => {
                           <p className="text-xs text-zinc-500 truncate">@{friend.userId}</p>
                         </div>
                       </div>
-                      <Button 
+                      <button 
+                        type="button"
                         onClick={() => navigate(`/friends/${friend.authUserId}`)}
-                        className="w-[130px] h-[48px] min-w-[130px] shrink-0 flex items-center justify-center text-sm tracking-normal font-bold"
+                        className="w-[130px] h-[48px] min-w-[130px] shrink-0 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs tracking-wider uppercase transition-all shadow-md shadow-orange-950/40 flex items-center justify-center"
                       >
                         View Profile
-                      </Button>
+                      </button>
                     </div>
                   ))}
                 </div>

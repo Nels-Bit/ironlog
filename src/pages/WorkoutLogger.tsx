@@ -641,7 +641,13 @@ const SetupScreen = ({ onStart, onCancel, onRestDay }: { onStart: (name: string)
         <div className="text-center"><div className="inline-flex w-12 h-12 bg-white/5 rounded-full items-center justify-center mb-4 text-zinc-500"><Dumbbell size={24} /></div><h2 className="text-xl font-bold text-white">Start Workout</h2></div>
         <input autoFocus type="text" placeholder={`Workout ${new Date().toLocaleDateString()}`} value={name} onChange={e => setName(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl p-4 text-white text-center font-bold focus:border-brand-orange outline-none" />
         <div className="space-y-3">
-          <Button className="w-full py-4" onClick={() => onStart(name)}><Play size={18} className="mr-2" /> Start Session</Button>
+          <button 
+            type="button" 
+            className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-sm tracking-wide shadow-lg shadow-orange-950/50 transition-all flex items-center justify-center gap-2" 
+            onClick={() => onStart(name)}
+          >
+            <Play size={18} className="mr-2" /> Start Session
+          </button>
           <Button
             onClick={onRestDay}
             className="w-full py-4 bg-blue-950/90 border border-blue-400/20 text-blue-100 hover:bg-blue-900/90 hover:text-white shadow-lg shadow-blue-950/30"
