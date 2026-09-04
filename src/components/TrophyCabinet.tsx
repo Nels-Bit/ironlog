@@ -297,32 +297,35 @@ const LadderModal = ({ trophy, onClose }: LadderModalProps) => {
           onClick={e => e.stopPropagation()}
         >
           {/* Static Header Container */}
-          <div className="p-6 pb-4 shrink-0 border-b border-white/5 relative">
+          <div className="p-5 pb-4 shrink-0 border-b border-white/5 relative">
             {/* Close button */}
             <button
               type="button"
               onClick={onClose}
-              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition-colors"
+              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition-colors z-10"
             >
               <X size={16} />
             </button>
 
-            {/* Header */}
-            <div className="flex items-center gap-3 mb-5 pr-8">
-              <span className="text-3xl">{trophy.emoji}</span>
-              <div>
-                <h3 className="text-xl font-black text-white">{trophy.categoryLabel}</h3>
-                <RankBadge style={style} />
+            {/* Row 1: Identity & Stat */}
+            <div className="flex items-center justify-between gap-3 pr-10">
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">{trophy.emoji}</span>
+                <div className="flex flex-col items-start gap-1">
+                  <h3 className="text-lg font-black text-white leading-none">{trophy.categoryLabel}</h3>
+                  <RankBadge style={style} />
+                </div>
+              </div>
+              
+              <div className="text-right flex-shrink-0">
+                <p className="text-[10px] uppercase tracking-wider text-zinc-400 font-medium leading-none mb-1">Current Best</p>
+                <p className="text-base font-black text-white leading-none">{trophy.currentValueFormatted}</p>
               </div>
             </div>
 
-            {/* Current Best Stat Pill */}
-            <div className="bg-zinc-900/50 rounded-xl p-4 border border-white/5">
-              <p className="text-sm font-bold text-white mb-3">
-                {trophy.currentValueFormatted}
-              </p>
-              
-              <div className="h-1.5 rounded-full bg-black/40 overflow-hidden mb-2">
+            {/* Row 2: Slim Inline Progress Bar & Next Target Delta */}
+            <div className="mt-4">
+              <div className="h-1 rounded-full bg-white/10 overflow-hidden mb-1.5">
                 <motion.div
                   className={cn('h-full rounded-full', style.progressBar)}
                   initial={{ width: 0 }}
@@ -330,13 +333,12 @@ const LadderModal = ({ trophy, onClose }: LadderModalProps) => {
                   transition={{ duration: 0.8, ease: 'easeOut', delay: 0.1 }}
                 />
               </div>
-              
               {trophy.nextDeltaLabel ? (
-                <p className="text-[10px] text-zinc-400 font-medium">
+                <p className="text-[10px] text-zinc-400 font-medium text-right">
                   {trophy.nextDeltaLabel}
                 </p>
               ) : !isLocked ? (
-                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
+                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider text-right">
                   Maxed ✦
                 </p>
               ) : null}
@@ -436,8 +438,8 @@ export const TrophyCabinet = ({ trophies, isReadOnly = false }: TrophyCabinetPro
           </span>
         </div>
 
-        {/* 2×3 responsive grid */}
-        <div className="grid grid-cols-2 gap-3.5">
+        {/* Responsive grid */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5 [&>*:last-child:nth-child(odd)]:col-span-2 md:[&>*:last-child:nth-child(odd)]:col-span-1">
           {trophies.map(trophy => (
             <TrophyCard
               key={trophy.category}

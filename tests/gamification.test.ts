@@ -44,15 +44,15 @@ const DAY = 24 * 60 * 60 * 1000;
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe('calculateTrophyCabinet', () => {
-  describe('returns exactly 6 category trophies', () => {
-    it('returns 6 trophies for empty history', () => {
+  describe('returns exactly 7 category trophies', () => {
+    it('returns 7 trophies for empty history', () => {
       const result = calculateTrophyCabinet({
         history: [],
         exerciseDefs: new Map(),
         totalXP: 0,
         prCount: 0,
       });
-      expect(result).toHaveLength(6);
+      expect(result).toHaveLength(7);
     });
 
     it('returns trophies with correct categories', () => {
@@ -69,6 +69,7 @@ describe('calculateTrophyCabinet', () => {
       expect(categories).toContain('volume');
       expect(categories).toContain('pr_hunter');
       expect(categories).toContain('level');
+      expect(categories).toContain('workouts');
     });
   });
 
@@ -247,7 +248,7 @@ describe('calculateTrophyCabinet', () => {
       const result = calculateTrophyCabinet({ history: [], exerciseDefs: new Map(), totalXP: 0, prCount: 0 });
       const level = result.find(t => t.category === 'level')!;
       expect(level.tiers).toHaveLength(LEVEL_LADDER.length);
-      expect(level.tiers[0].label).toBe('Level 5');
+      expect(level.tiers[0].label).toBe('Level 2');
       expect(level.tiers[level.tiers.length - 1].label).toBe('Level 100');
     });
   });
@@ -265,7 +266,7 @@ describe('calculateTrophyCabinet', () => {
       const defs = new Map([['bench-id', benchDef]]);
       const history = [
         makeWorkout('w1', Date.now(), 12000, [
-          { id: 'e1', exerciseId: 'bench-id', sets: [makeSet(505, 1)] },
+          { id: 'e1', exerciseId: 'bench-id', sets: [makeSet(600, 1)] },
         ]),
       ];
       const result = calculateTrophyCabinet({ history, exerciseDefs: defs, totalXP: 0, prCount: 0 });
@@ -298,13 +299,15 @@ describe('calculateTrophyCabinet', () => {
       const volume = result.find(t => t.category === 'volume')!;
       const pr = result.find(t => t.category === 'pr_hunter')!;
       const level = result.find(t => t.category === 'level')!;
+      const workouts = result.find(t => t.category === 'workouts')!;
 
-      expect(bench.tiers).toHaveLength(10);
-      expect(squat.tiers).toHaveLength(10);
-      expect(dead.tiers).toHaveLength(10);
+      expect(bench.tiers).toHaveLength(14);
+      expect(squat.tiers).toHaveLength(14);
+      expect(dead.tiers).toHaveLength(14);
       expect(volume.tiers).toHaveLength(VOLUME_LADDER.length);
       expect(pr.tiers).toHaveLength(PR_LADDER.length);
       expect(level.tiers).toHaveLength(LEVEL_LADDER.length);
+      expect(workouts.tiers).toHaveLength(14);
     });
   });
 });
