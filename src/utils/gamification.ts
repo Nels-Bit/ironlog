@@ -26,7 +26,8 @@ export type TrophyCategory =
   | 'deadlift'
   | 'volume'
   | 'pr_hunter'
-  | 'level';
+  | 'level'
+  | 'workouts';
 
 export interface TrophyTier {
   /** The milestone value (lbs, count, or level number). */
@@ -74,6 +75,7 @@ const DEADLIFT_LADDER = BIG_3_LADDER;
 export const VOLUME_LADDER = [1000, 2500, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000, 2000000, 3000000, 5000000, 10000000] as const;
 export const PR_LADDER = [1, 5, 10, 15, 25, 50, 75, 100, 150, 200, 250, 300, 400, 500] as const;
 export const LEVEL_LADDER = [2, 3, 5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 90, 100] as const;
+export const WORKOUTS_LADDER = [1, 5, 15, 30, 50, 100, 150, 200, 275, 365, 500, 712, 850, 1000] as const;
 
 // ─── Rank Mapping ─────────────────────────────────────────────────────────
 // Maps 1-based tier index (1 = first threshold unlocked) to a rank.
@@ -214,7 +216,7 @@ function calcLiftTrophy(
     progressPercent,
     tiers,
     currentValue: bestWeight,
-    currentValueFormatted: `Current Best: ${bestWeight} lbs`,
+    currentValueFormatted: `${bestWeight} lbs`,
     nextDeltaLabel: toWeight !== null ? `${toWeight - bestWeight} lbs to ${getRankLabel(getTrophyRank(unlockedCount + 1))}` : null,
   };
 }
@@ -267,7 +269,7 @@ function calcVolumeTrophy(history: WorkoutSession[]): CategoryTrophy {
     progressPercent,
     tiers,
     currentValue: cumulativeVolume,
-    currentValueFormatted: `Total Volume: ${cumulativeVolume.toLocaleString()} lbs`,
+    currentValueFormatted: `${cumulativeVolume.toLocaleString()} lbs`,
     nextDeltaLabel: toVol !== null ? `${formatVolume(toVol - cumulativeVolume)} to ${getRankLabel(getTrophyRank(unlockedCount + 1))}` : null,
   };
 }
@@ -307,7 +309,7 @@ function calcPRTrophy(prCount: number): CategoryTrophy {
     progressPercent,
     tiers,
     currentValue: prCount,
-    currentValueFormatted: `Total PRs: ${prCount}`,
+    currentValueFormatted: `${prCount} PRs`,
     nextDeltaLabel: toPR !== null ? `${toPR - prCount} PRs to ${getRankLabel(getTrophyRank(unlockedCount + 1))}` : null,
   };
 }
@@ -373,6 +375,61 @@ function calcLevelTrophy(
   };
 }
 
+// ─── Workouts Trophy Calculator ────────────────────────────────────────────
+
+function calcWorkoutsTrophy(history: WorkoutSession[]): CategoryTrophy {
+  const sorted = [...history].sort((a, b) => a.startTime - b.startTime);
+  const tierUnlockTimes = new Map<number, number>();
+  
+  let count = 0;
+  for (const workout of sorted) {
+    count++;
+    for (const threshold of WORKOUTS_LADDER) {
+      if (count >= threshold && !tierUnlockTimes.has(threshold)) {
+        tierUnlockTimes.set(threshold, workout.startTime);
+      }
+    }
+  }
+
+  const workoutCount = history.length;
+
+  const tiers: TrophyTier[] = WORKOUTS_LADDER.map(threshold => ({
+    value: threshold,
+    label: `${threshold} Workouts`,
+    earnedAt: tierUnlockTimes.get(threshold) ?? null,
+    unlocked: workoutCount >= threshold,
+  }));
+
+  const unlockedCount = tiers.filter(t => t.unlocked).length;
+  const currentTierIndex = unlockedCount - 1;
+  const currentTier = unlockedCount > 0 ? tiers[currentTierIndex] : null;
+  const nextTier = unlockedCount < tiers.length ? tiers[unlockedCount] : null;
+
+  const fromCount = currentTier ? currentTier.value : 0;
+  const toCount = nextTier ? nextTier.value : null;
+  let progressPercent = 100;
+  if (toCount !== null) {
+    const range = toCount - fromCount;
+    const achieved = Math.max(0, workoutCount - fromCount);
+    progressPercent = range > 0 ? Math.min(100, (achieved / range) * 100) : 0;
+  }
+
+  return {
+    category: 'workouts',
+    categoryLabel: 'Workouts',
+    emoji: '🔥',
+    rank: getTrophyRank(unlockedCount),
+    currentTierIndex,
+    currentTierLabel: currentTier?.label ?? null,
+    nextTierLabel: nextTier?.label ?? null,
+    progressPercent,
+    tiers,
+    currentValue: workoutCount,
+    currentValueFormatted: `${workoutCount} Workouts`,
+    nextDeltaLabel: toCount !== null ? `${toCount - workoutCount} workouts to ${getRankLabel(getTrophyRank(unlockedCount + 1))}` : null,
+  };
+}
+
 // ─── Main Export: calculateTrophyCabinet ──────────────────────────────────
 
 export interface TrophyCabinetInput {
@@ -385,7 +442,7 @@ export interface TrophyCabinetInput {
 }
 
 /**
- * Calculates the full Trophy Cabinet for a user — exactly 6 category trophies
+ * Calculates the full Trophy Cabinet for a user — exactly 7 category trophies
  * with progressive tier ladders, rank assignments, and progress bars.
  */
 export function calculateTrophyCabinet(input: TrophyCabinetInput): CategoryTrophy[] {
@@ -420,5 +477,6 @@ export function calculateTrophyCabinet(input: TrophyCabinetInput): CategoryTroph
     calcVolumeTrophy(history),
     calcPRTrophy(prCount),
     calcLevelTrophy(totalXP, history, xpBreakdowns ?? null),
+    calcWorkoutsTrophy(history),
   ];
 }
