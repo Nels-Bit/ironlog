@@ -16,7 +16,6 @@ import { replayAllXP, type TotalXPResult } from '../utils/xpEngine';
 import { parseUserWeight } from '../utils/workoutMath';
 import { calculateTrophyCabinet, type CategoryTrophy } from '../utils/gamification';
 import { TrophyCabinet } from '../components/TrophyCabinet';
-import { FluidTabs } from '../components/ui/fluid-tabs';
 import { ProfileSkeleton } from '../components/ProfileSkeleton';
 
 export const Profile = () => {
@@ -241,73 +240,131 @@ export const Profile = () => {
     <div className="min-h-screen bg-black pb-32 animate-in fade-in duration-500">
 
       <div className="p-4 space-y-4 max-w-lg mx-auto mt-2">
-        <FluidTabs
-          tabs={[
-            { id: 'overview', label: 'Overview' },
-            { id: 'activity', label: 'Activity' },
-            { id: 'friends', label: 'Friends' },
-          ]}
-          activeTab={activeTab}
-          onChange={(id) => setTab(id as 'overview' | 'activity' | 'friends')}
-        />
+        {/* Centered Tab Container */}
+        <div className="w-full max-w-md mx-auto px-1 my-2">
+          <div className="grid grid-cols-3 items-center w-full border-b border-white/10">
+            
+            {/* Tab 1: Overview */}
+            <button
+              onClick={() => setTab('overview')}
+              className={cn(
+                "py-3 text-center text-xs sm:text-sm font-bold tracking-wide transition-colors flex flex-col items-center justify-center relative",
+                activeTab === 'overview' ? "text-brand-orange" : "text-zinc-400 hover:text-zinc-200"
+              )}
+            >
+              <span>OVERVIEW</span>
+              {activeTab === 'overview' && (
+                <span className="absolute bottom-0 h-0.5 w-12 bg-brand-orange rounded-t-full" />
+              )}
+            </button>
+
+            {/* Tab 2: Activity */}
+            <button
+              onClick={() => setTab('activity')}
+              className={cn(
+                "py-3 text-center text-xs sm:text-sm font-bold tracking-wide transition-colors flex flex-col items-center justify-center relative",
+                activeTab === 'activity' ? "text-brand-orange" : "text-zinc-400 hover:text-zinc-200"
+              )}
+            >
+              <span>ACTIVITY</span>
+              {activeTab === 'activity' && (
+                <span className="absolute bottom-0 h-0.5 w-12 bg-brand-orange rounded-t-full" />
+              )}
+            </button>
+
+            {/* Tab 3: Friends */}
+            <button
+              onClick={() => setTab('friends')}
+              className={cn(
+                "py-3 text-center text-xs sm:text-sm font-bold tracking-wide transition-colors flex flex-col items-center justify-center relative",
+                activeTab === 'friends' ? "text-brand-orange" : "text-zinc-400 hover:text-zinc-200"
+              )}
+            >
+              <span>FRIENDS</span>
+              {activeTab === 'friends' && (
+                <span className="absolute bottom-0 h-0.5 w-12 bg-brand-orange rounded-t-full" />
+              )}
+            </button>
+
+          </div>
+        </div>
 
         {activeTab === 'overview' && (
-          <>
-        
-        {!isEditing ? (
-          <div className="relative overflow-hidden bg-zinc-900/50 border border-white/10 rounded-3xl p-6">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-brand-orange/20 blur-[100px] rounded-full pointer-events-none" />
-
-            {/* Edit button — top-right of card */}
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => setIsEditing(true)}
-              className="absolute top-4 right-4 z-20 rounded-full text-brand-orange bg-brand-orange/10 hover:bg-brand-orange/20"
-            >
-              <Edit2 size={16} />
-            </Button>
-
-            <div className="relative z-10 flex items-center gap-5 mb-6">
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-red-600 to-orange-500 flex items-center justify-center shadow-lg shadow-orange-500/20 text-3xl font-black text-white">
-                {profile?.name?.charAt(0) || 'U'}
-              </div>
-              
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <h2 className="text-2xl font-bold text-white">{profile?.name || 'Athlete'}</h2>
-                  {currentLevel >= 5 && <Award className="text-yellow-500" size={20} fill="currentColor" />}
+          <div className="py-4 px-2 bg-transparent">
+            {!isEditing ? (
+              <div className="relative">
+                {/* Action Bar / Top Row */}
+                <div className="flex justify-end mb-4">
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="flex items-center gap-1.5 text-neutral-400 hover:text-white border border-white/10 rounded-full px-3 py-1 text-xs transition-colors bg-transparent"
+                  >
+                    <Edit2 size={12} />
+                    Edit Profile
+                  </button>
                 </div>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <MiniStat label="Weight" value={profile?.weight ? `${profile.weight} lbs` : '-'} />
-                  <MiniStat label="Height" value={formatHeight(profile?.height)} />
-                  <MiniStat label="Age" value={profile?.age ? `${profile.age}` : '-'} />
-                  <MiniStat label="Goal" value={profile?.goal || '-'} />
+
+                {/* Athlete Identity (Centered) */}
+                <div className="flex flex-col items-center text-center relative z-10">
+                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-neutral-800 to-neutral-900 flex items-center justify-center text-4xl font-black text-white shrink-0 ring-2 ring-orange-500/30 ring-offset-2 ring-offset-black relative">
+                    {profile?.name?.charAt(0) || 'U'}
+                    {currentLevel >= 5 && (
+                      <div className="absolute -bottom-1 -right-1 bg-black rounded-full p-1">
+                        <Award className="text-yellow-500" size={18} fill="currentColor" />
+                      </div>
+                    )}
+                  </div>
+                  
+                  <h2 className="text-2xl font-black text-white tracking-tight mt-3">
+                    {profile?.name || 'Athlete'}
+                  </h2>
+                  
                   {currentStreak > 0 && (
-                    <MiniStat label="Streak" value={`🔥 ${formatStreakLabel(currentStreak)}`} />
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-orange-400 bg-orange-500/10 px-2.5 py-0.5 rounded-full mt-1">
+                      🔥 {formatStreakLabel(currentStreak)} Streak
+                    </span>
                   )}
                 </div>
-              </div>
-            </div>
 
-            <div className="space-y-2">
-              <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-zinc-500">
-                <span>XP Progress</span>
-                <span>{Math.round(xpInCurrentLevel)} / {levelProgress.xpForNextLevel} XP</span>
-              </div>
-              <div className="h-4 bg-black/50 rounded-full overflow-hidden border border-white/5 relative">
-                <div 
-                  className="h-full bg-gradient-to-r from-red-600 to-orange-500 shadow-[0_0_15px_rgba(234,88,12,0.6)] transition-all duration-1000 ease-out relative"
-                  style={{ width: `${progressPercent}%` }}
-                >
-                  <div className="absolute inset-0 bg-white/20 animate-[shimmer_2s_infinite]" />
+                {/* Bio Metrics Strip */}
+                <div className="grid grid-cols-4 gap-2 text-center my-5 py-3 border-y border-white/5">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-semibold tracking-wider uppercase text-neutral-500 mb-0.5">Weight</span>
+                    <span className="text-sm font-bold text-white">{profile?.weight ? `${profile.weight} lbs` : '-'}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-semibold tracking-wider uppercase text-neutral-500 mb-0.5">Height</span>
+                    <span className="text-sm font-bold text-white">{formatHeight(profile?.height)}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-semibold tracking-wider uppercase text-neutral-500 mb-0.5">Age</span>
+                    <span className="text-sm font-bold text-white">{profile?.age ? `${profile.age}` : '-'}</span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-semibold tracking-wider uppercase text-neutral-500 mb-0.5">Goal</span>
+                    <span className="text-sm font-bold text-white capitalize">{profile?.goal || '-'}</span>
+                  </div>
                 </div>
+
+                {/* Integrated Level & XP Progress */}
+                <div className="mb-6">
+                  <div className="flex justify-between items-baseline mb-1.5">
+                    <span className="text-xs font-bold text-white uppercase tracking-wider">Level {currentLevel}</span>
+                    <span className="text-xs font-mono text-neutral-400">
+                      {Math.round(xpInCurrentLevel)} / {levelProgress.xpForNextLevel} XP
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full bg-neutral-800 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-orange-500 to-amber-400 transition-all duration-1000 ease-out relative"
+                      style={{ width: `${progressPercent}%` }}
+                    >
+                      <div className="absolute inset-0 bg-white/20 animate-[shimmer_2s_infinite]" />
+                    </div>
+                  </div>
+                </div>
+
               </div>
-              <p className="text-right text-[10px] font-bold text-brand-orange mt-1">
-                Current Level: {currentLevel}
-              </p>
-            </div>
-          </div>
         ) : (
           <div className="text-center py-8 space-y-4 animate-in zoom-in-95 duration-300">
             <div className="w-24 h-24 mx-auto rounded-full bg-zinc-900 border-2 border-dashed border-zinc-700 flex items-center justify-center text-zinc-500">
@@ -500,14 +557,14 @@ export const Profile = () => {
             </Button>
           </div>
         )}
-          </>
+          </div>
         )}
 
         {activeTab === 'activity' && (
           <div className="space-y-3">
-            <div className="rounded-2xl border border-white/10 bg-zinc-900/40 p-4">
-              <p className="text-xs font-bold uppercase tracking-widest text-zinc-500 mb-1">Activity</p>
-              <p className="text-sm text-zinc-400">Your logged workout sessions and history.</p>
+            <div className="py-2 mb-2">
+              <h2 className="text-lg font-bold text-white tracking-tight">Activity</h2>
+              <p className="text-[11px] font-medium text-zinc-500 uppercase tracking-wider mt-0.5">Your logged workout sessions and history</p>
             </div>
 
             {workoutHistory.length === 0 ? (
@@ -555,11 +612,11 @@ export const Profile = () => {
               </div>
             )}
 
-            <div className="rounded-2xl border border-white/10 bg-zinc-900/40 p-4">
+            <div className="py-2 mb-2">
               <div className="flex items-center justify-between gap-2">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">Your User ID</p>
-                  <p className="text-lg font-black text-white">@{profile?.userId}</p>
+                  <h2 className="text-lg font-bold text-white tracking-tight">Your User ID</h2>
+                  <p className="text-sm font-medium text-zinc-400 mt-0.5">@{profile?.userId}</p>
                 </div>
                 <span className={cn(
                   "inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-widest border",
@@ -696,12 +753,6 @@ const InputGroup = ({ label, icon, children }: InputGroupProps) => (
   </div>
 );
 
-const MiniStat = ({ label, value }: { label: string; value: string }) => (
-  <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2">
-    <div className="text-[9px] uppercase tracking-widest text-zinc-500 font-bold">{label}</div>
-    <div className="text-sm font-bold text-white truncate">{value}</div>
-  </div>
-);
 
 
 

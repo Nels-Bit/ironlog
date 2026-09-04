@@ -24,7 +24,7 @@ export const FluidTabs = ({
   return (
     <div
       className={cn(
-        'flex gap-1 rounded-2xl border border-white/10 bg-zinc-950/70 p-1',
+        'flex gap-4 border-b border-zinc-800/80 mb-2 overflow-x-auto no-scrollbar',
         className
       )}
     >
@@ -36,19 +36,19 @@ export const FluidTabs = ({
             type="button"
             onClick={() => onChange(tab.id)}
             className={cn(
-              'relative flex-1 rounded-xl py-2 text-xs font-bold uppercase tracking-widest transition-colors duration-200 focus-visible:outline-none',
-              isActive ? 'text-white' : 'text-zinc-400 hover:text-zinc-200'
+              'relative py-3 px-2 text-sm font-bold uppercase tracking-wide transition-colors duration-200 focus-visible:outline-none shrink-0',
+              isActive ? 'text-brand-orange' : 'text-zinc-400 hover:text-zinc-200'
             )}
           >
-            {/* Animated sliding pill */}
+            {/* Animated bottom indicator line */}
             {isActive && (
               <motion.div
                 layoutId={layoutId}
-                className="absolute inset-0 rounded-xl bg-brand-orange"
-                transition={{ type: 'spring', bounce: 0.18, duration: 0.4 }}
+                className="absolute left-0 right-0 bottom-0 h-0.5 bg-brand-orange rounded-t-full"
+                transition={{ type: 'spring', bounce: 0.2, duration: 0.5 }}
               />
             )}
-            {/* Label sits above the pill */}
+            {/* Label */}
             <span className="relative z-10">{tab.label}</span>
           </button>
         );

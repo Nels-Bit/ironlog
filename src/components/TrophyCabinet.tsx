@@ -19,7 +19,7 @@ interface RankStyle {
 
 const RANK_STYLES: Record<TrophyRank, RankStyle> = {
   locked: {
-    cardBg: 'bg-zinc-900/40',
+    cardBg: 'bg-zinc-900/40 backdrop-blur-sm',
     cardBorder: 'border-white/5',
     badgeBg: 'bg-zinc-800/60',
     badgeText: 'text-zinc-500',
@@ -27,95 +27,131 @@ const RANK_STYLES: Record<TrophyRank, RankStyle> = {
     progressBar: 'bg-zinc-700',
     rankLabel: 'LOCKED',
   },
+  dirt: {
+    cardBg: 'bg-gradient-to-b from-amber-950/30 to-black',
+    cardBorder: 'border-amber-900/60',
+    badgeBg: 'bg-amber-950',
+    badgeText: 'text-amber-700',
+    glowShadow: '',
+    progressBar: 'bg-amber-900',
+    rankLabel: 'DIRT',
+  },
+  wood: {
+    cardBg: 'bg-gradient-to-b from-yellow-950/25 to-black',
+    cardBorder: 'border-amber-700/50',
+    badgeBg: 'bg-amber-900',
+    badgeText: 'text-amber-600',
+    glowShadow: '',
+    progressBar: 'bg-amber-700',
+    rankLabel: 'WOOD',
+  },
+  wood_max: {
+    cardBg: 'bg-gradient-to-b from-yellow-950/25 to-black',
+    cardBorder: 'border-amber-700/50',
+    badgeBg: 'bg-amber-900',
+    badgeText: 'text-amber-600',
+    glowShadow: '',
+    progressBar: 'bg-amber-700',
+    rankLabel: 'WOOD MAX',
+  },
   bronze: {
-    cardBg: 'bg-amber-950/30',
-    cardBorder: 'border-amber-700/30',
-    badgeBg: 'bg-amber-700/80',
-    badgeText: 'text-amber-100',
-    glowShadow: 'shadow-[0_0_18px_rgba(180,83,9,0.25)]',
-    progressBar: 'bg-gradient-to-r from-amber-700 to-amber-500',
+    cardBg: 'bg-gradient-to-b from-amber-900/30 to-black',
+    cardBorder: 'border-amber-600/60',
+    badgeBg: 'bg-amber-800/50',
+    badgeText: 'text-amber-500',
+    glowShadow: 'shadow-[0_0_20px_rgba(180,83,9,0.2)]',
+    progressBar: 'bg-amber-600',
     rankLabel: 'BRONZE',
   },
   bronze_max: {
-    cardBg: 'bg-amber-950/40',
-    cardBorder: 'border-brand-orange/40',
-    badgeBg: 'bg-gradient-to-r from-amber-600 to-brand-orange',
-    badgeText: 'text-white',
-    glowShadow: 'shadow-[0_0_20px_rgba(249,115,22,0.3)]',
-    progressBar: 'bg-gradient-to-r from-amber-600 to-brand-orange',
+    cardBg: 'bg-gradient-to-b from-amber-900/30 to-black',
+    cardBorder: 'border-amber-600/60',
+    badgeBg: 'bg-amber-800/50',
+    badgeText: 'text-amber-500',
+    glowShadow: 'shadow-[0_0_20px_rgba(180,83,9,0.2)]',
+    progressBar: 'bg-amber-600',
     rankLabel: 'BRONZE MAX',
   },
   silver: {
-    cardBg: 'bg-slate-800/30',
-    cardBorder: 'border-slate-400/25',
-    badgeBg: 'bg-slate-400/80',
-    badgeText: 'text-slate-900',
-    glowShadow: 'shadow-[0_0_18px_rgba(148,163,184,0.2)]',
-    progressBar: 'bg-gradient-to-r from-slate-400 to-slate-300',
+    cardBg: 'bg-gradient-to-b from-slate-700/30 to-black',
+    cardBorder: 'border-slate-300/60',
+    badgeBg: 'bg-slate-700/50',
+    badgeText: 'text-slate-200',
+    glowShadow: 'shadow-[0_0_20px_rgba(100,116,139,0.2)]',
+    progressBar: 'bg-slate-400',
     rankLabel: 'SILVER',
   },
   silver_max: {
-    cardBg: 'bg-slate-800/40',
-    cardBorder: 'border-slate-300/40',
-    badgeBg: 'bg-gradient-to-r from-slate-400 to-white',
-    badgeText: 'text-slate-900 font-extrabold',
-    glowShadow: 'shadow-[0_0_20px_rgba(203,213,225,0.3)]',
-    progressBar: 'bg-gradient-to-r from-slate-400 to-white',
+    cardBg: 'bg-gradient-to-b from-slate-700/30 to-black',
+    cardBorder: 'border-slate-300/60',
+    badgeBg: 'bg-slate-700/50',
+    badgeText: 'text-slate-200',
+    glowShadow: 'shadow-[0_0_20px_rgba(100,116,139,0.2)]',
+    progressBar: 'bg-slate-400',
     rankLabel: 'SILVER MAX',
   },
   gold: {
-    cardBg: 'bg-yellow-950/30',
-    cardBorder: 'border-yellow-400/30',
-    badgeBg: 'bg-yellow-500/90',
-    badgeText: 'text-yellow-950',
-    glowShadow: 'shadow-[0_0_22px_rgba(234,179,8,0.3)]',
-    progressBar: 'bg-gradient-to-r from-yellow-500 to-yellow-300',
+    cardBg: 'bg-gradient-to-b from-yellow-900/30 to-black',
+    cardBorder: 'border-yellow-500/60',
+    badgeBg: 'bg-yellow-700/50',
+    badgeText: 'text-yellow-400',
+    glowShadow: 'shadow-[0_0_20px_rgba(234,179,8,0.25)]',
+    progressBar: 'bg-yellow-500',
     rankLabel: 'GOLD',
   },
   gold_max: {
-    cardBg: 'bg-yellow-950/40',
-    cardBorder: 'border-yellow-300/50',
-    badgeBg: 'bg-gradient-to-r from-yellow-500 to-amber-300',
-    badgeText: 'text-yellow-950 font-extrabold',
-    glowShadow: 'shadow-[0_0_24px_rgba(253,224,71,0.35)]',
-    progressBar: 'bg-gradient-to-r from-yellow-500 to-amber-300',
+    cardBg: 'bg-gradient-to-b from-yellow-900/30 to-black',
+    cardBorder: 'border-yellow-500/60',
+    badgeBg: 'bg-yellow-700/50',
+    badgeText: 'text-yellow-400',
+    glowShadow: 'shadow-[0_0_20px_rgba(234,179,8,0.25)]',
+    progressBar: 'bg-yellow-500',
     rankLabel: 'GOLD MAX',
   },
   platinum: {
-    cardBg: 'bg-cyan-950/30',
-    cardBorder: 'border-cyan-400/30',
-    badgeBg: 'bg-cyan-400/90',
-    badgeText: 'text-cyan-950',
-    glowShadow: 'shadow-[0_0_24px_rgba(34,211,238,0.3)]',
-    progressBar: 'bg-gradient-to-r from-cyan-500 to-cyan-300',
+    cardBg: 'bg-gradient-to-b from-cyan-950/30 to-black',
+    cardBorder: 'border-cyan-400/60',
+    badgeBg: 'bg-cyan-900/50',
+    badgeText: 'text-cyan-300',
+    glowShadow: 'shadow-[0_0_20px_rgba(6,182,212,0.3)]',
+    progressBar: 'bg-cyan-400',
     rankLabel: 'PLATINUM',
   },
   platinum_max: {
-    cardBg: 'bg-cyan-950/40',
-    cardBorder: 'border-cyan-300/50',
-    badgeBg: 'bg-gradient-to-r from-cyan-400 to-blue-300',
-    badgeText: 'text-cyan-950 font-extrabold',
-    glowShadow: 'shadow-[0_0_26px_rgba(103,232,249,0.35)]',
-    progressBar: 'bg-gradient-to-r from-cyan-400 to-blue-300',
+    cardBg: 'bg-gradient-to-b from-cyan-950/30 to-black',
+    cardBorder: 'border-cyan-400/60',
+    badgeBg: 'bg-cyan-900/50',
+    badgeText: 'text-cyan-300',
+    glowShadow: 'shadow-[0_0_20px_rgba(6,182,212,0.3)]',
+    progressBar: 'bg-cyan-400',
     rankLabel: 'PLATINUM MAX',
   },
   diamond: {
-    cardBg: 'bg-violet-950/30',
-    cardBorder: 'border-violet-400/35',
-    badgeBg: 'bg-violet-400/90',
-    badgeText: 'text-violet-950',
-    glowShadow: 'shadow-[0_0_28px_rgba(167,139,250,0.35)]',
-    progressBar: 'bg-gradient-to-r from-violet-500 to-violet-300',
+    cardBg: 'bg-gradient-to-b from-cyan-950/30 to-black',
+    cardBorder: 'border-cyan-400/60',
+    badgeBg: 'bg-cyan-900/50',
+    badgeText: 'text-cyan-300',
+    glowShadow: 'shadow-[0_0_20px_rgba(6,182,212,0.3)]',
+    progressBar: 'bg-cyan-400',
     rankLabel: 'DIAMOND',
   },
   obsidian: {
-    cardBg: 'bg-fuchsia-950/30',
-    cardBorder: 'border-fuchsia-500/40',
-    badgeBg: 'bg-gradient-to-br from-fuchsia-500 to-purple-600',
-    badgeText: 'text-white',
-    glowShadow: 'shadow-[0_0_32px_rgba(217,70,239,0.4)]',
-    progressBar: 'bg-gradient-to-r from-fuchsia-500 to-purple-400',
+    cardBg: 'bg-gradient-to-b from-cyan-950/30 to-black',
+    cardBorder: 'border-cyan-400/60',
+    badgeBg: 'bg-cyan-900/50',
+    badgeText: 'text-cyan-300',
+    glowShadow: 'shadow-[0_0_20px_rgba(6,182,212,0.3)]',
+    progressBar: 'bg-cyan-400',
     rankLabel: 'OBSIDIAN',
+  },
+  elite: {
+    cardBg: 'bg-gradient-to-b from-cyan-950/30 to-black',
+    cardBorder: 'border-cyan-400/60',
+    badgeBg: 'bg-cyan-900/50',
+    badgeText: 'text-cyan-300',
+    glowShadow: 'shadow-[0_0_20px_rgba(6,182,212,0.3)]',
+    progressBar: 'bg-cyan-400',
+    rankLabel: 'ELITE',
   },
 };
 
@@ -164,11 +200,15 @@ const TrophyCard = ({ trophy, onTap }: TrophyCardProps) => {
       {!isLocked && (
         <div className="absolute -top-4 -right-4 w-20 h-20 rounded-full blur-2xl opacity-30 pointer-events-none"
           style={{
-            background: trophy.rank === 'bronze' ? '#b45309' :
-              trophy.rank === 'silver' ? '#94a3b8' :
-              trophy.rank === 'gold' ? '#eab308' :
-              trophy.rank === 'platinum' ? '#22d3ee' :
-              trophy.rank === 'diamond' ? '#a78bfa' : '#d946ef'
+            background: trophy.rank.includes('dirt') ? '#451a03' :
+              trophy.rank.includes('wood') ? '#78350f' :
+              trophy.rank.includes('bronze') ? '#b45309' :
+              trophy.rank.includes('silver') ? '#94a3b8' :
+              trophy.rank.includes('gold') ? '#eab308' :
+              trophy.rank.includes('platinum') ? '#22d3ee' :
+              trophy.rank === 'diamond' ? '#a78bfa' : 
+              trophy.rank === 'obsidian' ? '#d946ef' : 
+              trophy.rank === 'elite' ? '#06b6d4' : '#d946ef'
           }}
         />
       )}
@@ -387,20 +427,17 @@ export const TrophyCabinet = ({ trophies, isReadOnly = false }: TrophyCabinetPro
 
   return (
     <>
-      <div className="rounded-3xl border border-white/10 bg-zinc-900/20 p-4">
-        {/* Header */}
-        <div className="flex items-center gap-2 mb-4">
-          <span className="text-lg">🏆</span>
-          <div>
-            <h3 className="text-lg font-bold text-white">Trophy Cabinet</h3>
-            <p className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider">
-              Tap a trophy to view ladder
-            </p>
-          </div>
+      <div className="pt-2">
+        {/* Open Header */}
+        <div className="flex items-center justify-between px-1 mb-4">
+          <h2 className="text-lg font-bold text-white tracking-tight">Trophy Cabinet</h2>
+          <span className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider">
+            Tap to inspect ladder
+          </span>
         </div>
 
         {/* 2×3 responsive grid */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3.5">
           {trophies.map(trophy => (
             <TrophyCard
               key={trophy.category}

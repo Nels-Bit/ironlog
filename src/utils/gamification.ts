@@ -5,6 +5,9 @@ import { getLevelProgress, getLevelRequirementXP } from './achievementUtils';
 
 export type TrophyRank =
   | 'locked'
+  | 'dirt'
+  | 'wood'
+  | 'wood_max'
   | 'bronze'
   | 'bronze_max'
   | 'silver'
@@ -14,7 +17,8 @@ export type TrophyRank =
   | 'platinum'
   | 'platinum_max'
   | 'diamond'
-  | 'obsidian';
+  | 'obsidian'
+  | 'elite';
 
 export type TrophyCategory =
   | 'bench_press'
@@ -63,27 +67,32 @@ export interface CategoryTrophy {
 
 // ─── Ladder Definitions ────────────────────────────────────────────────────
 
-const BENCH_LADDER = [95, 135, 185, 225, 275, 315, 365, 405, 455, 505] as const;
-const SQUAT_LADDER = [135, 185, 225, 275, 315, 365, 405, 455, 495, 545] as const;
-const DEADLIFT_LADDER = [135, 225, 275, 315, 365, 405, 455, 495, 545, 585] as const;
-export const VOLUME_LADDER = [10000, 25000, 50000, 100000, 250000, 500000, 1000000, 2000000] as const;
-export const PR_LADDER = [5, 10, 25, 50, 100, 250] as const;
-export const LEVEL_LADDER = [5, 10, 15, 20, 30, 50, 100] as const;
+const BIG_3_LADDER = [45, 65, 95, 115, 135, 185, 225, 275, 315, 365, 405, 455, 495, 545] as const;
+const BENCH_LADDER = BIG_3_LADDER;
+const SQUAT_LADDER = BIG_3_LADDER;
+const DEADLIFT_LADDER = BIG_3_LADDER;
+export const VOLUME_LADDER = [1000, 2500, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000, 2000000, 3000000, 5000000, 10000000] as const;
+export const PR_LADDER = [1, 5, 10, 15, 25, 50, 75, 100, 150, 200, 250, 300, 400, 500] as const;
+export const LEVEL_LADDER = [2, 3, 5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 90, 100] as const;
 
 // ─── Rank Mapping ─────────────────────────────────────────────────────────
 // Maps 1-based tier index (1 = first threshold unlocked) to a rank.
 
 const RANK_FOR_TIER: TrophyRank[] = [
-  'bronze',       // tier 1
-  'bronze_max',   // tier 2
-  'silver',       // tier 3
-  'silver_max',   // tier 4
-  'gold',         // tier 5
-  'gold_max',     // tier 6
-  'platinum',     // tier 7
-  'platinum_max', // tier 8
-  'diamond',      // tier 9
-  'obsidian',     // tier 10+
+  'dirt',         // tier 1
+  'wood',         // tier 2
+  'wood_max',     // tier 3
+  'bronze',       // tier 4
+  'bronze_max',   // tier 5
+  'silver',       // tier 6
+  'silver_max',   // tier 7
+  'gold',         // tier 8
+  'gold_max',     // tier 9
+  'platinum',     // tier 10
+  'platinum_max', // tier 11
+  'diamond',      // tier 12
+  'obsidian',     // tier 13
+  'elite',        // tier 14+
 ];
 
 export function getTrophyRank(unlockedTierCount: number): TrophyRank {
@@ -94,6 +103,9 @@ export function getTrophyRank(unlockedTierCount: number): TrophyRank {
 
 export function getRankLabel(rank: TrophyRank): string {
   switch (rank) {
+    case 'dirt': return 'Dirt';
+    case 'wood': return 'Wood';
+    case 'wood_max': return 'Wood MAX';
     case 'bronze': return 'Bronze';
     case 'bronze_max': return 'Bronze MAX';
     case 'silver': return 'Silver';
@@ -104,6 +116,7 @@ export function getRankLabel(rank: TrophyRank): string {
     case 'platinum_max': return 'Platinum MAX';
     case 'diamond': return 'Diamond';
     case 'obsidian': return 'Obsidian';
+    case 'elite': return 'Elite';
     default: return 'Locked';
   }
 }
