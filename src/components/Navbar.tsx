@@ -40,8 +40,8 @@ export const Navbar = () => {
   }, []);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-[100] w-full bg-iron-950/95 backdrop-blur-xl border-t border-white/10 md:left-0 md:top-0 md:bottom-0 md:w-64 md:border-r md:border-t-0 pb-[env(safe-area-inset-bottom,0px)] md:pb-0">
-      <div className="w-full max-w-md mx-auto grid grid-cols-3 items-center h-20 px-0 md:flex md:max-w-none md:flex-col md:h-full md:justify-start md:pt-10 md:gap-5">
+    <nav className="fixed bottom-0 left-0 right-0 z-[100] bg-iron-950/95 backdrop-blur-xl border-t border-white/10 md:left-0 md:top-0 md:bottom-0 md:w-64 md:border-r md:border-t-0 pb-safe">
+      <div className="flex justify-around items-center h-24 md:flex-col md:h-full md:justify-start md:pt-10 md:gap-5">
         
         {/* DESKTOP LOGO */}
         <div className="hidden md:block mb-6">
@@ -89,7 +89,7 @@ const NavItem = ({ to, icon, label, active, highlight, badgeCount = 0, emphasize
     to={to} 
     onClick={() => { try { haptics.light(); } catch { /* ignore */ } }}
     className={cn(
-      "flex flex-col items-center justify-center w-full h-full text-center md:h-auto md:w-full md:px-6 md:py-4 transition-all duration-200 group active:scale-95",
+      "flex flex-col items-center justify-center w-full h-full md:h-auto md:w-full md:px-6 md:py-4 transition-all duration-200 group active:scale-95",
       active ? "text-white" : "text-zinc-500 hover:text-zinc-300"
     )}
     whileHover={{ scale: 1.03 }}
@@ -97,7 +97,7 @@ const NavItem = ({ to, icon, label, active, highlight, badgeCount = 0, emphasize
     transition={{ type: "spring", stiffness: 300 }}
   >
     <div className={cn(
-      "relative inline-flex items-center justify-center p-3 rounded-2xl transition-all duration-300 mb-1",
+      "relative p-3 rounded-2xl transition-all duration-300 mb-1",
       emphasize && !active && !highlight && "bg-brand-orange/15 border border-brand-orange/25",
       active && !highlight && "bg-white/10 text-white",
       highlight ? "bg-brand-orange text-white shadow-lg shadow-brand-orange/20 animate-pulse-slow" : ""
