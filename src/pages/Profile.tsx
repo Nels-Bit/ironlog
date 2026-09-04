@@ -555,7 +555,7 @@ export const Profile = () => {
                 <button
                   type="button"
                   onClick={() => setShowSignOutConfirm(true)}
-                  className="btn btn-error btn-outline hover:bg-error hover:text-white w-full font-semibold"
+                  className="w-full h-11 rounded-xl font-semibold text-sm transition-colors border border-red-500/30 bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white flex items-center justify-center"
                 >
                   Sign Out
                 </button>
@@ -564,7 +564,7 @@ export const Profile = () => {
                 <button
                   type="button"
                   onClick={handleSave}
-                  className="btn btn-success text-white w-full font-semibold"
+                  className="w-full h-11 rounded-xl font-semibold text-sm transition-colors bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/30 flex items-center justify-center"
                 >
                   Save Profile
                 </button>
@@ -579,14 +579,14 @@ export const Profile = () => {
                   <button
                     type="button"
                     onClick={() => setShowSignOutConfirm(false)}
-                    className="btn btn-neutral w-full font-semibold"
+                    className="w-full h-11 rounded-xl font-semibold text-sm transition-colors bg-zinc-800 hover:bg-zinc-700 text-white flex items-center justify-center"
                   >
                     Cancel
                   </button>
                   <button
                     type="button"
                     onClick={handleSignOut}
-                    className="btn btn-error text-white w-full font-semibold"
+                    className="w-full h-11 rounded-xl font-semibold text-sm transition-colors bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/30 flex items-center justify-center"
                   >
                     Yes, Sign Out
                   </button>
@@ -758,12 +758,13 @@ export const Profile = () => {
                           <p className="text-xs text-zinc-500 truncate">@{friend.userId}</p>
                         </div>
                       </div>
-                      <Button 
+                      <button 
+                        type="button"
                         onClick={() => navigate(`/friends/${friend.authUserId}`)}
-                        className="w-[130px] h-[48px] min-w-[130px] shrink-0 flex items-center justify-center text-sm tracking-normal font-bold"
+                        className="w-[130px] h-[48px] min-w-[130px] shrink-0 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs tracking-wider uppercase transition-all shadow-md shadow-orange-950/40 flex items-center justify-center"
                       >
                         View Profile
-                      </Button>
+                      </button>
                     </div>
                   ))}
                 </div>
