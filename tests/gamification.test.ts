@@ -222,11 +222,11 @@ describe('calculateTrophyCabinet', () => {
       expect(pr.rank).toBe('silver');
     });
 
-    it('maxes out at 250 PRs — gold (6 tiers max = gold)', () => {
-      // PR_LADDER only has 6 tiers total — tier 6 maps to RANK_FOR_TIER[5] = 'gold'
+    it('maxes out at 250 PRs — gold_max (6 tiers max = gold_max)', () => {
+      // PR_LADDER only has 6 tiers total — tier 6 maps to RANK_FOR_TIER[5] = 'gold_max'
       const result = calculateTrophyCabinet({ history: [], exerciseDefs: new Map(), totalXP: 0, prCount: 250 });
       const pr = result.find(t => t.category === 'pr_hunter')!;
-      expect(pr.rank).toBe('gold');
+      expect(pr.rank).toBe('gold_max');
       expect(pr.nextTierLabel).toBeNull();
       expect(pr.progressPercent).toBe(100);
     });

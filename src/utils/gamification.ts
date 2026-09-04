@@ -3,7 +3,18 @@ import { getLevelProgress, getLevelRequirementXP } from './achievementUtils';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-export type TrophyRank = 'locked' | 'bronze' | 'silver' | 'gold' | 'platinum' | 'diamond' | 'obsidian';
+export type TrophyRank =
+  | 'locked'
+  | 'bronze'
+  | 'bronze_max'
+  | 'silver'
+  | 'silver_max'
+  | 'gold'
+  | 'gold_max'
+  | 'platinum'
+  | 'platinum_max'
+  | 'diamond'
+  | 'obsidian';
 
 export type TrophyCategory =
   | 'bench_press'
@@ -42,6 +53,12 @@ export interface CategoryTrophy {
   progressPercent: number;
   /** Full ordered list of all tiers (for the detail modal). */
   tiers: TrophyTier[];
+  /** The current numeric value achieved in this category (e.g., best weight, total volume). */
+  currentValue: number;
+  /** Human-readable label for the current value (e.g., "Current Best: 210 lbs"). */
+  currentValueFormatted: string;
+  /** The label for the delta needed to reach the next tier (e.g. "15 lbs to Silver MAX"). */
+  nextDeltaLabel: string | null;
 }
 
 // ─── Ladder Definitions ────────────────────────────────────────────────────
@@ -57,22 +74,38 @@ export const LEVEL_LADDER = [5, 10, 15, 20, 30, 50, 100] as const;
 // Maps 1-based tier index (1 = first threshold unlocked) to a rank.
 
 const RANK_FOR_TIER: TrophyRank[] = [
-  'bronze',   // tier 1
-  'bronze',   // tier 2
-  'silver',   // tier 3
-  'silver',   // tier 4
-  'gold',     // tier 5
-  'gold',     // tier 6
-  'platinum', // tier 7
-  'platinum', // tier 8
-  'diamond',  // tier 9
-  'obsidian', // tier 10+
+  'bronze',       // tier 1
+  'bronze_max',   // tier 2
+  'silver',       // tier 3
+  'silver_max',   // tier 4
+  'gold',         // tier 5
+  'gold_max',     // tier 6
+  'platinum',     // tier 7
+  'platinum_max', // tier 8
+  'diamond',      // tier 9
+  'obsidian',     // tier 10+
 ];
 
-function getTrophyRank(unlockedTierCount: number): TrophyRank {
+export function getTrophyRank(unlockedTierCount: number): TrophyRank {
   if (unlockedTierCount <= 0) return 'locked';
   const idx = Math.min(unlockedTierCount - 1, RANK_FOR_TIER.length - 1);
   return RANK_FOR_TIER[idx];
+}
+
+export function getRankLabel(rank: TrophyRank): string {
+  switch (rank) {
+    case 'bronze': return 'Bronze';
+    case 'bronze_max': return 'Bronze MAX';
+    case 'silver': return 'Silver';
+    case 'silver_max': return 'Silver MAX';
+    case 'gold': return 'Gold';
+    case 'gold_max': return 'Gold MAX';
+    case 'platinum': return 'Platinum';
+    case 'platinum_max': return 'Platinum MAX';
+    case 'diamond': return 'Diamond';
+    case 'obsidian': return 'Obsidian';
+    default: return 'Locked';
+  }
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -167,6 +200,9 @@ function calcLiftTrophy(
     nextTierLabel: nextTier?.label ?? null,
     progressPercent,
     tiers,
+    currentValue: bestWeight,
+    currentValueFormatted: `Current Best: ${bestWeight} lbs`,
+    nextDeltaLabel: toWeight !== null ? `${toWeight - bestWeight} lbs to ${getRankLabel(getTrophyRank(unlockedCount + 1))}` : null,
   };
 }
 
@@ -217,6 +253,9 @@ function calcVolumeTrophy(history: WorkoutSession[]): CategoryTrophy {
     nextTierLabel: nextTier?.label ?? null,
     progressPercent,
     tiers,
+    currentValue: cumulativeVolume,
+    currentValueFormatted: `Total Volume: ${cumulativeVolume.toLocaleString()} lbs`,
+    nextDeltaLabel: toVol !== null ? `${formatVolume(toVol - cumulativeVolume)} to ${getRankLabel(getTrophyRank(unlockedCount + 1))}` : null,
   };
 }
 
@@ -254,6 +293,9 @@ function calcPRTrophy(prCount: number): CategoryTrophy {
     nextTierLabel: nextTier?.label ?? null,
     progressPercent,
     tiers,
+    currentValue: prCount,
+    currentValueFormatted: `Total PRs: ${prCount}`,
+    nextDeltaLabel: toPR !== null ? `${toPR - prCount} PRs to ${getRankLabel(getTrophyRank(unlockedCount + 1))}` : null,
   };
 }
 
@@ -312,6 +354,9 @@ function calcLevelTrophy(
     nextTierLabel: nextTier?.label ?? null,
     progressPercent: nextTier ? xpProgress : 100,
     tiers,
+    currentValue: totalXP,
+    currentValueFormatted: `Level ${currentLevel} • ${totalXP.toLocaleString()} XP`,
+    nextDeltaLabel: nextTier !== null ? `${nextTier.value - currentLevel} Levels to ${getRankLabel(getTrophyRank(unlockedCount + 1))}` : null,
   };
 }
 
