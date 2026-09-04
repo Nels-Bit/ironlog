@@ -16,7 +16,6 @@ import { replayAllXP, type TotalXPResult } from '../utils/xpEngine';
 import { parseUserWeight } from '../utils/workoutMath';
 import { calculateTrophyCabinet, type CategoryTrophy } from '../utils/gamification';
 import { TrophyCabinet } from '../components/TrophyCabinet';
-import { FluidTabs } from '../components/ui/fluid-tabs';
 import { ProfileSkeleton } from '../components/ProfileSkeleton';
 
 export const Profile = () => {
@@ -241,15 +240,54 @@ export const Profile = () => {
     <div className="min-h-screen bg-black pb-32 animate-in fade-in duration-500">
 
       <div className="p-4 space-y-4 max-w-lg mx-auto mt-2">
-        <FluidTabs
-          tabs={[
-            { id: 'overview', label: 'Overview' },
-            { id: 'activity', label: 'Activity' },
-            { id: 'friends', label: 'Friends' },
-          ]}
-          activeTab={activeTab}
-          onChange={(id) => setTab(id as 'overview' | 'activity' | 'friends')}
-        />
+        {/* Centered Tab Container */}
+        <div className="w-full max-w-md mx-auto px-1 my-2">
+          <div className="grid grid-cols-3 items-center w-full border-b border-white/10">
+            
+            {/* Tab 1: Overview */}
+            <button
+              onClick={() => setTab('overview')}
+              className={cn(
+                "py-3 text-center text-xs sm:text-sm font-bold tracking-wide transition-colors flex flex-col items-center justify-center relative",
+                activeTab === 'overview' ? "text-brand-orange" : "text-zinc-400 hover:text-zinc-200"
+              )}
+            >
+              <span>OVERVIEW</span>
+              {activeTab === 'overview' && (
+                <span className="absolute bottom-0 h-0.5 w-12 bg-brand-orange rounded-t-full" />
+              )}
+            </button>
+
+            {/* Tab 2: Activity */}
+            <button
+              onClick={() => setTab('activity')}
+              className={cn(
+                "py-3 text-center text-xs sm:text-sm font-bold tracking-wide transition-colors flex flex-col items-center justify-center relative",
+                activeTab === 'activity' ? "text-brand-orange" : "text-zinc-400 hover:text-zinc-200"
+              )}
+            >
+              <span>ACTIVITY</span>
+              {activeTab === 'activity' && (
+                <span className="absolute bottom-0 h-0.5 w-12 bg-brand-orange rounded-t-full" />
+              )}
+            </button>
+
+            {/* Tab 3: Friends */}
+            <button
+              onClick={() => setTab('friends')}
+              className={cn(
+                "py-3 text-center text-xs sm:text-sm font-bold tracking-wide transition-colors flex flex-col items-center justify-center relative",
+                activeTab === 'friends' ? "text-brand-orange" : "text-zinc-400 hover:text-zinc-200"
+              )}
+            >
+              <span>FRIENDS</span>
+              {activeTab === 'friends' && (
+                <span className="absolute bottom-0 h-0.5 w-12 bg-brand-orange rounded-t-full" />
+              )}
+            </button>
+
+          </div>
+        </div>
 
         {activeTab === 'overview' && (
           <div className="py-4 px-2 bg-transparent">
