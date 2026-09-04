@@ -92,35 +92,35 @@ describe('calculateTrophyCabinet', () => {
     const benchDef = makeExercise('bench-id', 'Barbell Bench Press');
     const defs = new Map([['bench-id', benchDef]]);
 
-    it('unlocks first bronze tier at 95 lbs', () => {
+    it('unlocks first dirt tier at 45 lbs', () => {
       const history = [
         makeWorkout('w1', Date.now() - DAY, 500, [
-          { id: 'e1', exerciseId: 'bench-id', sets: [makeSet(95, 5)] },
+          { id: 'e1', exerciseId: 'bench-id', sets: [makeSet(45, 5)] },
+        ]),
+      ];
+      const result = calculateTrophyCabinet({ history, exerciseDefs: defs, totalXP: 0, prCount: 0 });
+      const bench = result.find(t => t.category === 'bench_press')!;
+      expect(bench.rank).toBe('dirt');
+      expect(bench.currentTierLabel).toBe('45 lbs');
+      expect(bench.currentTierIndex).toBe(0);
+    });
+
+    it('unlocks bronze at 115 lbs (tier 4)', () => {
+      const history = [
+        makeWorkout('w1', Date.now() - 3 * DAY, 1000, [
+          { id: 'e1', exerciseId: 'bench-id', sets: [makeSet(65, 5)] },
+        ]),
+        makeWorkout('w2', Date.now() - 2 * DAY, 1200, [
+          { id: 'e1', exerciseId: 'bench-id', sets: [makeSet(115, 3)] },
         ]),
       ];
       const result = calculateTrophyCabinet({ history, exerciseDefs: defs, totalXP: 0, prCount: 0 });
       const bench = result.find(t => t.category === 'bench_press')!;
       expect(bench.rank).toBe('bronze');
-      expect(bench.currentTierLabel).toBe('95 lbs');
-      expect(bench.currentTierIndex).toBe(0);
+      expect(bench.currentTierLabel).toBe('115 lbs');
     });
 
-    it('unlocks silver at 185 lbs (tier 3)', () => {
-      const history = [
-        makeWorkout('w1', Date.now() - 3 * DAY, 1000, [
-          { id: 'e1', exerciseId: 'bench-id', sets: [makeSet(135, 5)] },
-        ]),
-        makeWorkout('w2', Date.now() - 2 * DAY, 1200, [
-          { id: 'e1', exerciseId: 'bench-id', sets: [makeSet(185, 3)] },
-        ]),
-      ];
-      const result = calculateTrophyCabinet({ history, exerciseDefs: defs, totalXP: 0, prCount: 0 });
-      const bench = result.find(t => t.category === 'bench_press')!;
-      expect(bench.rank).toBe('silver');
-      expect(bench.currentTierLabel).toBe('185 lbs');
-    });
-
-    it('unlocks gold at 275 lbs (tier 5)', () => {
+    it('unlocks gold at 275 lbs (tier 8)', () => {
       const history = [
         makeWorkout('w1', Date.now() - DAY, 5000, [
           { id: 'e1', exerciseId: 'bench-id', sets: [makeSet(275, 1)] },
@@ -131,7 +131,7 @@ describe('calculateTrophyCabinet', () => {
       expect(bench.rank).toBe('gold');
     });
 
-    it('unlocks platinum at 365 lbs (tier 7)', () => {
+    it('unlocks platinum at 365 lbs (tier 10)', () => {
       const history = [
         makeWorkout('w1', Date.now() - DAY, 8000, [
           { id: 'e1', exerciseId: 'bench-id', sets: [makeSet(365, 1)] },
@@ -142,7 +142,7 @@ describe('calculateTrophyCabinet', () => {
       expect(bench.rank).toBe('platinum');
     });
 
-    it('unlocks diamond at 455 lbs (tier 9)', () => {
+    it('unlocks diamond at 455 lbs (tier 12)', () => {
       const history = [
         makeWorkout('w1', Date.now() - DAY, 10000, [
           { id: 'e1', exerciseId: 'bench-id', sets: [makeSet(455, 1)] },
@@ -153,15 +153,15 @@ describe('calculateTrophyCabinet', () => {
       expect(bench.rank).toBe('diamond');
     });
 
-    it('unlocks obsidian at 505 lbs (tier 10)', () => {
+    it('unlocks elite at 545 lbs (tier 14)', () => {
       const history = [
         makeWorkout('w1', Date.now() - DAY, 12000, [
-          { id: 'e1', exerciseId: 'bench-id', sets: [makeSet(505, 1)] },
+          { id: 'e1', exerciseId: 'bench-id', sets: [makeSet(545, 1)] },
         ]),
       ];
       const result = calculateTrophyCabinet({ history, exerciseDefs: defs, totalXP: 0, prCount: 0 });
       const bench = result.find(t => t.category === 'bench_press')!;
-      expect(bench.rank).toBe('obsidian');
+      expect(bench.rank).toBe('elite');
       expect(bench.nextTierLabel).toBeNull();
       expect(bench.progressPercent).toBe(100);
     });
@@ -174,15 +174,15 @@ describe('calculateTrophyCabinet', () => {
       expect(volume.rank).toBe('locked');
     });
 
-    it('unlocks first tier at 10k lbs cumulative', () => {
+    it('unlocks dirt tier at 1k lbs cumulative', () => {
       const history = [
-        makeWorkout('w1', Date.now() - 2 * DAY, 5000),
-        makeWorkout('w2', Date.now() - DAY, 5500),
+        makeWorkout('w1', Date.now() - 2 * DAY, 500),
+        makeWorkout('w2', Date.now() - DAY, 500),
       ];
       const result = calculateTrophyCabinet({ history, exerciseDefs: new Map(), totalXP: 0, prCount: 0 });
       const volume = result.find(t => t.category === 'volume')!;
-      expect(volume.rank).toBe('bronze');
-      expect(volume.currentTierLabel).toBe('10k lbs');
+      expect(volume.rank).toBe('dirt');
+      expect(volume.currentTierLabel).toBe('1k lbs');
     });
 
     it('has correct label for 1M lbs tier', () => {
@@ -193,7 +193,7 @@ describe('calculateTrophyCabinet', () => {
         prCount: 0,
       });
       const volume = result.find(t => t.category === 'volume')!;
-      // Should have unlocked up to the 1M tier (7th tier = platinum)
+      // Should have unlocked up to the 1M tier (tier 10 = platinum)
       expect(volume.rank).toBe('platinum');
       // formatVolume uses toFixed(1) for millions
       expect(volume.currentTierLabel).toBe('1.0M lbs');
@@ -207,26 +207,23 @@ describe('calculateTrophyCabinet', () => {
       expect(pr.rank).toBe('locked');
     });
 
-    it('unlocks bronze at 5 PRs', () => {
+    it('unlocks wood at 5 PRs', () => {
       const result = calculateTrophyCabinet({ history: [], exerciseDefs: new Map(), totalXP: 0, prCount: 5 });
       const pr = result.find(t => t.category === 'pr_hunter')!;
-      expect(pr.rank).toBe('bronze');
+      expect(pr.rank).toBe('wood');
       expect(pr.currentTierLabel).toBe('5 PRs');
     });
 
-    it('unlocks silver at 25 PRs (tier 3)', () => {
-      // PR_LADDER has 6 tiers: 5,10,25,50,100,250 → tier indices 1,2,3,4,5,6
-      // Tier 3 = silver
-      const result = calculateTrophyCabinet({ history: [], exerciseDefs: new Map(), totalXP: 0, prCount: 25 });
+    it('unlocks bronze at 15 PRs (tier 4)', () => {
+      const result = calculateTrophyCabinet({ history: [], exerciseDefs: new Map(), totalXP: 0, prCount: 15 });
       const pr = result.find(t => t.category === 'pr_hunter')!;
-      expect(pr.rank).toBe('silver');
+      expect(pr.rank).toBe('bronze');
     });
 
-    it('maxes out at 250 PRs — gold_max (6 tiers max = gold_max)', () => {
-      // PR_LADDER only has 6 tiers total — tier 6 maps to RANK_FOR_TIER[5] = 'gold_max'
-      const result = calculateTrophyCabinet({ history: [], exerciseDefs: new Map(), totalXP: 0, prCount: 250 });
+    it('maxes out at 500 PRs — elite', () => {
+      const result = calculateTrophyCabinet({ history: [], exerciseDefs: new Map(), totalXP: 0, prCount: 500 });
       const pr = result.find(t => t.category === 'pr_hunter')!;
-      expect(pr.rank).toBe('gold_max');
+      expect(pr.rank).toBe('elite');
       expect(pr.nextTierLabel).toBeNull();
       expect(pr.progressPercent).toBe(100);
     });
@@ -239,11 +236,10 @@ describe('calculateTrophyCabinet', () => {
       expect(level.rank).toBe('locked');
     });
 
-    it('unlocks bronze at Level 5', () => {
-      // Level 5 requires roughly 250+335+420+505+590 = 2100 XP
+    it('unlocks wood max at Level 5', () => {
       const result = calculateTrophyCabinet({ history: [], exerciseDefs: new Map(), totalXP: 2200, prCount: 0 });
       const level = result.find(t => t.category === 'level')!;
-      expect(level.rank).toBe('bronze');
+      expect(level.rank).toBe('wood_max');
       expect(level.currentTierLabel).toBe('Level 5');
     });
 

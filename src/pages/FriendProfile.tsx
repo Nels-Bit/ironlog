@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  User, Weight, Loader2, ArrowLeft, Lock, Flame, ShieldAlert, Dumbbell, BarChart2, Calendar
+  User, Loader2, ArrowLeft, Lock, Flame, ShieldAlert, BarChart2
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { socialService } from '../services/socialService';
@@ -73,25 +73,20 @@ export const FriendProfile = () => {
 
       <div className="p-4 max-w-2xl mx-auto space-y-6">
         
-        {/* Profile Identity Card */}
-        <div className="rounded-2xl border border-white/5 bg-zinc-900/40 backdrop-blur-md p-6 flex flex-col items-center gap-4 relative overflow-hidden text-center">
-          <div className="w-24 h-24 rounded-full bg-brand-orange/20 border-2 border-brand-orange/50 flex items-center justify-center shrink-0">
+        {/* Profile Identity */}
+        <div className="relative py-4 flex flex-col items-center gap-4 text-center">
+          <div className="w-24 h-24 rounded-full border-[3px] border-zinc-800 bg-brand-orange/10 flex items-center justify-center shrink-0 shadow-lg shadow-orange-500/10">
             <User size={40} className="text-brand-orange" />
           </div>
           <div>
-            <h2 className="text-xl font-black text-white">{profile.name}</h2>
+            <h2 className="text-3xl font-black text-white tracking-tight">{profile.name}</h2>
             <p className="text-sm font-medium text-zinc-400 mt-1">@{profile.userId}</p>
-            {profile.goal && (
-              <span className="inline-block mt-3 bg-white/5 border border-white/5 text-xs px-2.5 py-1 rounded-full text-zinc-300">
-                Goal: <span className="font-bold text-white">{profile.goal}</span>
-              </span>
-            )}
           </div>
         </div>
 
         {/* Privacy Guard */}
         {isPrivate ? (
-          <div className="rounded-2xl border border-white/5 bg-zinc-900/30 backdrop-blur-md p-10 flex flex-col items-center justify-center gap-4 text-center">
+          <div className="rounded-2xl border border-white/5 bg-zinc-900/30 backdrop-blur-md p-10 flex flex-col items-center justify-center gap-4 text-center mt-4">
             <div className="w-16 h-16 rounded-full bg-zinc-800/50 flex items-center justify-center">
               <Lock size={28} className="text-zinc-400" />
             </div>
@@ -105,49 +100,39 @@ export const FriendProfile = () => {
         ) : (
           /* Public View */
           <>
-            {/* Badges Row */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-2xl border border-brand-orange/30 bg-brand-orange/10 p-4 flex flex-col items-center gap-2">
-                <span className="text-[10px] uppercase tracking-widest font-bold text-brand-orange/80">Current Level</span>
-                <span className="text-3xl font-black text-brand-orange">{levelProgress.currentLevel}</span>
-              </div>
-              <div className="rounded-2xl border border-white/5 bg-zinc-900/40 backdrop-blur-md p-4 flex flex-col items-center gap-2">
-                <span className="text-[10px] uppercase tracking-widest font-bold text-zinc-400">Active Streak</span>
-                <div className="flex items-center gap-1.5 text-3xl font-black text-white">
-                  {streak > 0 ? (
-                    <>
-                      <Flame size={28} className="text-orange-500 fill-orange-500" />
-                      {streak}
-                    </>
-                  ) : (
-                    <span className="text-zinc-600">0</span>
-                  )}
-                </div>
-              </div>
-            </div>
+            {/* Inline Key Stats Cluster */}
+            <div className="flex flex-wrap justify-center items-center gap-3 mb-6 text-xs font-semibold text-white">
+              <span className="flex items-center gap-1.5">
+                Level {levelProgress.currentLevel}
+              </span>
+              
+              {streak > 0 && (
+                <>
+                  <span className="text-zinc-600">•</span>
+                  <span className="flex items-center gap-1.5">
+                    🔥 {streak} Day{streak !== 1 ? 's' : ''}
+                  </span>
+                </>
+              )}
 
-            {/* Overview Stats */}
-            {stats && (
-              <div className="rounded-2xl border border-white/5 bg-zinc-900/40 backdrop-blur-md p-5 space-y-4">
-                <h3 className="text-[10px] uppercase tracking-widest font-bold text-zinc-500 mb-2">Overview</h3>
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs text-zinc-400 flex items-center gap-1"><Calendar size={12}/> Workouts</span>
-                    <span className="font-bold text-white text-lg tabular-nums">{stats.totalWorkouts}</span>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs text-zinc-400 flex items-center gap-1"><Weight size={12}/> Volume</span>
-                    <span className="font-bold text-white text-lg tabular-nums">
-                      {stats.totalVolume >= 1000 ? `${(stats.totalVolume / 1000).toFixed(1)}k` : stats.totalVolume} lbs
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-xs text-zinc-400 flex items-center gap-1"><Dumbbell size={12}/> Top Muscle</span>
-                    <span className="font-bold text-white text-sm truncate">{stats.topMuscle}</span>
-                  </div>
-                </div>
-              </div>
-            )}
+              {stats && (
+                <>
+                  <span className="text-zinc-600">•</span>
+                  <span className="flex items-center gap-1.5">
+                    🏋️ {stats.totalWorkouts} Workouts
+                  </span>
+                  
+                  {stats.topMuscle && (
+                    <>
+                      <span className="text-zinc-600">•</span>
+                      <span className="flex items-center gap-1.5 capitalize">
+                        💪 {stats.topMuscle}
+                      </span>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
 
             {/* Trophy Cabinet (replaces flat medal chips) */}
             {trophies.length > 0 && (
