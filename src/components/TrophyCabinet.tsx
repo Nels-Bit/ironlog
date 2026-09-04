@@ -244,7 +244,7 @@ const LadderModal = ({ trophy, onClose }: LadderModalProps) => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-end justify-center"
+        className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] flex items-end justify-center"
         onClick={onClose}
       >
         <motion.div
@@ -304,7 +304,7 @@ const LadderModal = ({ trophy, onClose }: LadderModalProps) => {
           </div>
 
           {/* Scrollable Ladder List */}
-          <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 p-6 space-y-3">
+          <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 px-6 pt-6 pb-[calc(6rem+env(safe-area-inset-bottom,0px))] md:pb-8 space-y-3">
             {trophy.tiers.map((tier, idx) => {
               const tierStyle = RANK_STYLES[getTrophyRank(idx + 1)];
               const isCurrent = idx === trophy.currentTierIndex && trophy.rank !== 'locked';
