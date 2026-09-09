@@ -5,7 +5,7 @@ import {
   getSetLoad,
   isCardioExercise
 } from '../src/utils/workoutMath';
-import type { Exercise, ExerciseSet, WorkoutSession } from '../src/types';
+import type { Exercise, ExerciseSet } from '../src/types';
 
 describe('PR Engine: Multi-Type Set Ingestion', () => {
   const benchPress: Exercise = {
@@ -178,7 +178,7 @@ describe('PR Engine: Multi-Type Set Ingestion', () => {
     it('evaluates legacy set with null/undefined set_type as normal', () => {
       let currentPR = 200;
 
-      const legacySet: any = {
+      const legacySet = {
         id: 'leg_1',
         type: undefined, // Legacy DB row where type was not set
         weight: 230,
@@ -186,8 +186,8 @@ describe('PR Engine: Multi-Type Set Ingestion', () => {
         isCompleted: true
       };
 
-      expect(shouldCountSetForPR(legacySet, benchPress)).toBe(true);
-      const load = getSetLoad(legacySet, benchPress);
+      expect(shouldCountSetForPR(legacySet as ExerciseSet, benchPress)).toBe(true);
+      const load = getSetLoad(legacySet as ExerciseSet, benchPress);
       if (load > currentPR) {
         currentPR = load;
       }

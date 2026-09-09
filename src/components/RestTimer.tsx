@@ -72,8 +72,10 @@ export const RestTimer = () => {
   const location = useLocation();
   const { restTimer, closeRestTimer, dockRestTimer, undockRestTimer, updateRestTimerPref } = useWorkout();
 
-  if (!restTimer) return null;
-  const { isOpen, isDocked, duration: initialSeconds, resetKey } = restTimer;
+  const isOpen = restTimer?.isOpen ?? false;
+  const isDocked = restTimer?.isDocked ?? false;
+  const initialSeconds = restTimer?.duration ?? 0;
+  const resetKey = restTimer?.resetKey ?? 0;
 
   const [timerState, dispatch] = useReducer(restTimerReducer, initialSeconds, createTimerState);
   const { timeLeft, endTime, overtime, isOvertime } = timerState;
@@ -123,6 +125,8 @@ export const RestTimer = () => {
     const s = sec % 60;
     return "" + m + ":" + s.toString().padStart(2, '0');
   };
+
+  if (!restTimer) return null;
 
   if (!isOpen) return null;
 
