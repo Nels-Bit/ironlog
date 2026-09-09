@@ -3,8 +3,7 @@ import {
   calculateTrophyCabinet,
   VOLUME_LADDER,
   PR_LADDER,
-  LEVEL_LADDER,
-  type TrophyCabinetInput,
+  LEVEL_LADDER
 } from '../src/utils/gamification';
 import type { WorkoutSession, Exercise } from '../src/types';
 

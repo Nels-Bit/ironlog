@@ -1,9 +1,9 @@
 import { supabase } from '../lib/supabase';
 import { exerciseService } from './exerciseService';
 import { getLevelProgress, calculateWorkoutStreak, calculateStrengthAchievements } from '../utils/achievementUtils';
-import { replayAllXP, getXPForWorkout } from '../utils/xpEngine';
+import { replayAllXP } from '../utils/xpEngine';
 import { parseUserWeight } from '../utils/workoutMath';
-import { calculateTrophyCabinet } from '../utils/gamification';
+import { calculateTrophyCabinet, getRankLabel } from '../utils/gamification';
 import { statsUtils } from '../utils/statsUtils';
 import type { FriendRequest, FriendSummary, FriendWithStats, NotificationItem, SocialProfile, FriendProfileData, WorkoutSession, UserProfile, Exercise } from '../types';
 
@@ -321,7 +321,7 @@ export const socialService = {
       .select('id, recipient_id, actor_id, type, message, payload, read_at, created_at')
       .eq('recipient_id', currentUserId)
       .order('created_at', { ascending: false })
-      .limit(100);
+      .limit(20);
 
     if (error) throw error;
 
@@ -430,7 +430,7 @@ export const socialService = {
     const history: WorkoutSession[] = (workouts ?? []).map(w => {
       let parsedExercises = w.exercises;
       if (typeof parsedExercises === 'string') {
-        try { parsedExercises = JSON.parse(parsedExercises); } catch (e) { parsedExercises = []; }
+        try { parsedExercises = JSON.parse(parsedExercises); } catch { parsedExercises = []; }
       }
       return {
         id: w.id,
@@ -547,18 +547,49 @@ export const socialService = {
 
       const userWeight = parseUserWeight(myProfileData.weight);
 
-      // 2. XP & Achievements before vs after
-      const xpResult = getXPForWorkout(workoutId, history, defMap, userWeight);
-      if (!xpResult) return;
+      // 2. XP & Level before vs after
+      const historyBefore = history.filter(w => w.id !== workoutId && w.startTime <= history.find(hw => hw.id === workoutId)!.startTime);
+      const historyAfter = history.filter(w => w.startTime <= history.find(hw => hw.id === workoutId)!.startTime);
 
-      const nextLevelProg = getLevelProgress(xpResult.totalXPAfter);
-      
-      const prevAchievements = calculateStrengthAchievements(history.filter(w => w.id !== workoutId && w.startTime <= history.find(hw => hw.id === workoutId)!.startTime), defMap).filter(a => a.unlocked);
-      const currAchievements = calculateStrengthAchievements(history.filter(w => w.startTime <= history.find(hw => hw.id === workoutId)!.startTime), defMap).filter(a => a.unlocked);
-      
-      const newlyUnlocked = currAchievements.filter(curr => !prevAchievements.some(prev => prev.lift === curr.lift && prev.threshold === curr.threshold));
+      const xpBefore = replayAllXP(historyBefore, defMap, userWeight);
+      const xpAfter = replayAllXP(historyAfter, defMap, userWeight);
 
-      // 3. Find friends
+      const levelBefore = getLevelProgress(xpBefore.totalXP).currentLevel;
+      const levelAfter = getLevelProgress(xpAfter.totalXP).currentLevel;
+
+      // 3. Trophies before vs after
+      const prsBefore = await statsUtils.calculatePRs(historyBefore);
+      const prsAfter = await statsUtils.calculatePRs(historyAfter);
+
+      const cabinetBefore = calculateTrophyCabinet({
+        history: historyBefore.filter(w => !w.name.toLowerCase().includes('rest day')),
+        exerciseDefs: defMap,
+        totalXP: xpBefore.totalXP,
+        prCount: prsBefore.length,
+        xpBreakdowns: xpBefore.breakdowns,
+      });
+
+      const cabinetAfter = calculateTrophyCabinet({
+        history: historyAfter.filter(w => !w.name.toLowerCase().includes('rest day')),
+        exerciseDefs: defMap,
+        totalXP: xpAfter.totalXP,
+        prCount: prsAfter.length,
+        xpBreakdowns: xpAfter.breakdowns,
+      });
+
+      const newlyUnlockedTrophies: { label: string }[] = [];
+      cabinetAfter.forEach(afterTrophy => {
+        const beforeTrophy = cabinetBefore.find(t => t.category === afterTrophy.category);
+        const unlockedAfter = afterTrophy.tiers.filter(t => t.unlocked).length;
+        const unlockedBefore = beforeTrophy ? beforeTrophy.tiers.filter(t => t.unlocked).length : 0;
+        
+        if (unlockedAfter > unlockedBefore && afterTrophy.rank !== 'locked') {
+           const rankLabel = getRankLabel(afterTrophy.rank);
+           newlyUnlockedTrophies.push({ label: `${rankLabel} ${afterTrophy.categoryLabel}` });
+        }
+      });
+
+      // 4. Find friends
       const { data: friendsData } = await supabase
         .from('friendships')
         .select('requester_id, addressee_id')
@@ -568,35 +599,50 @@ export const socialService = {
       if (!friendsData || friendsData.length === 0) return;
       const friendIds = friendsData.map(f => f.requester_id === currentAuthId ? f.addressee_id : f.requester_id);
 
-      // 4. Dispatch
+      // 5. Dispatch
       const notifications: Omit<NotificationRow, 'id' | 'created_at' | 'read_at'>[] = [];
+      const thisWorkout = history.find(w => w.id === workoutId);
+      const workoutName = thisWorkout?.name || 'a workout';
 
-      // Workout Completion
       friendIds.forEach(fId => {
+        // Workout Completed
         notifications.push({
           recipient_id: fId,
           actor_id: currentAuthId,
           type: 'workout_completed',
-          message: `${myProfileData.display_name} just finished a workout and is ${nextLevelProg.xpToNext} XP away from Level ${nextLevelProg.currentLevel + 1}`,
-          payload: { remainingXP: nextLevelProg.xpToNext, nextLevel: nextLevelProg.currentLevel + 1, userId: myProfileData.user_code }
+          message: `${myProfileData.display_name} logged a new workout: ${workoutName}`,
+          payload: { workoutName, userId: myProfileData.user_code }
         });
-      });
 
-      // Achievement Unlocks
-      newlyUnlocked.forEach(ach => {
-        friendIds.forEach(fId => {
+        // Level Up
+        if (levelAfter > levelBefore) {
           notifications.push({
             recipient_id: fId,
             actor_id: currentAuthId,
             type: 'achievement_unlocked',
-            message: `${myProfileData.display_name} just earned ${ach.currentWeight}lb ${ach.label}`,
-            payload: { achievementName: `${ach.currentWeight}lb ${ach.label}`, userId: myProfileData.user_code }
+            message: `${myProfileData.display_name} reached Level ${levelAfter}!`,
+            payload: { achievementName: `Level ${levelAfter}`, userId: myProfileData.user_code }
+          });
+        }
+
+        // Trophies
+        newlyUnlockedTrophies.forEach(ach => {
+          notifications.push({
+            recipient_id: fId,
+            actor_id: currentAuthId,
+            type: 'achievement_unlocked',
+            message: `${myProfileData.display_name} unlocked the ${ach.label} trophy!`,
+            payload: { achievementName: `${ach.label} Trophy`, userId: myProfileData.user_code }
           });
         });
       });
 
       if (notifications.length > 0) {
         await supabase.from('notifications').insert(notifications);
+        
+        // Trim notifications to top 20 for these recipients
+        // Actually it's complex to do for all friends in one query here,
+        // so we could either rely on a DB trigger or just let the fetch query limit handle the UI side.
       }
     } catch (err) {
       console.error('Error dispatching milestones', err);
