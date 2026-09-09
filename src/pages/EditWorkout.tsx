@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Plus, 
@@ -12,7 +13,8 @@ import {
   Flame,
   Skull,
   ArrowDown,
-  CornerDownRight
+  CornerDownRight,
+  Circle
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -41,6 +43,7 @@ import type { WorkoutSession, WorkoutExercise, Exercise, ExerciseSet } from '../
 export const EditWorkout = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   
   const blockInvalidNumberChars = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (['e', 'E', '+', '-'].includes(e.key)) {
@@ -57,6 +60,7 @@ export const EditWorkout = () => {
   const [userWeight, setUserWeight] = useState<number | null>(null);
   
   const [workout, setWorkout] = useState<WorkoutSession | null>(null);
+  const [typeSheetOpen, setTypeSheetOpen] = useState<{ exIndex: number; setIndex: number } | null>(null);
 
 
   // --- EFFECTS ---
@@ -145,6 +149,37 @@ export const EditWorkout = () => {
     setWorkout(updated);
   };
 
+  const handleSetType = (exIndex: number, setIndex: number, type: ExerciseSet['type']) => {
+    setWorkout(current => {
+      if (!current) return current;
+      const exercises = current.exercises.map(exercise => ({ ...exercise, sets: [...exercise.sets] }));
+      const set = exercises[exIndex]?.sets[setIndex];
+      if (!set) return current;
+
+      if (type === 'dropset' && set.type !== 'dropset') {
+        const parent = { ...set, type: 'dropset' as const };
+        const child: ExerciseSet = {
+          ...set,
+          id: uuidv4(),
+          type: 'dropset_child',
+          parentSetId: parent.id,
+          isCompleted: false
+        };
+        exercises[exIndex].sets.splice(setIndex, 1, parent, child);
+      } else if (set.type === 'dropset' && type !== 'dropset') {
+        const childIndex = exercises[exIndex].sets.findIndex(
+          (candidate, index) => index > setIndex && candidate.type === 'dropset_child' && candidate.parentSetId === set.id
+        );
+        if (childIndex >= 0) exercises[exIndex].sets.splice(childIndex, 1);
+        exercises[exIndex].sets[setIndex] = { ...set, type };
+      } else {
+        exercises[exIndex].sets[setIndex] = { ...set, type };
+      }
+      return { ...current, exercises };
+    });
+    setTypeSheetOpen(null);
+  };
+
   const removeSet = (exIndex: number, setIndex: number) => {
       if (!workout) return;
       const updated = { ...workout };
@@ -207,6 +242,11 @@ export const EditWorkout = () => {
     };
 
     await workoutService.updateWorkout(id, finalWorkout);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['workout-history'] }),
+      queryClient.invalidateQueries({ queryKey: ['personal-records'] }),
+      ...finalWorkout.exercises.map(exercise => queryClient.invalidateQueries({ queryKey: ['ghost-sets', exercise.exerciseId] }))
+    ]);
     navigate('/profile?tab=activity');
   };
 
@@ -314,15 +354,21 @@ export const EditWorkout = () => {
                             )}>
                                 {/* Set Number / Icon */}
                                 <div className="col-span-1 flex justify-center">
-                                     <div className={cn(
-                                        "w-7 h-7 rounded-lg flex items-center justify-center gap-0.5 text-xs font-bold transition-all",
+                                      <button
+                                        type="button"
+                                        disabled={isDropChild}
+                                        aria-label={isDropChild ? 'Drop set continuation' : 'Change set type'}
+                                        onClick={() => !isDropChild && setTypeSheetOpen({ exIndex, setIndex })}
+                                        className={cn(
+                                         "w-7 h-7 rounded-lg flex items-center justify-center gap-0.5 text-xs font-bold transition-all",
+                                         'enabled:active:scale-95 disabled:cursor-default',
                                         set.type === 'warmup' ? "bg-yellow-500/20 text-yellow-500 ring-1 ring-yellow-500/50" :
                                         set.type === 'failure' ? "bg-red-500/20 text-red-500 ring-1 ring-red-500/50" :
                                         set.type === 'dropset' || isDropChild ? "bg-zinc-700 text-white ring-1 ring-zinc-500" :
                                         "bg-white/5 text-zinc-400"
-                                     )}>
+                                      )}>
                                          {isDropChild ? <CornerDownRight size={12}/> : (getTypeIcon(set.type) || setIndex + 1)}
-                                     </div>
+                                      </button>
                                 </div>
                                 
                                 {isCardio ? (
@@ -428,6 +474,27 @@ export const EditWorkout = () => {
         onClose={() => setIsSelectorOpen(false)} 
         onSelect={handleAddExercise}
       />
+      {typeSheetOpen && (() => {
+        const set = workout.exercises[typeSheetOpen.exIndex]?.sets[typeSheetOpen.setIndex];
+        if (!set) return null;
+        const options = [
+          { type: 'normal' as const, label: 'Normal', icon: <Circle size={20} /> },
+          { type: 'warmup' as const, label: 'Warmup', icon: <Flame size={20} /> },
+          { type: 'dropset' as const, label: 'Drop set', icon: <ArrowDown size={20} /> },
+          { type: 'failure' as const, label: 'Failure', icon: <Skull size={20} /> }
+        ].filter(option => option.type !== set.type);
+        return <div className="fixed inset-0 z-[70] flex items-center justify-center p-6">
+          <button type="button" aria-label="Close set type selector" className="absolute inset-0 bg-black/80" onClick={() => setTypeSheetOpen(null)} />
+          <div className="relative w-full max-w-xs rounded-3xl border border-white/10 bg-iron-950 p-5 shadow-2xl">
+            <h2 className="mb-4 text-center text-sm font-bold uppercase tracking-wider text-zinc-400">Set type</h2>
+            <div className="flex flex-col gap-2">
+              {options.map(option => <button key={option.type} type="button" onClick={() => handleSetType(typeSheetOpen.exIndex, typeSheetOpen.setIndex, option.type)} className="btn h-12 min-h-12 justify-start gap-3 border-white/10 bg-white/5 text-white hover:bg-white/10">
+                {option.icon}<span>{option.label}</span>
+              </button>)}
+            </div>
+          </div>
+        </div>;
+      })()}
     </div>
   );
 };

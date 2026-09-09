@@ -44,20 +44,24 @@ export const exerciseService = {
     });
   },
 
-  async createExercise(ex: Partial<Exercise>): Promise<Exercise | null> {
+  async createExercise(ex: Partial<Exercise>): Promise<Exercise> {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
+    if (!user) throw new Error('You must be signed in to create an exercise.');
 
-    const isCardio = ex.exerciseCategory === 'cardio' || (ex.category || '').toLowerCase() === 'cardio';
-    const exerciseCategory = isCardio ? 'cardio' : (ex.exerciseCategory || 'strength');
+    const name = ex.name?.trim();
+    if (!name) throw new Error('Enter an exercise name before saving.');
+
+    // The deployed table classifies exercises through `category`; it has no
+    // `exercise_category` column. Keep the cardio behavior in the app from
+    // that stable category value instead of writing an unsupported field.
+    const isCardio = (ex.category || '').toLowerCase() === 'cardio';
 
     const { data, error } = await supabase
       .from('exercises')
       .insert({
         user_id: user.id, // Link to user
-        name: ex.name,
+        name,
         category: ex.category,
-        exercise_category: exerciseCategory,
         target_muscle: isCardio ? null : (ex.target || null),
         is_unilateral: isCardio ? false : (ex.isUnilateral ?? false)
       })
@@ -66,8 +70,10 @@ export const exerciseService = {
 
     if (error) {
       console.error('Error creating exercise:', error);
-      return null;
+      throw new Error(error.message || 'Unable to create this exercise. Please try again.');
     }
+
+    if (!data) throw new Error('The exercise was not returned after saving. Please try again.');
 
     const row = data as ExerciseRow;
 
@@ -82,16 +88,25 @@ export const exerciseService = {
     };
   },
 
-  async deleteCustomExercise(id: string): Promise<boolean> {
-    const { error } = await supabase
+  async deleteCustomExercise(id: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('You must be signed in to delete an exercise.');
+
+    // Selecting the deleted id detects RLS policies that silently affect zero rows.
+    const { data, error } = await supabase
       .from('exercises')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .select('id')
+      .maybeSingle();
 
     if (error) {
       console.error('Error deleting exercise:', error);
-      return false;
+      throw new Error(error.message || 'Unable to delete this exercise.');
     }
-    return true;
+    if (!data) {
+      throw new Error('This exercise could not be deleted. Your database needs the custom-exercise delete policy.');
+    }
   }
 };

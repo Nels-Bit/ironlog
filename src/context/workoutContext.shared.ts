@@ -12,6 +12,7 @@ export interface WorkoutContextType {
   cancelWorkout: () => void;
   finishWorkout: () => Promise<string | null>;
   addExercise: (exDef: Exercise) => void;
+  hydrateExerciseGhostSets: (workoutExerciseId: string, exerciseId: string, sets: ExerciseSet[]) => void;
   removeExercise: (index: number) => void;
   addSet: (exIndex: number, insertIndex?: number) => void;
   removeSet: (exIndex: number, setIndex: number) => void;

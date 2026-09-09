@@ -6,6 +6,7 @@ import {
 import { Button } from '../components/ui/Button';
 import { motion } from 'framer-motion';
 import { ExerciseSelector } from '../components/ExerciseSelector';
+import { GhostSetHydrator } from '../components/GhostSetHydrator';
 import { cn } from '../lib/utils';
 import { useWorkout } from '../context/useWorkout';
 import { authService } from '../services/authService';
@@ -38,7 +39,7 @@ export const WorkoutLogger = () => {
   const { 
     workout, elapsed, isActive, historyCache, prCache,
     startWorkout, logRestDay, cancelWorkout, finishWorkout, 
-    addExercise, removeExercise, addSet, removeSet, updateSet, exerciseDefs 
+    addExercise, hydrateExerciseGhostSets, removeExercise, addSet, removeSet, updateSet, exerciseDefs
   } = useWorkout();
 
   // Keep the screen awake while an active workout session is running
@@ -322,6 +323,11 @@ export const WorkoutLogger = () => {
 
               return (
                 <div key={ex.id} className="relative">
+                  <GhostSetHydrator
+                    workoutExerciseId={ex.id}
+                    exerciseId={ex.exerciseId}
+                    onHydrate={hydrateExerciseGhostSets}
+                  />
                   <div className="bg-zinc-900/60 backdrop-blur-lg border border-white/5 rounded-2xl overflow-hidden shadow-2xl shadow-black/50 transition-all duration-300">
                       
                       {/* EXERCISE HEADER */}

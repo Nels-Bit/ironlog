@@ -83,7 +83,7 @@ export const shouldCountSetForVolume = (
 export const isCardioExercise = (def?: Exercise) =>
   (def?.category || '').toLowerCase() === 'cardio' || def?.exerciseCategory === 'cardio';
 
-export const PR_ELIGIBLE_SET_TYPES = ['normal', 'failure', 'drop', 'dropset'] as const;
+export const PR_ELIGIBLE_SET_TYPES = ['normal', 'warmup', 'failure', 'drop', 'dropset', 'dropset_child'] as const;
 export type PREligibleSetType = typeof PR_ELIGIBLE_SET_TYPES[number];
 
 export const isEligibleForPR = (setType?: string | null): boolean => {
