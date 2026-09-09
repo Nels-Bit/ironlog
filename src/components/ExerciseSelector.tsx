@@ -4,6 +4,7 @@ import { exerciseService } from '../services/exerciseService';
 import type { Exercise } from '../types';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface Props {
   isOpen: boolean;
@@ -16,6 +17,12 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
   const [search, setSearch] = useState('');
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [formSuccess, setFormSuccess] = useState<string | null>(null);
+  const [libraryError, setLibraryError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   // New Exercise Form State
   const [newName, setNewName] = useState('');
@@ -54,34 +61,59 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
   const handleDelete = async (e: React.MouseEvent, id: string, name: string) => {
     e.stopPropagation();
     if (confirm(`Delete custom exercise "${name}"?`)) {
-      await exerciseService.deleteCustomExercise(id);
-      const data = await loadExercises();
-      setExercises(data);
+      setLibraryError(null);
+      setDeletingId(id);
+      try {
+        await exerciseService.deleteCustomExercise(id);
+        setExercises(previous => previous.filter(exercise => exercise.id !== id));
+        await queryClient.invalidateQueries({ queryKey: ['exercises'] });
+      } catch (error) {
+        setLibraryError(error instanceof Error ? error.message : 'Unable to delete this exercise.');
+      } finally {
+        setDeletingId(null);
+      }
     }
   };
 
   const handleCreate = async () => {
-    if (!newName) return;
-    setLoading(true);
+    const name = newName.trim();
+    if (!name) {
+      setFormError('Enter a name for the exercise.');
+      return;
+    }
+    setFormError(null);
+    setFormSuccess(null);
+    setIsSubmitting(true);
     const isCardio = newCategory.toLowerCase() === 'cardio';
-    const created = await exerciseService.createExercise({
-      name: newName,
-      category: newCategory,
-      exerciseCategory: isCardio ? 'cardio' : 'strength',
-      target: isCardio ? null : newTarget,
-      isUnilateral: isCardio ? false : isUnilateral
-    });
-    
-    if (created) {
+    try {
+      const created = await exerciseService.createExercise({
+        name,
+        category: newCategory,
+        exerciseCategory: isCardio ? 'cardio' : 'strength',
+        target: isCardio ? null : newTarget,
+        isUnilateral: isCardio ? false : isUnilateral
+      });
+      // Update this open picker immediately, then invalidate any future exercise queries.
+      setExercises(previous => [...previous, created].sort((a, b) => a.name.localeCompare(b.name)));
+      await queryClient.invalidateQueries({ queryKey: ['exercises'] });
+      setFormSuccess(`Created ${created.name}.`);
       onSelect(created);
       onClose();
       resetForm();
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Unable to create this exercise.');
+    } finally {
+      setIsSubmitting(false);
     }
-    setLoading(false);
   };
 
   const resetForm = () => {
     setNewName('');
+    setNewCategory('Free Weights');
+    setNewTarget('Chest');
+    setIsUnilateral(false);
+    setFormError(null);
+    setFormSuccess(null);
     setMode('search');
     setSearch('');
   };
@@ -182,6 +214,7 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
 
           {/* Scrollable List */}
           <div className="flex-1 overflow-y-auto px-4 pb-safe space-y-3">
+            {libraryError && <p role="alert" className="mt-3 rounded-xl border border-error/30 bg-error/10 p-3 text-sm font-medium text-error">{libraryError}</p>}
             {loading ? (
               <div className="flex flex-col items-center justify-center py-20 opacity-50">
                 <Loader2 className="animate-spin mb-4" size={32} />
@@ -229,9 +262,11 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
                         {ex.isCustom && (
                           <button 
                             onClick={(e) => handleDelete(e, ex.id, ex.name)}
-                            className="w-10 h-10 flex items-center justify-center rounded-xl text-zinc-600 hover:bg-red-500/10 hover:text-red-500 transition-colors z-10"
+                            disabled={deletingId === ex.id}
+                            aria-label={`Delete ${ex.name}`}
+                            className="btn btn-ghost btn-square h-11 min-h-11 w-11 text-zinc-600 hover:bg-red-500/10 hover:text-red-500 disabled:text-zinc-700 z-10"
                           >
-                            <Trash2 size={18} />
+                            {deletingId === ex.id ? <Loader2 className="animate-spin" size={18} /> : <Trash2 size={18} />}
                           </button>
                         )}
                         
@@ -302,13 +337,13 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
                   <select 
                     value={newCategory}
                     onChange={e => setNewCategory(e.target.value)}
-                    className="w-full bg-iron-950 border border-white/10 rounded-2xl p-4 pr-10 text-white font-medium appearance-none focus:border-brand-orange outline-none"
+                    className="select select-lg min-h-16 w-full rounded-2xl border border-white/10 bg-iron-950 px-5 pr-12 text-lg font-semibold text-white appearance-none focus:border-brand-orange focus:outline-none"
                   >
                     {['Free Weights', 'Machines', 'Cables', 'Cardio', 'Bodyweight', 'Other'].map(c => (
                       <option key={c} value={c}>{c}</option>
                     ))}
                   </select>
-                  <ChevronLeft className="absolute right-4 top-1/2 -translate-y-1/2 rotate-[-90deg] text-zinc-600 pointer-events-none" size={16} />
+                  <ChevronLeft className="pointer-events-none absolute right-5 top-1/2 -translate-y-1/2 rotate-[-90deg] text-zinc-500" size={22} />
                 </div>
               </div>
 
@@ -319,7 +354,7 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
                     <select 
                       value={newTarget}
                       onChange={e => setNewTarget(e.target.value)}
-                      className="w-full bg-iron-950 border border-white/10 rounded-2xl p-4 pr-10 text-white font-medium appearance-none focus:border-brand-orange outline-none"
+                      className="select select-lg min-h-16 w-full rounded-2xl border border-white/10 bg-iron-950 px-5 pr-12 text-lg font-semibold text-white appearance-none focus:border-brand-orange focus:outline-none"
                     >
                       <option value="Chest">Chest</option>
                       <option value="Back">Back</option>
@@ -335,7 +370,7 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
                       <option value="Full Body">Full Body</option>
                       <option value="Other">Other</option>
                     </select>
-                    <ChevronLeft className="absolute right-4 top-1/2 -translate-y-1/2 rotate-[-90deg] text-zinc-600 pointer-events-none" size={16} />
+                    <ChevronLeft className="pointer-events-none absolute right-5 top-1/2 -translate-y-1/2 rotate-[-90deg] text-zinc-500" size={22} />
                   </div>
                 </div>
               )}
@@ -380,18 +415,21 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
               </div>
             )}
 
+            {formError && <p role="alert" className="text-sm font-medium text-error">{formError}</p>}
+            {formSuccess && <p role="status" className="text-sm font-medium text-success">{formSuccess}</p>}
+
             {/* Action Button */}
             <button
               onClick={handleCreate}
-              disabled={loading || !newName}
+              disabled={isSubmitting || !newName.trim()}
               className={cn(
                 "w-full py-5 rounded-2xl font-black text-lg uppercase tracking-wide transition-all shadow-xl mt-8",
-                !newName || loading
+                !newName.trim() || isSubmitting
                   ? "bg-zinc-800 text-zinc-500 cursor-not-allowed"
                   : "bg-brand-orange text-white hover:bg-orange-500 active:scale-[0.98] shadow-brand-orange/20"
               )}
             >
-              {loading ? (
+              {isSubmitting ? (
                 <div className="flex items-center justify-center gap-2">
                   <Loader2 className="animate-spin" size={24} /> 
                   <span>Saving...</span>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { workoutService } from '../services/workoutService';
 import { exerciseService } from '../services/exerciseService';
@@ -199,54 +199,62 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
     previousBest: historySet?.weight ?? undefined 
   });
 
-  const addExercise = async (exDef: Exercise) => {
+  const addExercise = (exDef: Exercise) => {
     if (!resolvedWorkout) return;
-    
     setExerciseDefs(prev => new Map(prev).set(exDef.id, exDef));
-
-    const [lastLog, prValue] = await Promise.all([
-      workoutService.getLastLog(exDef.id),
-      workoutService.getPersonalRecord(exDef.id)
-    ]);
-    
-    const ghostSets = lastLog?.sets || [];
-
-    setHistoryCache(prev => new Map(prev).set(exDef.id, ghostSets));
-    setPrCache(prev => new Map(prev).set(exDef.id, prValue));
-
-    // SMART SET GENERATION: Copy exact structure (Warmups, Dropsets, etc.)
-    let initialSets: ExerciseSet[] = [];
-
-    if (ghostSets.length > 0) {
-      const idMap = new Map<string, string>(); 
-      initialSets = ghostSets.map(ghost => {
-        const newId = uuidv4();
-        idMap.set(ghost.id, newId);
-
-        return {
-          id: newId,
-          type: ghost.type,
-          weight: null,     
-          reps: null,       
-          repsLeft: null,
-          repsRight: null,
-          isCompleted: false,
-          previousBest: ghost.weight || undefined,
-          parentSetId: ghost.parentSetId ? idMap.get(ghost.parentSetId) : undefined
-        };
-      });
-    } else {
-      initialSets = [createSet()];
-    }
 
     const newExercise: WorkoutExercise = {
       id: uuidv4(),
       exerciseId: exDef.id,
-      sets: initialSets
+      sets: [createSet()]
     };
 
     setWorkout(prev => prev ? ({...prev, exercises: [...prev.exercises, newExercise]}) : null);
+
+    // PR data is independent of ghost-set hydration and can load in the background.
+    void workoutService.getPersonalRecord(exDef.id).then(prValue => {
+      setPrCache(prev => new Map(prev).set(exDef.id, prValue));
+    });
   };
+
+  const hydrateExerciseGhostSets = useCallback((
+    workoutExerciseId: string,
+    exerciseId: string,
+    ghostSets: ExerciseSet[]
+  ) => {
+    setHistoryCache(prev => new Map(prev).set(exerciseId, ghostSets));
+    if (ghostSets.length === 0) return;
+
+    setWorkout(prev => {
+      if (!prev) return null;
+      const exerciseIndex = prev.exercises.findIndex(exercise => exercise.id === workoutExerciseId);
+      if (exerciseIndex < 0) return prev;
+      const current = prev.exercises[exerciseIndex];
+      const onlyUntouchedDefault = current.sets.length === 1
+        && !current.sets[0].isCompleted
+        && current.sets[0].weight === null
+        && current.sets[0].reps === null
+        && current.sets[0].distance === null
+        && current.sets[0].durationSeconds === null;
+      if (!onlyUntouchedDefault) return prev;
+
+      const ids = new Map<string, string>();
+      const hydratedSets = ghostSets.map(ghost => {
+        const id = uuidv4();
+        ids.set(ghost.id, id);
+        return {
+          ...createSet(ghost),
+          id,
+          type: ghost.type,
+          previousBest: ghost.weight ?? undefined,
+          parentSetId: ghost.parentSetId ? ids.get(ghost.parentSetId) : undefined
+        };
+      });
+      const exercises = [...prev.exercises];
+      exercises[exerciseIndex] = { ...current, sets: hydratedSets };
+      return { ...prev, exercises };
+    });
+  }, []);
 
   const removeExercise = (index: number) => {
     setWorkout(prev => {
@@ -297,7 +305,7 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
       workout: resolvedWorkout, elapsed, isActive: !!resolvedWorkout, 
       historyCache, prCache,
       startWorkout, logRestDay, cancelWorkout, finishWorkout,
-      addExercise, removeExercise, addSet, removeSet, updateSet,
+      addExercise, hydrateExerciseGhostSets, removeExercise, addSet, removeSet, updateSet,
       exerciseDefs,
       restTimer: { ...restTimerState, prefs: restTimerPrefs },
       openRestTimer, closeRestTimer, dockRestTimer, undockRestTimer, updateRestTimerPref
