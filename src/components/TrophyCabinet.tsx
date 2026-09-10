@@ -127,33 +127,62 @@ const RANK_STYLES: Record<TrophyRank, RankStyle> = {
     rankLabel: 'PLATINUM MAX',
   },
   diamond: {
-    cardBg: 'bg-gradient-to-b from-cyan-950/30 to-black',
-    cardBorder: 'border-cyan-400/60',
-    badgeBg: 'bg-cyan-900/50',
-    badgeText: 'text-cyan-300',
-    glowShadow: 'shadow-[0_0_20px_rgba(6,182,212,0.3)]',
-    progressBar: 'bg-cyan-400',
+    cardBg: 'bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-sky-300/20 via-blue-900/40 to-black backdrop-blur-md',
+    cardBorder: 'border-sky-300/50',
+    badgeBg: 'bg-sky-950',
+    badgeText: 'text-sky-100 drop-shadow-[0_0_8px_rgba(186,230,253,0.8)]',
+    glowShadow: 'shadow-[0_0_25px_rgba(56,189,248,0.25)]',
+    progressBar: 'bg-gradient-to-r from-sky-500 to-blue-300',
     rankLabel: 'DIAMOND',
   },
   obsidian: {
-    cardBg: 'bg-gradient-to-b from-cyan-950/30 to-black',
-    cardBorder: 'border-cyan-400/60',
-    badgeBg: 'bg-cyan-900/50',
-    badgeText: 'text-cyan-300',
-    glowShadow: 'shadow-[0_0_20px_rgba(6,182,212,0.3)]',
-    progressBar: 'bg-cyan-400',
+    cardBg: 'bg-gradient-to-br from-purple-950/80 via-zinc-900 to-black',
+    cardBorder: 'border-purple-600/50',
+    badgeBg: 'bg-purple-900/80',
+    badgeText: 'text-purple-300 drop-shadow-[0_0_8px_rgba(216,180,254,0.7)]',
+    glowShadow: 'shadow-[0_0_25px_rgba(147,51,234,0.3)]',
+    progressBar: 'bg-purple-500',
     rankLabel: 'OBSIDIAN',
   },
   elite: {
-    cardBg: 'bg-gradient-to-b from-cyan-950/30 to-black',
-    cardBorder: 'border-cyan-400/60',
-    badgeBg: 'bg-cyan-900/50',
-    badgeText: 'text-cyan-300',
-    glowShadow: 'shadow-[0_0_20px_rgba(6,182,212,0.3)]',
-    progressBar: 'bg-cyan-400',
+    cardBg: 'bg-black elite-border-rainbow',
+    cardBorder: 'border-transparent',
+    badgeBg: 'elite-bg-rainbow shadow-[0_0_15px_rgba(255,255,255,0.2)]',
+    badgeText: 'text-white font-black',
+    glowShadow: 'shadow-[0_0_30px_rgba(255,255,255,0.1)]',
+    progressBar: 'elite-bg-rainbow',
     rankLabel: 'ELITE',
   },
 };
+
+const eliteStyles = `
+@keyframes elite-rainbow-bg {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.elite-bg-rainbow {
+  background: linear-gradient(90deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3, #ff0000);
+  background-size: 200% 100%;
+  animation: elite-rainbow-bg 3s linear infinite;
+}
+.elite-border-rainbow {
+  position: relative;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+.elite-border-rainbow::before {
+  content: '';
+  position: absolute;
+  top: 0; right: 0; bottom: 0; left: 0;
+  z-index: -1;
+  margin: -1px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3, #ff0000);
+  background-size: 200% 100%;
+  animation: elite-rainbow-bg 3s linear infinite;
+}
+`;
 
 // ─── Rank Badge ───────────────────────────────────────────────────────────
 
@@ -206,9 +235,9 @@ const TrophyCard = ({ trophy, onTap }: TrophyCardProps) => {
               trophy.rank.includes('silver') ? '#94a3b8' :
               trophy.rank.includes('gold') ? '#eab308' :
               trophy.rank.includes('platinum') ? '#22d3ee' :
-              trophy.rank === 'diamond' ? '#a78bfa' : 
-              trophy.rank === 'obsidian' ? '#d946ef' : 
-              trophy.rank === 'elite' ? '#06b6d4' : '#d946ef'
+              trophy.rank === 'diamond' ? '#38bdf8' : 
+              trophy.rank === 'obsidian' ? '#a855f7' : 
+              trophy.rank === 'elite' ? '#ef4444' : '#d946ef'
           }}
         />
       )}
@@ -399,7 +428,7 @@ const LadderModal = ({ trophy, onClose }: LadderModalProps) => {
 
                   {/* Rank badge */}
                   <span className={cn(
-                    'text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full shrink-0',
+                    'inline-block w-[90px] text-center text-[8px] font-black uppercase tracking-widest py-0.5 rounded-full shrink-0',
                     tierStyle.badgeBg,
                     tierStyle.badgeText
                   )}>
@@ -429,6 +458,7 @@ export const TrophyCabinet = ({ trophies, isReadOnly = false }: TrophyCabinetPro
 
   return (
     <>
+      <style>{eliteStyles}</style>
       <div className="pt-2">
         {/* Open Header */}
         <div className="flex items-center justify-between px-1 mb-4">

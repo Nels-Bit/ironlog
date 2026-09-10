@@ -26,16 +26,7 @@ export const Alerts = () => {
     loadNotifications();
   }, []);
 
-  const handleMarkRead = async (notificationId: string) => {
-    try {
-      await socialService.markNotificationAsRead(notificationId);
-      setNotifications((current) =>
-        current.map((item) => item.id === notificationId ? { ...item, readAt: Date.now() } : item)
-      );
-    } catch (markError) {
-      console.error(markError);
-    }
-  };
+
 
   const handleMarkAllRead = async () => {
     try {
@@ -56,19 +47,18 @@ export const Alerts = () => {
 
   const unreadCount = notifications.filter((item) => item.readAt === null).length;
 
-  const renderAlertIcon = (type: NotificationItem['type'], isRead: boolean) => {
-    const iconColor = isRead ? "text-neutral-500" : "text-neutral-300";
+  const renderAlertIcon = (type: NotificationItem['type']) => {
     switch (type) {
       case 'achievement_unlocked':
-        return <Trophy size={18} className={iconColor} />;
+        return <Trophy size={18} className="text-yellow-500" />;
       case 'workout_completed':
-        return <Zap size={18} className={iconColor} />;
+        return <Zap size={18} className="text-orange-500" />;
       case 'friend_request_accepted':
-        return <CheckCircle size={18} className={iconColor} />;
+        return <CheckCircle size={18} className="text-emerald-500" />;
       case 'friend_request':
-        return <UserPlus size={18} className={iconColor} />;
+        return <UserPlus size={18} className="text-blue-400" />;
       default:
-        return <Bell size={18} className={iconColor} />;
+        return <Bell size={18} className="text-neutral-400" />;
     }
   };
 
@@ -94,7 +84,7 @@ export const Alerts = () => {
       const workoutName = notification.payload?.workoutName || 'a workout';
       return (
         <p className={`text-sm ${eventColor} leading-snug`}>
-          {friendNameEl} logged a new workout: <span className={`font-medium ${highlightColor}`}>{String(workoutName)}</span>
+          {friendNameEl} logged: <span className={`font-medium ${highlightColor}`}>{String(workoutName)}</span>
         </p>
       );
     }
@@ -110,7 +100,7 @@ export const Alerts = () => {
     if (notification.type === 'friend_request_accepted') {
       return (
         <p className={`text-sm ${eventColor} leading-snug`}>
-          {friendNameEl} accepted your friend request.
+          {friendNameEl} is now your friend.
         </p>
       );
     }
@@ -130,27 +120,11 @@ export const Alerts = () => {
     return `${Math.floor(diff / 86400)}d ago`;
   };
 
-  const injectMocks = () => {
-    const mockAlerts: NotificationItem[] = [
-      { id: `mock-1-${Date.now()}`, type: 'friend_request_accepted', message: 'accepted your friend request.', createdAt: Date.now(), readAt: null, actor: { authUserId: 'm1', userId: 'm1', name: 'Bryanna', isPublic: true } },
-      { id: `mock-2-${Date.now()}`, type: 'workout_completed', message: 'completed a workout: Heavy Push Day.', createdAt: Date.now() - 3600000, readAt: null, actor: { authUserId: 'm2', userId: 'm2', name: 'Gabriel', isPublic: true }, payload: { workoutName: 'Heavy Push Day' } },
-      { id: `mock-3-${Date.now()}`, type: 'achievement_unlocked', message: 'unlocked the Silver MAX Bench Press trophy!', createdAt: Date.now() - 86400000, readAt: Date.now(), actor: { authUserId: 'm3', userId: 'm3', name: 'Milagrosa', isPublic: true }, payload: { achievementName: 'Silver MAX Bench Press trophy' } },
-      { id: `mock-4-${Date.now()}`, type: 'achievement_unlocked', message: 'reached Level 20!', createdAt: Date.now() - 172800000, readAt: Date.now(), actor: { authUserId: 'm2', userId: 'm2', name: 'Gabriel', isPublic: true }, payload: { achievementName: 'Level 20' } },
-    ];
-    setNotifications((prev) => [...mockAlerts, ...prev]);
-  };
-
   return (
     <div className="min-h-screen bg-black pb-32 animate-in fade-in duration-500">
       <header className="flex justify-between items-center px-4 py-3 border-b border-white/10 sticky top-0 z-50 bg-black/80 backdrop-blur-md">
         <h1 className="text-xl font-bold text-white tracking-tight">Alerts</h1>
         <div className="flex gap-2 items-center">
-          <button
-            className="btn btn-ghost btn-xs text-neutral-400 hover:text-white hover:bg-white/10 font-semibold tracking-wide"
-            onClick={injectMocks}
-          >
-            Test UI
-          </button>
           <button
             className="btn btn-ghost btn-xs text-white hover:bg-white/10 font-semibold tracking-wide disabled:opacity-50 disabled:bg-transparent"
             onClick={handleMarkAllRead}
@@ -181,15 +155,12 @@ export const Alerts = () => {
                 <div
                   key={notification.id}
                   className={cn(
-                    "flex gap-3 px-4 py-4 border-b border-white/5 transition-colors items-center cursor-pointer",
+                    "flex gap-3 px-4 py-4 border-b border-white/5 items-center cursor-default",
                     !isRead ? 'bg-neutral-800' : 'bg-neutral-950/40 opacity-60'
                   )}
-                  onClick={() => {
-                    if (!isRead) handleMarkRead(notification.id);
-                  }}
                 >
                   <div className="shrink-0 w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 object-cover overflow-hidden">
-                    {renderAlertIcon(notification.type, isRead)}
+                    {renderAlertIcon(notification.type)}
                   </div>
                   
                   <div className="flex-1 min-w-0 flex flex-col justify-center">

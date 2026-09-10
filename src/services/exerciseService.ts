@@ -62,7 +62,7 @@ export const exerciseService = {
         user_id: user.id, // Link to user
         name,
         category: ex.category,
-        target_muscle: isCardio ? null : (ex.target || null),
+        target_muscle: isCardio ? 'Cardio' : (ex.target || 'Other'),
         is_unilateral: isCardio ? false : (ex.isUnilateral ?? false)
       })
       .select()
