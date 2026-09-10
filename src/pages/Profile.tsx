@@ -65,6 +65,41 @@ export const Profile = () => {
   }, [searchParams]);
 
   useEffect(() => {
+    // Stale-While-Revalidate: Load cached data immediately to skip the skeleton
+    const cachedProfile = localStorage.getItem('profile_cache_user');
+    const cachedXP = localStorage.getItem('profile_cache_xp');
+    const cachedTrophies = localStorage.getItem('profile_cache_trophies');
+    const cachedHistory = localStorage.getItem('profile_cache_history');
+    const cachedFriends = localStorage.getItem('profile_cache_friends');
+
+    if (cachedProfile && cachedXP && cachedTrophies && cachedHistory) {
+      try {
+        const p = JSON.parse(cachedProfile);
+        setProfile(p);
+        setXpResult(JSON.parse(cachedXP));
+        setTrophies(JSON.parse(cachedTrophies));
+        setWorkoutHistory(JSON.parse(cachedHistory));
+        if (cachedFriends) setFriends(JSON.parse(cachedFriends));
+        
+        setFormData({
+          name: p.name,
+          isPublic: p.isPublic,
+          weight: p.weight,
+          age: p.age,
+          goal: p.goal,
+          level: p.level,
+          environment: p.environment
+        });
+        const { feet, inches } = splitHeight(p.height);
+        setHeightFeet(feet ? String(feet) : '');
+        setHeightInches(inches ? String(inches) : '');
+        
+        setLoading(false); // Instantly render page with stale data
+      } catch (e) {
+        // Ignore cache parsing errors
+      }
+    }
+
     loadData();
   }, []);
 
@@ -97,7 +132,25 @@ export const Profile = () => {
 
   const loadData = async () => {
     try {
-      const user = await authService.getUser();
+      // Fetch everything concurrently to dramatically reduce load time
+      const [
+        user,
+        history,
+        allExercises,
+        [friendsData, incoming, outgoing, socialErr]
+      ] = await Promise.all([
+        authService.getUser(),
+        workoutService.getHistory(),
+        exerciseService.getAllExercises(),
+        Promise.all([
+          socialService.getFriendsWithStats(),
+          socialService.getIncomingFriendRequests(),
+          socialService.getOutgoingFriendRequests()
+        ])
+          .then(([f, i, o]) => [f, i, o, null] as [FriendWithStats[], FriendRequest[], FriendRequest[], string | null])
+          .catch(e => [[], [], [], e instanceof Error ? e.message : 'Social features are unavailable.'] as [FriendWithStats[], FriendRequest[], FriendRequest[], string | null])
+      ]);
+
       if (user) {
         setProfile(user);
         setFormData({
@@ -114,14 +167,12 @@ export const Profile = () => {
         setHeightInches(inches ? String(inches) : '');
       }
 
-      const history = await workoutService.getHistory();
       const activeWorkouts = history.filter(session => !isRestDaySession(session));
       setWorkoutHistory(history);
       const activeWorkoutsAscending = [...activeWorkouts].sort((a, b) => a.startTime - b.startTime);
       const prs = await statsUtils.calculatePRs(activeWorkouts);
 
       // XP replay: load exercise defs and compute total XP from history
-      const allExercises = await exerciseService.getAllExercises();
       const defMap = new Map<string, Exercise>(allExercises.map(e => [e.id, e]));
       const userWeight = parseUserWeight(user?.weight);
       const xp = replayAllXP(history, defMap, userWeight);
@@ -136,20 +187,17 @@ export const Profile = () => {
         xpBreakdowns: xp.breakdowns,
       });
       setTrophies(cabinet);
+      setFriends(friendsData);
+      setIncomingRequests(incoming);
+      setOutgoingRequests(outgoing);
+      setSocialError(socialErr);
 
-      try {
-        const [friendsData, incoming, outgoing] = await Promise.all([
-          socialService.getFriendsWithStats(),
-          socialService.getIncomingFriendRequests(),
-          socialService.getOutgoingFriendRequests()
-        ]);
-        setFriends(friendsData);
-        setIncomingRequests(incoming);
-        setOutgoingRequests(outgoing);
-        setSocialError(null);
-      } catch (error) {
-        setSocialError(error instanceof Error ? error.message : 'Social features are unavailable.');
-      }
+      // Save to cache for instant loading next time (Stale-While-Revalidate)
+      if (user) localStorage.setItem('profile_cache_user', JSON.stringify(user));
+      localStorage.setItem('profile_cache_xp', JSON.stringify(xp));
+      localStorage.setItem('profile_cache_trophies', JSON.stringify(cabinet));
+      localStorage.setItem('profile_cache_history', JSON.stringify(history));
+      localStorage.setItem('profile_cache_friends', JSON.stringify(friendsData));
     } catch (error) {
       console.error(error);
     } finally {
