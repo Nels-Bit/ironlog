@@ -1,10 +1,11 @@
 import { supabase } from '../lib/supabase';
 import { exerciseService } from './exerciseService';
-import { getLevelProgress, calculateWorkoutStreak, calculateStrengthAchievements } from '../utils/achievementUtils';
+import { calculateWorkoutStreak, calculateStrengthAchievements } from '../utils/achievementUtils';
 import { replayAllXP } from '../utils/xpEngine';
 import { parseUserWeight } from '../utils/workoutMath';
-import { calculateTrophyCabinet, getRankLabel } from '../utils/gamification';
-import { statsUtils } from '../utils/statsUtils';
+import { calculateTrophyCabinet } from '../utils/gamification';
+import { buildFriendMilestoneEvents, countPersonalRecords } from '../utils/friendMilestones';
+import { getWorkoutExercises } from './workoutService';
 import type { FriendRequest, FriendSummary, FriendWithStats, NotificationItem, SocialProfile, FriendProfileData, WorkoutSession, UserProfile, Exercise } from '../types';
 
 type UserProfileRow = {
@@ -32,6 +33,10 @@ type NotificationRow = {
   payload: Record<string, unknown> | null;
   read_at: string | null;
   created_at: string;
+};
+
+type NotificationInsert = Omit<NotificationRow, 'id' | 'created_at' | 'read_at'> & {
+  event_key: string;
 };
 
 const isMissingSocialSchemaError = (error: { message?: string } | null): boolean => {
@@ -162,13 +167,15 @@ export const socialService = {
       throw new Error('You cannot send a friend request to yourself.');
     }
 
-    const { error } = await supabase
+    const { data: friendship, error } = await supabase
       .from('friendships')
       .insert({
         requester_id: selfProfile.user_id,
         addressee_id: typedTarget.user_id,
         status: 'pending'
-      });
+      })
+      .select('id')
+      .single();
 
     if (error) throw error;
 
@@ -178,6 +185,7 @@ export const socialService = {
         recipient_id: typedTarget.user_id,
         actor_id: selfProfile.user_id,
         type: 'friend_request',
+        event_key: `friend-request:${friendship.id}`,
         message: `${selfProfile.display_name} sent you a friend request.`,
         payload: { userId: selfProfile.user_code }
       });
@@ -251,6 +259,7 @@ export const socialService = {
           recipient_id: typedRequest.requester_id,
           actor_id: currentUserId,
           type: 'friend_request_accepted',
+          event_key: `friend-accepted:${typedRequest.id}`,
           message: `${actorName} accepted your friend request.`,
           payload: { friendshipId: typedRequest.id }
         });
@@ -473,8 +482,7 @@ export const socialService = {
     const totalVolume = history.reduce((sum, w) => sum + w.volumeLoad, 0);
 
     // Compute PRs count for PR Hunter trophy
-    const prs = await statsUtils.calculatePRs(history);
-    const prCount = prs.length;
+    const prCount = countPersonalRecords(history, defMap, userWeight);
 
     // Compute the Trophy Cabinet
     const activeHistory = history.filter(w => !w.name.toLowerCase().includes('rest day'));
@@ -516,8 +524,22 @@ export const socialService = {
     };
   },
 
-  async dispatchFriendMilestones(workoutId: string): Promise<void> {
-    try {
+  async subscribeToNotifications(onNotification: () => void): Promise<() => void> {
+    const currentUserId = await getCurrentAuthUserId();
+    const channel = supabase
+      .channel(`notifications:${currentUserId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+        filter: `recipient_id=eq.${currentUserId}`
+      }, onNotification)
+      .subscribe();
+
+    return () => { void supabase.removeChannel(channel); };
+  },
+
+  async dispatchFriendMilestones(workoutId: string): Promise<{ recipients: number; notifications: number }> {
       const currentAuthId = await getCurrentAuthUserId();
 
       // 1. Get history and this workout
@@ -527,7 +549,8 @@ export const socialService = {
         .eq('user_id', currentAuthId)
         .order('start_time', { ascending: true });
 
-      if (workoutsError || !workoutsData) return;
+      if (workoutsError) throw workoutsError;
+      if (!workoutsData) throw new Error('Unable to load workouts for notification dispatch.');
 
       const history: WorkoutSession[] = workoutsData.map(w => ({
         id: w.id,
@@ -535,117 +558,88 @@ export const socialService = {
         startTime: w.start_time,
         endTime: w.end_time || undefined,
         volumeLoad: w.volume_load,
-        exercises: Array.isArray(w.exercises) ? (w.exercises as import('../types').WorkoutExercise[]) : [],
+        exercises: getWorkoutExercises(w.exercises),
         bodyWeight: w.body_weight || undefined
       }));
 
       const allExercises = await exerciseService.getAllExercises();
       const defMap = new Map<string, Exercise>(allExercises.map(e => [e.id, e]));
       
-      const { data: myProfileData } = await supabase.from('user_profiles').select('*').eq('user_id', currentAuthId).single();
-      if (!myProfileData) return;
+      const { data: myProfileData, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('display_name, user_code, weight')
+        .eq('user_id', currentAuthId)
+        .single();
+      if (profileError) throw profileError;
+      if (!myProfileData) throw new Error('Unable to load the current social profile.');
 
       const userWeight = parseUserWeight(myProfileData.weight);
 
       // 2. XP & Level before vs after
-      const historyBefore = history.filter(w => w.id !== workoutId && w.startTime <= history.find(hw => hw.id === workoutId)!.startTime);
-      const historyAfter = history.filter(w => w.startTime <= history.find(hw => hw.id === workoutId)!.startTime);
+      const savedWorkout = history.find(workout => workout.id === workoutId);
+      if (!savedWorkout) throw new Error('The saved workout was not found for notification dispatch.');
+      const historyBefore = history.filter(workout => workout.id !== workoutId && workout.startTime <= savedWorkout.startTime);
+      const historyAfter = history.filter(workout => workout.startTime <= savedWorkout.startTime);
 
       const xpBefore = replayAllXP(historyBefore, defMap, userWeight);
       const xpAfter = replayAllXP(historyAfter, defMap, userWeight);
 
-      const levelBefore = getLevelProgress(xpBefore.totalXP).currentLevel;
-      const levelAfter = getLevelProgress(xpAfter.totalXP).currentLevel;
-
-      // 3. Trophies before vs after
-      const prsBefore = await statsUtils.calculatePRs(historyBefore);
-      const prsAfter = await statsUtils.calculatePRs(historyAfter);
-
-      const cabinetBefore = calculateTrophyCabinet({
-        history: historyBefore.filter(w => !w.name.toLowerCase().includes('rest day')),
+      const milestoneEvents = buildFriendMilestoneEvents({
+        workoutId,
+        historyBefore,
+        historyAfter,
         exerciseDefs: defMap,
-        totalXP: xpBefore.totalXP,
-        prCount: prsBefore.length,
-        xpBreakdowns: xpBefore.breakdowns,
-      });
-
-      const cabinetAfter = calculateTrophyCabinet({
-        history: historyAfter.filter(w => !w.name.toLowerCase().includes('rest day')),
-        exerciseDefs: defMap,
-        totalXP: xpAfter.totalXP,
-        prCount: prsAfter.length,
-        xpBreakdowns: xpAfter.breakdowns,
-      });
-
-      const newlyUnlockedTrophies: { label: string }[] = [];
-      cabinetAfter.forEach(afterTrophy => {
-        const beforeTrophy = cabinetBefore.find(t => t.category === afterTrophy.category);
-        const unlockedAfter = afterTrophy.tiers.filter(t => t.unlocked).length;
-        const unlockedBefore = beforeTrophy ? beforeTrophy.tiers.filter(t => t.unlocked).length : 0;
-        
-        if (unlockedAfter > unlockedBefore && afterTrophy.rank !== 'locked') {
-           const rankLabel = getRankLabel(afterTrophy.rank);
-           newlyUnlockedTrophies.push({ label: `${rankLabel} ${afterTrophy.categoryLabel}` });
-        }
+        totalXPBefore: xpBefore.totalXP,
+        totalXPAfter: xpAfter.totalXP,
+        prCountBefore: countPersonalRecords(historyBefore, defMap, userWeight),
+        prCountAfter: countPersonalRecords(historyAfter, defMap, userWeight)
       });
 
       // 4. Find friends
-      const { data: friendsData } = await supabase
+      const { data: friendsData, error: friendsError } = await supabase
         .from('friendships')
         .select('requester_id, addressee_id')
         .eq('status', 'accepted')
         .or(`requester_id.eq.${currentAuthId},addressee_id.eq.${currentAuthId}`);
       
-      if (!friendsData || friendsData.length === 0) return;
+      if (friendsError) throw friendsError;
+      if (!friendsData || friendsData.length === 0) return { recipients: 0, notifications: 0 };
       const friendIds = friendsData.map(f => f.requester_id === currentAuthId ? f.addressee_id : f.requester_id);
 
       // 5. Dispatch
-      const notifications: Omit<NotificationRow, 'id' | 'created_at' | 'read_at'>[] = [];
-      const thisWorkout = history.find(w => w.id === workoutId);
-      const workoutName = thisWorkout?.name || 'a workout';
+      const notifications: NotificationInsert[] = [];
+      const workoutName = savedWorkout.name || 'a workout';
 
       friendIds.forEach(fId => {
-        // Workout Completed
-        notifications.push({
-          recipient_id: fId,
-          actor_id: currentAuthId,
-          type: 'workout_completed',
-          message: `${myProfileData.display_name} logged a new workout: ${workoutName}`,
-          payload: { workoutName, userId: myProfileData.user_code }
-        });
-
-        // Level Up
-        if (levelAfter > levelBefore) {
-          notifications.push({
-            recipient_id: fId,
-            actor_id: currentAuthId,
-            type: 'achievement_unlocked',
-            message: `${myProfileData.display_name} reached Level ${levelAfter}!`,
-            payload: { achievementName: `Level ${levelAfter}`, userId: myProfileData.user_code }
-          });
-        }
-
-        // Trophies
-        newlyUnlockedTrophies.forEach(ach => {
-          notifications.push({
-            recipient_id: fId,
-            actor_id: currentAuthId,
-            type: 'achievement_unlocked',
-            message: `${myProfileData.display_name} unlocked the ${ach.label} trophy!`,
-            payload: { achievementName: `${ach.label} Trophy`, userId: myProfileData.user_code }
-          });
+        milestoneEvents.forEach(event => {
+          if (event.kind === 'workout_completed') {
+            notifications.push({
+              recipient_id: fId,
+              actor_id: currentAuthId,
+              type: 'workout_completed',
+              event_key: event.eventKey,
+              message: `${myProfileData.display_name} logged a new workout: ${workoutName}`,
+              payload: { workoutName, userId: myProfileData.user_code }
+            });
+          } else {
+            notifications.push({
+              recipient_id: fId,
+              actor_id: currentAuthId,
+              type: 'achievement_unlocked',
+              event_key: event.eventKey,
+              message: `${myProfileData.display_name} unlocked ${event.achievementName}!`,
+              payload: { achievementName: event.achievementName, userId: myProfileData.user_code }
+            });
+          }
         });
       });
 
       if (notifications.length > 0) {
-        await supabase.from('notifications').insert(notifications);
-        
-        // Trim notifications to top 20 for these recipients
-        // Actually it's complex to do for all friends in one query here,
-        // so we could either rely on a DB trigger or just let the fetch query limit handle the UI side.
+        const { error: notificationError } = await supabase
+          .from('notifications')
+          .upsert(notifications, { onConflict: 'recipient_id,event_key', ignoreDuplicates: true });
+        if (notificationError) throw notificationError;
       }
-    } catch (err) {
-      console.error('Error dispatching milestones', err);
-    }
+      return { recipients: friendIds.length, notifications: notifications.length };
   }
 };
