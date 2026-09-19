@@ -10,6 +10,8 @@ export const Alerts = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+    let cancelled = false;
     const loadNotifications = async () => {
       setLoading(true);
       setError(null);
@@ -23,7 +25,21 @@ export const Alerts = () => {
       }
     };
 
-    loadNotifications();
+    void loadNotifications();
+    void socialService.subscribeToNotifications(() => {
+      void loadNotifications();
+    }).then(stop => {
+      if (cancelled) stop();
+      else unsubscribe = stop;
+    }).catch(subscriptionError => {
+      // Alerts still work through their initial fetch if Realtime is unavailable.
+      console.error('Unable to subscribe to live alerts.', subscriptionError);
+    });
+
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
   }, []);
 
 

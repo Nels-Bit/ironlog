@@ -32,10 +32,21 @@ export const Navbar = () => {
 
     loadUnreadCount();
     const intervalId = window.setInterval(loadUnreadCount, 30_000);
+    let unsubscribe: (() => void) | undefined;
+    void socialService.subscribeToNotifications(() => {
+      void loadUnreadCount();
+    }).then(stop => {
+      if (isMounted) unsubscribe = stop;
+      else stop();
+    }).catch(error => {
+      // Polling remains the fallback when Realtime is unavailable.
+      console.error('Failed to subscribe to unread notifications.', error);
+    });
 
     return () => {
       isMounted = false;
       window.clearInterval(intervalId);
+      unsubscribe?.();
     };
   }, []);
 

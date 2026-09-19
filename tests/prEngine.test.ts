@@ -38,12 +38,12 @@ describe('PR Engine: Multi-Type Set Ingestion', () => {
       expect(isEligibleForPR('drop')).toBe(true);
     });
 
-    it('excludes warmup sets from PR calculation', () => {
-      expect(isEligibleForPR('warmup')).toBe(false);
+    it('evaluates warmup sets as eligible', () => {
+      expect(isEligibleForPR('warmup')).toBe(true);
     });
 
-    it('excludes secondary drop sets (dropset_child) from PR calculation', () => {
-      expect(isEligibleForPR('dropset_child')).toBe(false);
+    it('evaluates secondary drop sets as eligible', () => {
+      expect(isEligibleForPR('dropset_child')).toBe(true);
     });
 
     it('gracefully defaults legacy rows with null or undefined set_type to normal', () => {
@@ -76,7 +76,7 @@ describe('PR Engine: Multi-Type Set Ingestion', () => {
       expect(shouldCountSetForPR(set, benchPress)).toBe(true);
     });
 
-    it('rejects warmup sets even with high weight', () => {
+    it('accepts completed warmup sets with valid weight and reps', () => {
       const set: ExerciseSet = {
         id: 's3',
         type: 'warmup',
@@ -84,10 +84,10 @@ describe('PR Engine: Multi-Type Set Ingestion', () => {
         reps: 5,
         isCompleted: true
       };
-      expect(shouldCountSetForPR(set, benchPress)).toBe(false);
+      expect(shouldCountSetForPR(set, benchPress)).toBe(true);
     });
 
-    it('rejects secondary drop sets (dropset_child)', () => {
+    it('accepts completed secondary drop sets', () => {
       const set: ExerciseSet = {
         id: 's4',
         type: 'dropset_child',
@@ -95,7 +95,7 @@ describe('PR Engine: Multi-Type Set Ingestion', () => {
         reps: 8,
         isCompleted: true
       };
-      expect(shouldCountSetForPR(set, benchPress)).toBe(false);
+      expect(shouldCountSetForPR(set, benchPress)).toBe(true);
     });
 
     it('rejects cardio exercises from strength PR evaluation', () => {
@@ -134,11 +134,11 @@ describe('PR Engine: Multi-Type Set Ingestion', () => {
       expect(currentPR).toBe(225);
     });
 
-    it('ignores a warmup set even if the weight exceeds the current PR', () => {
+    it('allows a warmup set to establish a higher PR', () => {
       let currentPR = 200;
 
       const setsInWorkout: ExerciseSet[] = [
-        { id: '1', type: 'warmup', weight: 275, reps: 1, isCompleted: true }, // Accidental high weight logged as warmup
+        { id: '1', type: 'warmup', weight: 275, reps: 1, isCompleted: true },
         { id: '2', type: 'normal', weight: 195, reps: 5, isCompleted: true }
       ];
 
@@ -151,16 +151,15 @@ describe('PR Engine: Multi-Type Set Ingestion', () => {
         }
       }
 
-      // PR remains 200 because 275 warmup was ignored and 195 < 200
-      expect(currentPR).toBe(200);
+      expect(currentPR).toBe(275);
     });
 
-    it('evaluates primary drop set weight but ignores child drop set weight', () => {
+    it('evaluates primary and child drop-set weights', () => {
       let currentPR = 200;
 
       const setsInWorkout: ExerciseSet[] = [
         { id: '1', type: 'dropset', weight: 215, reps: 6, isCompleted: true }, // Primary drop set (eligible)
-        { id: '2', type: 'dropset_child', weight: 165, reps: 8, isCompleted: true } // Secondary drop set (ignored)
+        { id: '2', type: 'dropset_child', weight: 225, reps: 8, isCompleted: true }
       ];
 
       for (const set of setsInWorkout) {
@@ -172,7 +171,7 @@ describe('PR Engine: Multi-Type Set Ingestion', () => {
         }
       }
 
-      expect(currentPR).toBe(215);
+      expect(currentPR).toBe(225);
     });
 
     it('evaluates legacy set with null/undefined set_type as normal', () => {
@@ -195,4 +194,3 @@ describe('PR Engine: Multi-Type Set Ingestion', () => {
     });
   });
 });
-
