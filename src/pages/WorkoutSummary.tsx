@@ -465,7 +465,7 @@ export const WorkoutSummary = () => {
               {/* Animated progress bar */}
               <div className="h-3 bg-black/50 rounded-full overflow-hidden border border-white/5 relative">
                 <motion.div
-                  className="h-full rounded-full bg-gradient-to-r from-red-600 to-orange-500 shadow-[0_0_12px_rgba(234,88,12,0.5)] relative overflow-hidden"
+                  className="h-full rounded-full bg-gradient-to-r from-brand-red to-brand-accent shadow-[0_0_12px_rgba(234,88,12,0.5)] relative overflow-hidden"
                   initial={{ width: `${prevProgress.progressPercent}%` }}
                   animate={{ width: `${targetPct}%` }}
                   transition={{ duration: 1.1, delay: 0.65, ease: [0.25, 0.46, 0.45, 0.94] }}

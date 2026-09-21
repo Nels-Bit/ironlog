@@ -368,7 +368,7 @@ export const Profile = () => {
 
                 {/* Athlete Identity (Centered) */}
                 <div className="flex flex-col items-center text-center relative z-10">
-                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-neutral-800 to-neutral-900 flex items-center justify-center text-4xl font-black text-white shrink-0 ring-2 ring-orange-500/30 ring-offset-2 ring-offset-black relative">
+                  <div className="w-24 h-24 rounded-full bg-gradient-to-br from-neutral-800 to-neutral-900 flex items-center justify-center text-4xl font-black text-white shrink-0 ring-2 ring-brand-accent/30 ring-offset-2 ring-offset-black relative">
                     {profile?.name?.charAt(0) || 'U'}
                     {currentLevel >= 5 && (
                       <div className="absolute -bottom-1 -right-1 bg-black rounded-full p-1">
@@ -382,7 +382,7 @@ export const Profile = () => {
                   </h2>
                   
                   {currentStreak > 0 && (
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-orange-400 bg-orange-500/10 px-2.5 py-0.5 rounded-full mt-1">
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-brand-accent bg-brand-accent/10 px-2.5 py-0.5 rounded-full mt-1">
                       🔥 {formatStreakLabel(currentStreak)} Streak
                     </span>
                   )}
@@ -418,7 +418,7 @@ export const Profile = () => {
                   </div>
                   <div className="h-1.5 w-full bg-neutral-800 rounded-full overflow-hidden">
                     <div 
-                      className="h-full bg-gradient-to-r from-orange-500 to-amber-400 transition-all duration-1000 ease-out relative"
+                      className="h-full bg-gradient-to-r from-brand-accent to-amber-400 transition-all duration-1000 ease-out relative"
                       style={{ width: `${progressPercent}%` }}
                     >
                       <div className="absolute inset-0 bg-white/20 animate-[shimmer_2s_infinite]" />
@@ -809,7 +809,7 @@ export const Profile = () => {
                       <button 
                         type="button"
                         onClick={() => navigate(`/friends/${friend.authUserId}`)}
-                        className="w-[130px] h-[48px] min-w-[130px] shrink-0 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs tracking-wider uppercase transition-all shadow-md shadow-orange-950/40 flex items-center justify-center"
+                        className="w-[130px] h-[48px] min-w-[130px] shrink-0 rounded-xl bg-brand-accent hover:bg-brand-orange text-white font-bold text-xs tracking-wider uppercase transition-all shadow-md shadow-orange-950/40 flex items-center justify-center"
                       >
                         View Profile
                       </button>

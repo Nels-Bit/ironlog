@@ -9,6 +9,10 @@ export const PR_BONUS = 85;
 export const NEW_EXERCISE_BONUS = 15;
 export const MAX_STREAK_MULTIPLIER = 1.30;
 export const STREAK_PER_DAY = 0.01;
+/** 2 XP per minute of cardio duration. Formula: (durationSeconds / 60) * 2 */
+export const CARDIO_XP_PER_MINUTE = 2;
+/** 20 XP per mile of cardio distance. Formula: distanceMiles * 20 */
+export const CARDIO_XP_PER_MILE = 20;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -17,6 +21,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export interface XPBreakdown {
   base: number;
   volume: number;
+  cardioXP: number;
   prCount: number;
   prBonus: number;
   newExerciseCount: number;
@@ -67,6 +72,42 @@ const normalizeDateKey = (value: number) =>
 export const getStreakMultiplier = (streakDays: number): number =>
   Math.min(1 + streakDays * STREAK_PER_DAY, MAX_STREAK_MULTIPLIER);
 
+/**
+ * Calculate XP from cardio sets in a workout.
+ *
+ * Duration: (durationSeconds / 60) * CARDIO_XP_PER_MINUTE (= 2 XP/min)
+ * Distance: distanceMiles * CARDIO_XP_PER_MILE (= 20 XP/mile)
+ * Both contribute when both are present. No rounding of inputs.
+ *
+ * ExerciseSet.distance is stored in miles (US-unit app).
+ * ExerciseSet.durationSeconds is stored in seconds and converted to minutes here.
+ *
+ * Only completed sets are counted. This function is idempotent — it derives XP
+ * purely from the saved workout data, so replaying the same workout always
+ * produces the same result with no risk of double-awarding.
+ */
+export const calculateCardioXP = (
+  workout: WorkoutSession,
+  exerciseDefs: Map<string, Exercise>
+): number => {
+  let rawCardioXP = 0;
+  for (const ex of workout.exercises) {
+    const def = exerciseDefs.get(ex.exerciseId);
+    if (!def || def.exerciseCategory !== 'cardio') continue;
+    for (const set of ex.sets) {
+      if (!set.isCompleted) continue;
+      if (set.durationSeconds != null && set.durationSeconds > 0) {
+        rawCardioXP += (set.durationSeconds / 60) * CARDIO_XP_PER_MINUTE;
+      }
+      if (set.distance != null && set.distance > 0) {
+        rawCardioXP += set.distance * CARDIO_XP_PER_MILE;
+      }
+    }
+  }
+  // Round the total, not the intermediate values, to preserve fractional accuracy
+  return Math.round(rawCardioXP);
+};
+
 // ─── Core: Single Workout XP ───────────────────────────────────────────────
 
 /**
@@ -82,8 +123,11 @@ export const calculateWorkoutXP = (
   // Base
   const base = BASE_XP;
 
-  // Volume: 2 XP per full 1,000 lbs moved
+  // Volume: 2 XP per full 1,000 lbs moved (strength volume only)
   const volume = Math.floor((workout.volumeLoad || 0) / 1000) * VOLUME_XP_PER_THOUSAND;
+
+  // Cardio XP: duration + distance for completed cardio sets
+  const cardioXP = calculateCardioXP(workout, exerciseDefs);
 
   // PR & New Exercise detection
   let prCount = 0;
@@ -121,7 +165,7 @@ export const calculateWorkoutXP = (
 
   const prBonus = prCount * PR_BONUS;
   const newExerciseBonus = newExerciseCount * NEW_EXERCISE_BONUS;
-  const rawXP = base + volume + prBonus + newExerciseBonus;
+  const rawXP = base + volume + cardioXP + prBonus + newExerciseBonus;
 
   // Streak multiplier
   const multiplier = getStreakMultiplier(streakDays);
@@ -131,6 +175,7 @@ export const calculateWorkoutXP = (
   return {
     base,
     volume,
+    cardioXP,
     prCount,
     prBonus,
     newExerciseCount,
