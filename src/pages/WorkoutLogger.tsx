@@ -29,16 +29,16 @@ import type { Exercise, ExerciseSet } from '../types';
 
 export const WorkoutLogger = () => {
   const navigate = useNavigate();
-  
+
   const blockInvalidNumberChars = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (['e', 'E', '+', '-'].includes(e.key)) {
       e.preventDefault();
     }
   };
 
-  const { 
-    workout, elapsed, isActive, historyCache, prCache,
-    startWorkout, logRestDay, cancelWorkout, finishWorkout, 
+  const {
+    workout, elapsed, isActive, historyCache, prCache, prCacheReady,
+    startWorkout, logRestDay, cancelWorkout, finishWorkout,
     addExercise, hydrateExerciseGhostSets, removeExercise, addSet, removeSet, updateSet, exerciseDefs
   } = useWorkout();
 
@@ -81,7 +81,7 @@ export const WorkoutLogger = () => {
       setCollapsed(allIds);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); 
+  }, []);
 
   const handleAddExercise = (ex: Exercise) => {
     // Collapse all existing exercises before adding the new one
@@ -94,10 +94,10 @@ export const WorkoutLogger = () => {
   };
 
   const handleFinish = async () => {
-    if(confirm("Finish workout?")) {
-        const id = await finishWorkout();
-        try { haptics.success(); } catch { /* ignore */ }
-        navigate(id ? `/summary/${id}` : '/profile');
+    if (confirm("Finish workout?")) {
+      const id = await finishWorkout();
+      try { haptics.success(); } catch { /* ignore */ }
+      navigate(id ? `/summary/${id}` : '/profile');
     }
   };
 
@@ -154,7 +154,7 @@ export const WorkoutLogger = () => {
   };
 
   const getTypeIcon = (type: ExerciseSet['type']) => {
-    switch(type) {
+    switch (type) {
       case 'warmup': return <Flame size={14} className="text-yellow-500" />;
       case 'dropset': return <ArrowDown size={14} className="text-zinc-400" />;
       case 'failure': return <Skull size={14} className="text-red-500" />;
@@ -232,7 +232,7 @@ export const WorkoutLogger = () => {
         updateSet(exIndex, setIndex, 'durationSeconds', ghostSet.durationSeconds);
       }
     }
-    
+
     // 2. Toggle Completion
     updateSet(exIndex, setIndex, 'isCompleted', isNowComplete);
 
@@ -257,39 +257,39 @@ export const WorkoutLogger = () => {
   // --- RENDER: ACTIVE LOGGER ---
   return (
     <div className="min-h-screen pb-48 animate-in fade-in duration-500 bg-black">
-      
+
       {/* HEADER */}
       <header className="sticky top-0 z-50 bg-iron-950/90 backdrop-blur-md border-b border-white/5 px-4 h-16 flex justify-between items-center shadow-2xl">
         <button onClick={handleCancel} className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 text-zinc-400 hover:text-red-500 transition-colors">
-            <X size={20} />
+          <X size={20} />
         </button>
 
         <div className="flex flex-col items-center">
-            <h1 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{workout.name}</h1>
-            <div className="font-mono text-xl font-black text-brand-orange tabular-nums leading-none">
-                {formatTime(elapsed)}
-            </div>
+          <h1 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{workout.name}</h1>
+          <div className="font-mono text-xl font-black text-brand-orange tabular-nums leading-none">
+            {formatTime(elapsed)}
+          </div>
         </div>
 
         <button onClick={handleFinish} className="w-10 h-10 flex items-center justify-center rounded-full bg-brand-orange text-white shadow-lg shadow-brand-orange/20 hover:scale-105 transition-transform">
-            <Save size={20} />
+          <Save size={20} />
         </button>
       </header>
 
       {/* WORKOUT LIST */}
       <div className="p-4 space-y-4 max-w-3xl mx-auto">
-        
+
         {/* EMPTY STATE */}
-          {workout.exercises.length === 0 ? (
-            <button 
-              onClick={() => setIsSelectorOpen(true)}
-              className="w-full text-center py-16 px-6 rounded-3xl border-2 border-dashed border-white/10 bg-white/[0.02] space-y-4 hover:bg-white/[0.05] hover:border-white/20 active:scale-[0.98] transition-all duration-300"
-            >
-              <div className="w-16 h-16 mx-auto bg-brand-orange/10 rounded-full flex items-center justify-center">
-                  <Plus className="text-brand-orange" size={28} />
-              </div>
-              <p className="text-zinc-400 font-medium">Tap to add your first exercise</p>
-            </button>
+        {workout.exercises.length === 0 ? (
+          <button
+            onClick={() => setIsSelectorOpen(true)}
+            className="w-full text-center py-16 px-6 rounded-3xl border-2 border-dashed border-white/10 bg-white/[0.02] space-y-4 hover:bg-white/[0.05] hover:border-white/20 active:scale-[0.98] transition-all duration-300"
+          >
+            <div className="w-16 h-16 mx-auto bg-brand-orange/10 rounded-full flex items-center justify-center">
+              <Plus className="text-brand-orange" size={28} />
+            </div>
+            <p className="text-zinc-400 font-medium">Tap to add your first exercise</p>
+          </button>
         ) : (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -305,21 +305,25 @@ export const WorkoutLogger = () => {
               const isCardio = isCardioExercise(def);
               const isBodyweightMovement = isBodyweightExercise(def);
               const isAssisted = isAssistedExercise(def);
-              
+
               const ghostSets = historyCache.get(ex.exerciseId);
               const historicPR = prCache.get(ex.exerciseId) || 0;
+              // Only show PR indicator once historical baseline has been loaded from Supabase.
+              // This prevents the false-positive "NEW PR" flash that occurs on PWA restart
+              // when prCache is empty and every set with any weight appears to beat a baseline of 0.
+              const prReady = prCacheReady.has(ex.exerciseId);
 
               // Calculate Best Set (Current Session)
               const currentBestLoad = ex.sets.reduce((best, current) => {
-                  if (!shouldCountSetForPR(current, def, undefined, userWeight)) return best;
-
-                  const load = getSetLoad(current, def, undefined, userWeight);
-                  return load > best ? load : best;
+                if (!shouldCountSetForPR(current, def, undefined, userWeight)) return best;
+                const load = getSetLoad(current, def, undefined, userWeight);
+                return load > best ? load : best;
               }, 0);
-              
+
               // DISPLAY PR LOGIC: Max of Historic vs Current
               const displayPR = Math.max(historicPR, currentBestLoad);
-              const isNewPR = currentBestLoad > historicPR && currentBestLoad > 0;
+              // Only compute isNewPR after the historical baseline is confirmed loaded
+              const isNewPR = prReady && currentBestLoad > historicPR && currentBestLoad > 0;
 
               return (
                 <div key={ex.id} className="relative">
@@ -329,266 +333,266 @@ export const WorkoutLogger = () => {
                     onHydrate={hydrateExerciseGhostSets}
                   />
                   <div className="bg-zinc-900/60 backdrop-blur-lg border border-white/5 rounded-2xl overflow-hidden shadow-2xl shadow-black/50 transition-all duration-300">
-                      
-                      {/* EXERCISE HEADER */}
-                      <div 
-                        className="flex justify-between items-center p-4 cursor-pointer hover:bg-white/5 active:bg-white/10 transition-colors"
-                        onClick={() => toggleCollapse(ex.id)}
-                      >
-                        <div className="flex items-center gap-3 overflow-hidden">
-                          <div className={cn("transition-transform duration-300 text-zinc-500", isCollapsed ? "-rotate-90" : "rotate-0")}>
-                              <ChevronDown size={20} />
-                          </div>
-                          <div>
-                              <h3 className="text-white font-bold text-lg flex items-center gap-2 truncate">
-                                  {def?.name || 'Loading...'}
-                                  {def?.isUnilateral && <span className="text-[10px] bg-brand-orange/20 text-brand-orange px-1.5 py-0.5 rounded uppercase">Uni</span>}
-                              </h3>
-                              {isCardio ? (
-                                <p className="text-xs font-mono mt-1 text-brand-orange/80 font-bold">
-                                  Cardio Session
-                                </p>
-                              ) : (
-                                <p className={cn(
-                                    "text-xs font-mono mt-1 transition-colors",
-                                    isNewPR ? "text-brand-orange font-bold" : "text-zinc-500"
-                                )}>
-                                    {isNewPR ? '🏆 NEW PR ' : 'PR '} 
-                                    {displayPR} lbs
-                                </p>
-                              )}
-                          </div>
-                        </div>
 
-                        <motion.button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleEditMode(ex.id);
-                          }}
-                          whileHover={{ scale: 1.03 }}
-                          whileTap={{ scale: 0.97 }}
-                          transition={{ type: "spring", stiffness: 300 }}
-                          className={cn(
-                            "w-9 h-9 flex items-center justify-center rounded-full",
-                            isEditing ? "bg-red-500/20 text-red-500" : "bg-white/5 text-zinc-500 hover:text-white"
+                    {/* EXERCISE HEADER */}
+                    <div
+                      className="flex justify-between items-center p-4 cursor-pointer hover:bg-white/5 active:bg-white/10 transition-colors"
+                      onClick={() => toggleCollapse(ex.id)}
+                    >
+                      <div className="flex items-center gap-3 overflow-hidden">
+                        <div className={cn("transition-transform duration-300 text-zinc-500", isCollapsed ? "-rotate-90" : "rotate-0")}>
+                          <ChevronDown size={20} />
+                        </div>
+                        <div>
+                          <h3 className="text-white font-bold text-lg flex items-center gap-2 truncate">
+                            {def?.name || 'Loading...'}
+                            {def?.isUnilateral && <span className="text-[10px] bg-brand-orange/20 text-brand-orange px-1.5 py-0.5 rounded uppercase">Uni</span>}
+                          </h3>
+                          {isCardio ? (
+                            <p className="text-xs font-mono mt-1 text-brand-orange/80 font-bold">
+                              Cardio Session
+                            </p>
+                          ) : (
+                            <p className={cn(
+                              "text-xs font-mono mt-1 transition-colors",
+                              isNewPR ? "text-brand-orange font-bold" : "text-zinc-500"
+                            )}>
+                              {/* Show a brief loading state while historical PR baseline is being fetched */}
+                              {!prReady ? '— loading PR' : isNewPR ? `🏆 NEW PR ${displayPR} lbs` : `PR ${displayPR} lbs`}
+                            </p>
                           )}
-                        >
-                          {isEditing ? <Check size={18} /> : <Pencil size={16} />}
-                        </motion.button>
+                        </div>
                       </div>
 
-                      {/* CONTENT */}
-                      <div className={cn("grid transition-[grid-template-rows] duration-300 ease-out", isCollapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]")}>
-                        <div className="overflow-hidden">
-                          <div className="px-4 pb-4">
-                              
-                              <div className="grid grid-cols-10 gap-2 text-[10px] font-bold text-zinc-500 uppercase tracking-wider text-center mb-2 px-2">
-                                  <div className="col-span-1">#</div>
-                                  <div className="col-span-3">
-                                    {isCardio ? 'Miles' : isAssisted ? 'Assistance' : isBodyweightMovement ? 'Extra LBS' : 'LBS'}
-                                  </div>
-                                  <div className="col-span-3">{isCardio ? 'Time (min)' : 'Reps'}</div>
-                                  <div className="col-span-3">{isEditing ? "Delete" : "Done"}</div>
-                              </div>
+                      <motion.button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleEditMode(ex.id);
+                        }}
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.97 }}
+                        transition={{ type: "spring", stiffness: 300 }}
+                        className={cn(
+                          "w-9 h-9 flex items-center justify-center rounded-full",
+                          isEditing ? "bg-red-500/20 text-red-500" : "bg-white/5 text-zinc-500 hover:text-white"
+                        )}
+                      >
+                        {isEditing ? <Check size={18} /> : <Pencil size={16} />}
+                      </motion.button>
+                    </div>
 
-                              <div className="space-y-2">
-                              {ex.sets.map((set, setIndex) => {
-                                  const isDropChild = set.type === 'dropset_child';
-                                  const ghostSet = ghostSets ? ghostSets[setIndex] : undefined;
-                                  
-                                  return (
-                                      <div key={set.id} className="relative">
-                                          {isDropChild && (
-                                              <div className="absolute -top-3 left-[-6px] w-4 h-8 border-l-2 border-b-2 border-zinc-700 rounded-bl-xl z-0 pointer-events-none" />
+                    {/* CONTENT */}
+                    <div className={cn("grid transition-[grid-template-rows] duration-300 ease-out", isCollapsed ? "grid-rows-[0fr]" : "grid-rows-[1fr]")}>
+                      <div className="overflow-hidden">
+                        <div className="px-4 pb-4">
+
+                          <div className="grid grid-cols-10 gap-2 text-[10px] font-bold text-zinc-500 uppercase tracking-wider text-center mb-2 px-2">
+                            <div className="col-span-1">#</div>
+                            <div className="col-span-3">
+                              {isCardio ? 'Miles' : isAssisted ? 'Assistance' : isBodyweightMovement ? 'Extra LBS' : 'LBS'}
+                            </div>
+                            <div className="col-span-3">{isCardio ? 'Time (min)' : 'Reps'}</div>
+                            <div className="col-span-3">{isEditing ? "Delete" : "Done"}</div>
+                          </div>
+
+                          <div className="space-y-2">
+                            {ex.sets.map((set, setIndex) => {
+                              const isDropChild = set.type === 'dropset_child';
+                              const ghostSet = ghostSets ? ghostSets[setIndex] : undefined;
+
+                              return (
+                                <div key={set.id} className="relative">
+                                  {isDropChild && (
+                                    <div className="absolute -top-3 left-[-6px] w-4 h-8 border-l-2 border-b-2 border-zinc-700 rounded-bl-xl z-0 pointer-events-none" />
+                                  )}
+
+                                  <div className={cn(
+                                    "grid grid-cols-10 gap-2 items-center p-2 rounded-xl border transition-all relative z-10",
+                                    set.isCompleted ? "opacity-50 border-brand-orange/20 bg-black/40" : "bg-black/40 border-white/5",
+                                    isDropChild ? "ml-4 border-l-2 border-l-zinc-700" : ""
+                                  )}>
+
+                                    <div className="col-span-1 flex justify-center">
+                                      {isDropChild ? (
+                                        <div className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 bg-zinc-900/50">
+                                          <ArrowDown size={14} />
+                                        </div>
+                                      ) : (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setTypeSheetOpen({ exIndex, setIndex });
+                                          }}
+                                          disabled={isEditing}
+                                          className={cn(
+                                            "w-7 h-7 rounded-lg flex items-center justify-center gap-0.5 text-xs font-bold transition-all active:scale-90",
+                                            "bg-white/5 text-zinc-400 hover:bg-white/10 border border-white/10"
                                           )}
+                                        >
+                                          <span className="text-[11px]">{setIndex + 1}</span>
+                                          {getTypeIcon(set.type)}
+                                        </button>
+                                      )}
+                                    </div>
 
-                                          <div className={cn(
-                                              "grid grid-cols-10 gap-2 items-center p-2 rounded-xl border transition-all relative z-10",
-                                              set.isCompleted ? "opacity-50 border-brand-orange/20 bg-black/40" : "bg-black/40 border-white/5",
-                                              isDropChild ? "ml-4 border-l-2 border-l-zinc-700" : ""
-                                          )}>
-                                            
-                                            <div className="col-span-1 flex justify-center">
-                                                {isDropChild ? (
-                                                  <div className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 bg-zinc-900/50">
-                                                    <ArrowDown size={14} />
-                                                  </div>
-                                                ) : (
-                                                  <button
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      setTypeSheetOpen({ exIndex, setIndex });
-                                                    }}
-                                                    disabled={isEditing}
-                                                    className={cn(
-                                                      "w-7 h-7 rounded-lg flex items-center justify-center gap-0.5 text-xs font-bold transition-all active:scale-90",
-                                                      "bg-white/5 text-zinc-400 hover:bg-white/10 border border-white/10"
-                                                    )}
-                                                  >
-                                                    <span className="text-[11px]">{setIndex + 1}</span>
-                                                    {getTypeIcon(set.type)}
-                                                  </button>
-                                                )}
-                                            </div>
-                                            
-                                            {isCardio ? (
-                                              <>
-                                                <div className="col-span-3">
-                                                    <motion.input
-                                                        type="number" step="any" onKeyDown={blockInvalidNumberChars}
-                                                        min={0}
-                                                        placeholder={getNumberPlaceholder(ghostSet?.distance, "-")}
-                                                        value={formatNumberInputValue(set.distance)}
-                                                        disabled={isEditing}
-                                                        onChange={(e) => updateSet(exIndex, setIndex, 'distance', parseNumberInputValue(e.target.value))}
-                                                        whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
-                                                        transition={{ type: "spring", stiffness: 300 }}
-                                                        className="w-full bg-white/5 rounded-lg py-2 text-center font-bold text-white text-lg outline-none focus:bg-white/10 disabled:opacity-50"
-                                                    />
-                                                </div>
-                                                <div className="col-span-3 flex justify-center">
-                                                    <motion.input
-                                                        type="number" step="any" onKeyDown={blockInvalidNumberChars}
-                                                        min={0}
-                                                        placeholder={getNumberPlaceholder(ghostSet?.durationSeconds ? Math.round((ghostSet.durationSeconds / 60) * 10) / 10 : null, "-")}
-                                                        value={formatNumberInputValue(set.durationSeconds ? Math.round((set.durationSeconds / 60) * 10) / 10 : null)}
-                                                        disabled={isEditing}
-                                                        onChange={(e) => {
-                                                            const val = parseNumberInputValue(e.target.value);
-                                                            updateSet(exIndex, setIndex, 'durationSeconds', val !== null ? Math.round(val * 60) : null);
-                                                        }}
-                                                        whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
-                                                        transition={{ type: "spring", stiffness: 300 }}
-                                                        className="w-full bg-white/5 rounded-lg py-2 text-center font-bold text-white text-lg outline-none focus:bg-white/10 disabled:opacity-50"
-                                                    />
-                                                </div>
-                                              </>
-                                            ) : (
-                                              <>
-                                                <div className="col-span-3">
-                                                    <motion.input
-                                                        type="number" onKeyDown={blockInvalidNumberChars}
-                                                    min={0}
-                                                    placeholder={getNumberPlaceholder(ghostSet?.weight, "-")}
-                                                    value={formatNumberInputValue(set.weight)}
-                                                        disabled={isEditing}
-                                                    onChange={(e) => updateSet(exIndex, setIndex, 'weight', parseNumberInputValue(e.target.value))}
-                                                        whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
-                                                        transition={{ type: "spring", stiffness: 300 }}
-                                                        className="w-full bg-white/5 rounded-lg py-2 text-center font-bold text-white text-lg outline-none focus:bg-white/10 disabled:opacity-50"
-                                                    />
-                                                </div>
-                                                
-                                                <div className="col-span-3 flex justify-center">
-                                                    {def?.isUnilateral ? (
-                                                    <div className="flex gap-1 w-full">
-                                                        <motion.input
-                                                          type="number" onKeyDown={blockInvalidNumberChars}
-                                                          min={0}
-                                                          placeholder={getNumberPlaceholder(ghostSet?.repsLeft, "L")}
-                                                          value={formatNumberInputValue(set.repsLeft)}
-                                                          onChange={(e) => handleUnilateralChange(exIndex, setIndex, set.id, 'repsLeft', e.target.value)}
-                                                          disabled={isEditing}
-                                                          whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
-                                                          transition={{ type: "spring", stiffness: 300 }}
-                                                          className="w-1/2 bg-white/5 rounded-lg py-2 text-center font-bold text-white text-sm outline-none focus:bg-white/10 disabled:opacity-50"
-                                                        />
-                                                        <motion.input
-                                                          type="number" onKeyDown={blockInvalidNumberChars}
-                                                          min={0}
-                                                          placeholder={getNumberPlaceholder(ghostSet?.repsRight, "R")}
-                                                          value={formatNumberInputValue(set.repsRight)}
-                                                          onChange={(e) => handleUnilateralChange(exIndex, setIndex, set.id, 'repsRight', e.target.value)}
-                                                          disabled={isEditing}
-                                                          whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
-                                                          transition={{ type: "spring", stiffness: 300 }}
-                                                          className="w-1/2 bg-white/5 rounded-lg py-2 text-center font-bold text-white text-sm outline-none focus:bg-white/10 disabled:opacity-50"
-                                                        />
-                                                    </div>
-                                                    ) : (
-                                                    <motion.input
-                                                        type="number" onKeyDown={blockInvalidNumberChars}
-                                                    min={0}
-                                                      placeholder={getNumberPlaceholder(ghostSet?.reps, "-")}
-                                                      value={formatNumberInputValue(set.reps)}
-                                                      onChange={(e) => updateSet(exIndex, setIndex, 'reps', parseNumberInputValue(e.target.value))}
-                                                        disabled={isEditing}
-                                                        whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
-                                                        transition={{ type: "spring", stiffness: 300 }}
-                                                        className="w-full bg-white/5 rounded-lg py-2 text-center font-bold text-white text-lg outline-none focus:bg-white/10 disabled:opacity-50"
-                                                    />
-                                                    )}
-                                                </div>
-                                              </>
-                                            )}
+                                    {isCardio ? (
+                                      <>
+                                        <div className="col-span-3">
+                                          <motion.input
+                                            type="number" step="any" onKeyDown={blockInvalidNumberChars}
+                                            min={0}
+                                            placeholder={getNumberPlaceholder(ghostSet?.distance, "-")}
+                                            value={formatNumberInputValue(set.distance)}
+                                            disabled={isEditing}
+                                            onChange={(e) => updateSet(exIndex, setIndex, 'distance', parseNumberInputValue(e.target.value))}
+                                            whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
+                                            transition={{ type: "spring", stiffness: 300 }}
+                                            className="w-full bg-white/5 rounded-lg py-2 text-center font-bold text-white text-lg outline-none focus:bg-white/10 disabled:opacity-50"
+                                          />
+                                        </div>
+                                        <div className="col-span-3 flex justify-center">
+                                          <motion.input
+                                            type="number" step="any" onKeyDown={blockInvalidNumberChars}
+                                            min={0}
+                                            placeholder={getNumberPlaceholder(ghostSet?.durationSeconds ? Math.round((ghostSet.durationSeconds / 60) * 10) / 10 : null, "-")}
+                                            value={formatNumberInputValue(set.durationSeconds ? Math.round((set.durationSeconds / 60) * 10) / 10 : null)}
+                                            disabled={isEditing}
+                                            onChange={(e) => {
+                                              const val = parseNumberInputValue(e.target.value);
+                                              updateSet(exIndex, setIndex, 'durationSeconds', val !== null ? Math.round(val * 60) : null);
+                                            }}
+                                            whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
+                                            transition={{ type: "spring", stiffness: 300 }}
+                                            className="w-full bg-white/5 rounded-lg py-2 text-center font-bold text-white text-lg outline-none focus:bg-white/10 disabled:opacity-50"
+                                          />
+                                        </div>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <div className="col-span-3">
+                                          <motion.input
+                                            type="number" onKeyDown={blockInvalidNumberChars}
+                                            min={0}
+                                            placeholder={getNumberPlaceholder(ghostSet?.weight, "-")}
+                                            value={formatNumberInputValue(set.weight)}
+                                            disabled={isEditing}
+                                            onChange={(e) => updateSet(exIndex, setIndex, 'weight', parseNumberInputValue(e.target.value))}
+                                            whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
+                                            transition={{ type: "spring", stiffness: 300 }}
+                                            className="w-full bg-white/5 rounded-lg py-2 text-center font-bold text-white text-lg outline-none focus:bg-white/10 disabled:opacity-50"
+                                          />
+                                        </div>
 
-                                            <div className="col-span-3 flex items-center gap-2">
-                                              {isEditing ? (
-                                                <motion.button
-                                                  onClick={() => handleDeleteSet(exIndex, setIndex)}
-                                                  whileHover={{ scale: 1.03 }}
-                                                  whileTap={{ scale: 0.97 }}
-                                                  transition={{ type: "spring", stiffness: 300 }}
-                                                  className="flex-1 h-10 rounded-lg flex items-center justify-center bg-red-500/10 text-red-500 border border-red-500/50 hover:bg-red-500 hover:text-white"
-                                                >
-                                                  <Trash2 size={18} />
-                                                </motion.button>
-                                              ) : (
-                                                <button 
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      handleSmartComplete(exIndex, setIndex, set, ghostSet);
-                                                    }}
-                                                    className={cn(
-                                                        "flex-1 h-10 rounded-lg flex items-center justify-center transition-all active:scale-95", 
-                                                        set.isCompleted ? "bg-brand-orange text-white" : "bg-white/5 text-zinc-600 hover:bg-white/10"
-                                                    )}
-                                                >
-                                                    <Check size={20} strokeWidth={4} />
-                                                </button>
-                                              )}
+                                        <div className="col-span-3 flex justify-center">
+                                          {def?.isUnilateral ? (
+                                            <div className="flex gap-1 w-full">
+                                              <motion.input
+                                                type="number" onKeyDown={blockInvalidNumberChars}
+                                                min={0}
+                                                placeholder={getNumberPlaceholder(ghostSet?.repsLeft, "L")}
+                                                value={formatNumberInputValue(set.repsLeft)}
+                                                onChange={(e) => handleUnilateralChange(exIndex, setIndex, set.id, 'repsLeft', e.target.value)}
+                                                disabled={isEditing}
+                                                whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
+                                                transition={{ type: "spring", stiffness: 300 }}
+                                                className="w-1/2 bg-white/5 rounded-lg py-2 text-center font-bold text-white text-sm outline-none focus:bg-white/10 disabled:opacity-50"
+                                              />
+                                              <motion.input
+                                                type="number" onKeyDown={blockInvalidNumberChars}
+                                                min={0}
+                                                placeholder={getNumberPlaceholder(ghostSet?.repsRight, "R")}
+                                                value={formatNumberInputValue(set.repsRight)}
+                                                onChange={(e) => handleUnilateralChange(exIndex, setIndex, set.id, 'repsRight', e.target.value)}
+                                                disabled={isEditing}
+                                                whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
+                                                transition={{ type: "spring", stiffness: 300 }}
+                                                className="w-1/2 bg-white/5 rounded-lg py-2 text-center font-bold text-white text-sm outline-none focus:bg-white/10 disabled:opacity-50"
+                                              />
                                             </div>
-                                          </div>
-                                      </div>
-                                  );
-                              })}
-                              </div>
-                              
-                              <div className="mt-3">
-                                {isEditing ? (
-                                  <motion.button
-                                      whileHover={{ scale: 1.01 }}
-                                      whileTap={{ scale: 0.98 }}
-                                      transition={{ type: "spring", stiffness: 400, damping: 25 }}
-                                      onClick={() => removeExercise(exIndex)}
-                                      className="w-full py-3 px-4 rounded-xl bg-red-500/10 hover:bg-red-500/20 active:bg-red-500/30 border border-red-500/30 text-red-400 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all duration-200"
-                                  >
-                                      <Trash2 size={15} />
-                                      <span>Delete Exercise</span>
-                                  </motion.button>
-                                ) : (
-                                  <motion.button
-                                      whileHover={{ scale: 1.01 }}
-                                      whileTap={{ scale: 0.98 }}
-                                      transition={{ type: "spring", stiffness: 400, damping: 25 }}
-                                      onClick={() => addSet(exIndex)}
-                                      className="w-full py-3 px-4 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] active:bg-white/[0.12] border border-white/[0.08] hover:border-white/20 text-zinc-400 hover:text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all duration-200 shadow-sm"
-                                  >
-                                      <Plus size={15} className="text-brand-orange" strokeWidth={2.5} />
-                                      <span>Add Set</span>
-                                  </motion.button>
-                                )}
-                              </div>
+                                          ) : (
+                                            <motion.input
+                                              type="number" onKeyDown={blockInvalidNumberChars}
+                                              min={0}
+                                              placeholder={getNumberPlaceholder(ghostSet?.reps, "-")}
+                                              value={formatNumberInputValue(set.reps)}
+                                              onChange={(e) => updateSet(exIndex, setIndex, 'reps', parseNumberInputValue(e.target.value))}
+                                              disabled={isEditing}
+                                              whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
+                                              transition={{ type: "spring", stiffness: 300 }}
+                                              className="w-full bg-white/5 rounded-lg py-2 text-center font-bold text-white text-lg outline-none focus:bg-white/10 disabled:opacity-50"
+                                            />
+                                          )}
+                                        </div>
+                                      </>
+                                    )}
+
+                                    <div className="col-span-3 flex items-center gap-2">
+                                      {isEditing ? (
+                                        <motion.button
+                                          onClick={() => handleDeleteSet(exIndex, setIndex)}
+                                          whileHover={{ scale: 1.03 }}
+                                          whileTap={{ scale: 0.97 }}
+                                          transition={{ type: "spring", stiffness: 300 }}
+                                          className="flex-1 h-10 rounded-lg flex items-center justify-center bg-red-500/10 text-red-500 border border-red-500/50 hover:bg-red-500 hover:text-white"
+                                        >
+                                          <Trash2 size={18} />
+                                        </motion.button>
+                                      ) : (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleSmartComplete(exIndex, setIndex, set, ghostSet);
+                                          }}
+                                          className={cn(
+                                            "flex-1 h-10 rounded-lg flex items-center justify-center transition-all active:scale-95",
+                                            set.isCompleted ? "bg-brand-orange text-white" : "bg-white/5 text-zinc-600 hover:bg-white/10"
+                                          )}
+                                        >
+                                          <Check size={20} strokeWidth={4} />
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          <div className="mt-3">
+                            {isEditing ? (
+                              <motion.button
+                                whileHover={{ scale: 1.01 }}
+                                whileTap={{ scale: 0.98 }}
+                                transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                                onClick={() => removeExercise(exIndex)}
+                                className="w-full py-3 px-4 rounded-xl bg-red-500/10 hover:bg-red-500/20 active:bg-red-500/30 border border-red-500/30 text-red-400 font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all duration-200"
+                              >
+                                <Trash2 size={15} />
+                                <span>Delete Exercise</span>
+                              </motion.button>
+                            ) : (
+                              <motion.button
+                                whileHover={{ scale: 1.01 }}
+                                whileTap={{ scale: 0.98 }}
+                                transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                                onClick={() => addSet(exIndex)}
+                                className="w-full py-3 px-4 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] active:bg-white/[0.12] border border-white/[0.08] hover:border-white/20 text-zinc-400 hover:text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all duration-200 shadow-sm"
+                              >
+                                <Plus size={15} className="text-brand-orange" strokeWidth={2.5} />
+                                <span>Add Set</span>
+                              </motion.button>
+                            )}
                           </div>
                         </div>
                       </div>
+                    </div>
                   </div>
                 </div>
               );
             })}
 
             {/* --- ADD EXERCISE BUTTON --- */}
-            <Button 
+            <Button
               className="w-full py-6 text-sm font-bold bg-white/[0.03] hover:bg-white/[0.07] border border-dashed border-white/20 hover:border-brand-orange/50 text-zinc-400 hover:text-white active:scale-[0.98] transition-all rounded-2xl flex items-center justify-center gap-2"
               onClick={() => setIsSelectorOpen(true)}
             >
@@ -602,7 +606,7 @@ export const WorkoutLogger = () => {
       {typeSheetOpen && (() => {
         const currentSet = workout.exercises[typeSheetOpen.exIndex].sets[typeSheetOpen.setIndex];
         const currentType = currentSet?.type || 'normal';
-        
+
         const availableTypes = [
           { type: 'normal' as const, icon: <Circle size={32} className="text-zinc-400" />, label: 'Normal' },
           { type: 'warmup' as const, icon: <Flame size={32} className="text-yellow-500" />, label: 'Warmup' },
@@ -635,9 +639,9 @@ export const WorkoutLogger = () => {
       })()}
 
       <ExerciseSelector isOpen={isSelectorOpen} onClose={() => setIsSelectorOpen(false)} onSelect={handleAddExercise} />
-      </div>
-    );
-  };
+    </div>
+  );
+};
 
 const SetupScreen = ({ onStart, onCancel, onRestDay }: { onStart: (name: string) => void, onCancel: () => void, onRestDay: () => void }) => {
   const [name, setName] = useState('');
@@ -647,9 +651,9 @@ const SetupScreen = ({ onStart, onCancel, onRestDay }: { onStart: (name: string)
         <div className="text-center"><div className="inline-flex w-12 h-12 bg-white/5 rounded-full items-center justify-center mb-4 text-zinc-500"><Dumbbell size={24} /></div><h2 className="text-xl font-bold text-white">Start Workout</h2></div>
         <input autoFocus type="text" placeholder={`Workout ${new Date().toLocaleDateString()}`} value={name} onChange={e => setName(e.target.value)} className="w-full bg-black border border-white/10 rounded-xl p-4 text-white text-center font-bold focus:border-brand-orange outline-none" />
         <div className="space-y-3">
-          <button 
-            type="button" 
-            className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-sm tracking-wide shadow-lg shadow-orange-950/50 transition-all flex items-center justify-center gap-2" 
+          <button
+            type="button"
+            className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-brand-accent to-amber-500 hover:from-brand-orange hover:to-brand-orange-secondary text-white font-bold text-sm tracking-wide shadow-lg shadow-brand-orange/20 transition-all flex items-center justify-center gap-2"
             onClick={() => onStart(name)}
           >
             <Play size={18} className="mr-2" /> Start Session

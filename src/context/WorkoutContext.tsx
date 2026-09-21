@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { workoutService } from '../services/workoutService';
 import { exerciseService } from '../services/exerciseService';
@@ -40,9 +40,6 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
 
   const openRestTimer = (type: string) => {
     setRestTimerState(prev => {
-      // If docked, stay docked. If not, open it fully.
-      // Update the duration from prefs ONLY if it was not already open, or just force the new type?
-      // Actually, standard behavior: reset the timer for the new set.
       const duration = restTimerPrefs[type] || 90;
       return {
         ...prev,
@@ -69,7 +66,18 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
   const [exerciseDefs, setExerciseDefs] = useState<Map<string, Exercise>>(new Map<string, Exercise>());
   const [historyCache, setHistoryCache] = useState<Map<string, ExerciseSet[]>>(new Map());
   const [prCache, setPrCache] = useState<Map<string, number>>(new Map());
+  /**
+   * Tracks which exercise IDs have had their historical PR baseline fetched from Supabase.
+   * This is distinct from prCache to handle the "0 PR" case (exercise exists in history
+   * but user has never hit a qualifying PR). An empty prCache entry and a missing prCache
+   * entry would otherwise be indistinguishable, causing false positives.
+   */
+  const [prCacheReady, setPrCacheReady] = useState<Set<string>>(new Set());
   const [userWeight, setUserWeight] = useState<number | null>(null);
+
+  // Ref so the rehydration effect doesn't re-run if prCacheReady changes during the fetch
+  const prCacheReadyRef = useRef(prCacheReady);
+  prCacheReadyRef.current = prCacheReady;
 
   useEffect(() => {
     const loadDefs = async () => {
@@ -94,6 +102,43 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
     if (workout.bodyWeight !== undefined || userWeight === null) return workout;
     return { ...workout, bodyWeight: userWeight ?? undefined };
   }, [workout, userWeight]);
+
+  /**
+   * Shared helper: fetch the historical PR baseline for a single exercise from Supabase
+   * and update both prCache and prCacheReady. This is the ONE source of truth used by
+   * both addExercise() (new exercises) and the rehydration effect (restored exercises).
+   *
+   * Crucially, getPersonalRecord() scans COMPLETED workouts in Supabase — the active
+   * workout is not yet saved, so it is never included in the baseline. This means
+   * a 230 lb set in the active workout does NOT inflate historicPR to 230 lb;
+   * the baseline correctly remains at whatever was logged in prior completed sessions.
+   */
+  const fetchAndCacheHistoricalPR = useCallback((exerciseId: string) => {
+    void workoutService.getPersonalRecord(exerciseId).then(prValue => {
+      setPrCache(prev => new Map(prev).set(exerciseId, prValue));
+      setPrCacheReady(prev => new Set(prev).add(exerciseId));
+    });
+  }, []);
+
+  /**
+   * PWA Rehydration Effect: when the app cold-starts and restores an active workout from
+   * localStorage, prCache is empty. This effect backfills the historical PR baseline
+   * for every exercise already present in the rehydrated session.
+   *
+   * Guard: only runs when exerciseDefs has loaded (size > 0 or we've attempted the load)
+   * and only for exercises whose PR isn't already in the ready set.
+   */
+  useEffect(() => {
+    if (!resolvedWorkout) return;
+    // Only backfill exercises that are not yet in the ready set
+    const missing = resolvedWorkout.exercises.filter(
+      ex => !prCacheReadyRef.current.has(ex.exerciseId)
+    );
+    if (missing.length === 0) return;
+    missing.forEach(ex => fetchAndCacheHistoricalPR(ex.exerciseId));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolvedWorkout?.id, fetchAndCacheHistoricalPR]);
+  // ^^ Keyed on workout.id: fires once when a workout is rehydrated/started, not on every set update.
 
   useEffect(() => {
     if (!resolvedWorkout) return;
@@ -129,6 +174,7 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
     setElapsed(0);
     setHistoryCache(new Map());
     setPrCache(new Map());
+    setPrCacheReady(new Set());
   };
 
   const logRestDay = async () => {
@@ -147,6 +193,8 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
   const cancelWorkout = () => {
     setWorkout(null);
     setElapsed(0);
+    setPrCache(new Map());
+    setPrCacheReady(new Set());
     closeRestTimer();
   };
 
@@ -180,6 +228,8 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
     };
     const saved = await workoutService.saveWorkout(final);
     setWorkout(null);
+    setPrCache(new Map());
+    setPrCacheReady(new Set());
     if (saved?.id) {
       socialService.dispatchFriendMilestones(saved.id).catch(err => {
         console.error('Failed to dispatch friend milestones:', err);
@@ -196,7 +246,7 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
     repsLeft: null,
     repsRight: null,
     isCompleted: false,
-    previousBest: historySet?.weight ?? undefined 
+    previousBest: historySet?.weight ?? undefined
   });
 
   const addExercise = (exDef: Exercise) => {
@@ -209,12 +259,10 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
       sets: [createSet()]
     };
 
-    setWorkout(prev => prev ? ({...prev, exercises: [...prev.exercises, newExercise]}) : null);
+    setWorkout(prev => prev ? ({ ...prev, exercises: [...prev.exercises, newExercise] }) : null);
 
-    // PR data is independent of ghost-set hydration and can load in the background.
-    void workoutService.getPersonalRecord(exDef.id).then(prValue => {
-      setPrCache(prev => new Map(prev).set(exDef.id, prValue));
-    });
+    // Use the shared helper so addExercise and rehydration share the same fetch logic
+    fetchAndCacheHistoricalPR(exDef.id);
   };
 
   const hydrateExerciseGhostSets = useCallback((
@@ -258,52 +306,52 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
 
   const removeExercise = (index: number) => {
     setWorkout(prev => {
-        if(!prev) return null;
-        const copy = [...prev.exercises];
-        copy.splice(index, 1);
-        return { ...prev, exercises: copy };
+      if (!prev) return null;
+      const copy = [...prev.exercises];
+      copy.splice(index, 1);
+      return { ...prev, exercises: copy };
     });
   };
 
   const addSet = (exIndex: number, insertIndex?: number) => {
     setWorkout(prev => {
-        if(!prev) return null;
-        const exs = [...prev.exercises];
-        const sets = [...exs[exIndex].sets];
-        const newSet = createSet(); 
-        if (insertIndex !== undefined) sets.splice(insertIndex, 0, newSet);
-        else sets.push(newSet);
-        exs[exIndex] = { ...exs[exIndex], sets };
-        return { ...prev, exercises: exs };
+      if (!prev) return null;
+      const exs = [...prev.exercises];
+      const sets = [...exs[exIndex].sets];
+      const newSet = createSet();
+      if (insertIndex !== undefined) sets.splice(insertIndex, 0, newSet);
+      else sets.push(newSet);
+      exs[exIndex] = { ...exs[exIndex], sets };
+      return { ...prev, exercises: exs };
     });
   };
 
   const removeSet = (exIndex: number, setIndex: number) => {
     setWorkout(prev => {
-        if(!prev) return null;
-        const exs = [...prev.exercises];
-        const sets = [...exs[exIndex].sets];
-        sets.splice(setIndex, 1);
-        exs[exIndex] = { ...exs[exIndex], sets };
-        return { ...prev, exercises: exs };
+      if (!prev) return null;
+      const exs = [...prev.exercises];
+      const sets = [...exs[exIndex].sets];
+      sets.splice(setIndex, 1);
+      exs[exIndex] = { ...exs[exIndex], sets };
+      return { ...prev, exercises: exs };
     });
   };
 
   const updateSet = <K extends keyof ExerciseSet>(exIndex: number, setIndex: number, field: K, value: ExerciseSet[K]) => {
     setWorkout(prev => {
-        if(!prev) return null;
-        const exs = [...prev.exercises];
-        const sets = [...exs[exIndex].sets];
-        sets[setIndex] = { ...sets[setIndex], [field]: value } as ExerciseSet;
-        exs[exIndex] = { ...exs[exIndex], sets };
-        return { ...prev, exercises: exs };
+      if (!prev) return null;
+      const exs = [...prev.exercises];
+      const sets = [...exs[exIndex].sets];
+      sets[setIndex] = { ...sets[setIndex], [field]: value } as ExerciseSet;
+      exs[exIndex] = { ...exs[exIndex], sets };
+      return { ...prev, exercises: exs };
     });
   };
 
   return (
     <WorkoutContext.Provider value={{
-      workout: resolvedWorkout, elapsed, isActive: !!resolvedWorkout, 
-      historyCache, prCache,
+      workout: resolvedWorkout, elapsed, isActive: !!resolvedWorkout,
+      historyCache, prCache, prCacheReady,
       startWorkout, logRestDay, cancelWorkout, finishWorkout,
       addExercise, hydrateExerciseGhostSets, removeExercise, addSet, removeSet, updateSet,
       exerciseDefs,

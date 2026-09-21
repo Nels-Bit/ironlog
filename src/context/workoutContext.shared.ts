@@ -7,6 +7,10 @@ export interface WorkoutContextType {
   isActive: boolean;
   historyCache: Map<string, ExerciseSet[]>;
   prCache: Map<string, number>;
+  /** Exercise IDs whose historical PR baseline has been loaded from Supabase.
+   *  Until an exercise's ID appears in this set, suppress PR indicators to prevent
+   *  the false-positive flash that occurs after a cold PWA restart when prCache is empty. */
+  prCacheReady: Set<string>;
   startWorkout: (name: string) => void;
   logRestDay: () => Promise<string | null>;
   cancelWorkout: () => void;

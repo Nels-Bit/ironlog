@@ -1,16 +1,17 @@
 @import "tailwindcss";
 @plugin "daisyui";
 
-
-
 @theme {
-  /* Define the IronLog Color Palette */
+  /* ── IronLog Color Palette ─────────────────────────────────────────── */
   --color-iron-950: #0a0a0a;
   --color-iron-base: #000000;
-  
-  --color-brand-orange: #ea580c;
-  --color-brand-red: #b91c1c;
-  --color-brand-accent: #f97316;
+
+  /* Orange brand hierarchy */
+  --color-brand-orange: #ea580c;           /* Primary Orange — main CTA (nav log, save, finish) */
+  --color-brand-orange-secondary: #c2440a; /* Secondary Orange — supporting actions, noticeably darker */
+  --color-brand-accent: #f97316;           /* Accent Orange — gradient highlights (lighter) */
+
+  --color-brand-red: #b91c1c;              /* Error / destructive */
 
   /* Fonts */
   --font-sans: "Inter", sans-serif;
@@ -27,7 +28,7 @@ html, body {
   touch-action: pan-x pan-y;
 }
 
-/* Global Styles 
+/* Global Styles
   Note: In v4, we don't use @apply in :root or body as often.
   We just write standard CSS using the theme variables we made.
 */
