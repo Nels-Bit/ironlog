@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/Button';
-import { RegisteredAccountCount } from '../components/RegisteredAccountCount';
+import { startDemo } from '../lib/demo-session';
 import { Dumbbell, Loader2, ArrowRight, Mail, Lock, AlertCircle, Weight } from 'lucide-react';
 
 export const Auth = () => {
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin, setIsLogin] = useState(() => new URLSearchParams(window.location.search).get('signup') !== '1');
   const [loading, setLoading] = useState(false);
   
   // Form State
@@ -162,7 +162,7 @@ export const Auth = () => {
           
           {/* Action Button */}
           <Button 
-            className="w-full py-6 text-lg font-bold tracking-wide shadow-lg shadow-brand-orange/20 mt-2" 
+            className="w-full bg-brand-orange text-white hover:bg-brand-orange-secondary py-6 text-lg font-bold tracking-wide shadow-lg shadow-brand-orange/20 mt-2"
             disabled={loading}
           >
             {loading ? (
@@ -192,7 +192,8 @@ export const Auth = () => {
             </p>
           </div>
         </form>
-        <RegisteredAccountCount />
+        <Button type="button" variant="secondary" className="w-full mt-5 border border-brand-orange/40" onClick={startDemo}>Try Demo</Button>
+        <p className="text-xs text-zinc-400 text-center mt-3">Explore fictional workouts. No account needed. Nothing is saved.</p>
       </div>
     </div>
   );

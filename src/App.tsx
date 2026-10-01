@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, Link } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { Analytics } from '@vercel/analytics/react';
-import { supabase } from './lib/supabase';
+import { supabase, demoMode } from './lib/supabase';
+import { exitDemo, startDemo } from './lib/demo-session';
 import { WorkoutProvider } from './context/WorkoutContext';
 import { authService } from './services/authService';
 
@@ -58,6 +59,11 @@ const AppContent = () => {
         
         <Navbar />
 
+        {demoMode && <aside className="demo-toolbar md:ml-0" aria-label="Demo controls">
+          <span><strong>Demo Mode</strong><small>Fictional data · changes disappear on refresh</small></span>
+          <div><button onClick={startDemo}>Reset Demo</button><button onClick={() => exitDemo()}>Exit Demo</button><button onClick={() => exitDemo(true)}>Create your own account</button></div>
+        </aside>}
+
         <main className={cn(
           "min-h-screen transition-all",
           !isFullScreen && "max-w-3xl mx-auto p-6 md:p-12"
@@ -76,6 +82,9 @@ const AppContent = () => {
           )}
           <Routes>
             <Route path="/" element={<Navigate to="/profile" replace />} />
+            <Route path="/demo" element={<Navigate to="/profile" replace />} />
+            <Route path="/dashboard" element={<Navigate to="/profile" replace />} />
+            <Route path="/settings" element={<Navigate to="/profile" replace />} />
             <Route path="/workout" element={<WorkoutLogger />} />
             <Route path="/history" element={<Navigate to="/profile?tab=activity" replace />} />
             <Route path="/history/:id" element={<EditWorkout />} />
@@ -97,9 +106,10 @@ const AppContent = () => {
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!demoMode);
 
   useEffect(() => {
+    if (demoMode) return;
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
@@ -116,7 +126,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      {!session ? (
+      {!session && !demoMode ? (
         <Routes>
           <Route path="*" element={<Auth />} />
         </Routes>

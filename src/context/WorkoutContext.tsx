@@ -1,3 +1,4 @@
+import { appStorage } from '../lib/demo-session';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { workoutService } from '../services/workoutService';
@@ -16,18 +17,18 @@ import { WorkoutContext } from './workoutContext.shared';
 
 export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
   const [workout, setWorkout] = useState<WorkoutSession | null>(() => {
-    const saved = localStorage.getItem('current_workout');
+    const saved = appStorage.getItem('current_workout');
     return saved ? JSON.parse(saved) : null;
   });
 
   const [elapsed, setElapsed] = useState(() => {
-    const saved = localStorage.getItem('workout_start_time');
+    const saved = appStorage.getItem('workout_start_time');
     return saved ? Math.floor((Date.now() - parseInt(saved)) / 1000) : 0;
   });
 
   // --- REST TIMER STATE ---
   const [restTimerPrefs, setRestTimerPrefs] = useState<Record<string, number>>(() => {
-    const savedPrefs = localStorage.getItem('ironlog_rest_prefs');
+    const savedPrefs = appStorage.getItem('ironlog_rest_prefs');
     return savedPrefs ? JSON.parse(savedPrefs) : { normal: 90, warmup: 60, dropset: 45 };
   });
   const [restTimerState, setRestTimerState] = useState({
@@ -58,7 +59,7 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
     setRestTimerState(prev => ({ ...prev, duration: newDuration }));
     setRestTimerPrefs(prev => {
       const updated = { ...prev, [restTimerState.type]: newDuration };
-      localStorage.setItem('ironlog_rest_prefs', JSON.stringify(updated));
+      appStorage.setItem('ironlog_rest_prefs', JSON.stringify(updated));
       return updated;
     });
   };
@@ -153,11 +154,11 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (resolvedWorkout) {
-      localStorage.setItem('current_workout', JSON.stringify(resolvedWorkout));
-      localStorage.setItem('workout_start_time', resolvedWorkout.startTime.toString());
+      appStorage.setItem('current_workout', JSON.stringify(resolvedWorkout));
+      appStorage.setItem('workout_start_time', resolvedWorkout.startTime.toString());
     } else {
-      localStorage.removeItem('current_workout');
-      localStorage.removeItem('workout_start_time');
+      appStorage.removeItem('current_workout');
+      appStorage.removeItem('workout_start_time');
     }
   }, [resolvedWorkout]);
 

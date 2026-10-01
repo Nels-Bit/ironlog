@@ -71,6 +71,12 @@ button, a, [role="button"], input, textarea {
 .sticky.top-0 { padding-top: env(safe-area-inset-top); }
 .fixed.bottom-0 { padding-bottom: env(safe-area-inset-bottom); }
 
+.demo-toolbar { display:flex; flex-wrap:wrap; justify-content:space-between; gap:12px; padding:14px 24px; border-bottom:1px solid #ea580c55; background:#ea580c12; font-size:13px; }
+.demo-toolbar strong { color:#fb923c; }
+.demo-toolbar small { display:block; color:#a1a1aa; margin-top:3px; }
+.demo-toolbar > div { display:flex; flex-wrap:wrap; gap:14px; align-items:center; }
+.demo-toolbar button { min-height:36px; text-decoration:underline; text-underline-offset:4px; cursor:pointer; }
+
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
