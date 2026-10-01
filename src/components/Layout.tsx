@@ -1,5 +1,6 @@
 import React from 'react';
 import { Navbar } from './Navbar';
+import { RegisteredAccountCount } from './RegisteredAccountCount';
 
 export const Layout = ({ children }: { children: React.ReactNode }) => {
   return (
@@ -11,6 +12,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
       */}
       <main className="md:pl-64 pb-24 p-6 max-w-7xl mx-auto">
         {children}
+        <RegisteredAccountCount />
       </main>
     </div>
   );

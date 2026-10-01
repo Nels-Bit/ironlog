@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/Button';
+import { RegisteredAccountCount } from '../components/RegisteredAccountCount';
 import { Dumbbell, Loader2, ArrowRight, Mail, Lock, AlertCircle, Weight } from 'lucide-react';
 
 export const Auth = () => {
@@ -191,6 +192,7 @@ export const Auth = () => {
             </p>
           </div>
         </form>
+        <RegisteredAccountCount />
       </div>
     </div>
   );
