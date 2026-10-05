@@ -39,7 +39,7 @@ export const WorkoutLogger = () => {
   const {
     workout, elapsed, isActive, historyCache, prCache, prCacheReady,
     startWorkout, logRestDay, cancelWorkout, finishWorkout,
-    addExercise, hydrateExerciseGhostSets, removeExercise, addSet, removeSet, updateSet, exerciseDefs
+    addExercise, hydrateExerciseGhostSets, removeExercise, addSet, removeSet, updateSet, exerciseDefs, restTimer
   } = useWorkout();
 
   // Keep the screen awake while an active workout session is running
@@ -254,9 +254,16 @@ export const WorkoutLogger = () => {
     }} onCancel={() => navigate(-1)} />;
   }
 
+  // The expanded timer is fixed above the navigation. Give the scrollable
+  // workout enough tail room to bring its final controls above that overlay.
+  const needsExpandedTimerClearance = restTimer.isOpen && !restTimer.isDocked;
+
   // --- RENDER: ACTIVE LOGGER ---
   return (
-    <div className="min-h-screen pb-48 animate-in fade-in duration-500 bg-black">
+    <div className={cn(
+      'min-h-screen animate-in fade-in duration-500 bg-black md:pb-48',
+      needsExpandedTimerClearance ? 'pb-[calc(23rem+env(safe-area-inset-bottom,0px))]' : 'pb-48'
+    )}>
 
       {/* HEADER */}
       <header className="sticky top-0 z-50 bg-iron-950/90 backdrop-blur-md border-b border-white/5 px-4 h-16 flex justify-between items-center shadow-2xl">
