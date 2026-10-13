@@ -111,6 +111,12 @@ export interface WorkoutExercise {
   sets: ExerciseSet[];
 }
 
+/** Highest eligible per-set load and the actual set that established it. */
+export interface PersonalRecordPerformance {
+  load: number;
+  set: ExerciseSet | null;
+}
+
 export interface WorkoutSession {
   id: string;
   name: string;

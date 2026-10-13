@@ -1,7 +1,7 @@
 import { supabase } from '../lib/supabase';
 import { exerciseService } from './exerciseService';
-import { getSetLoad, parseUserWeight, shouldCountSetForPR } from '../utils/workoutMath';
-import type { WorkoutSession, WorkoutExercise, Exercise, ExerciseSet } from '../types';
+import { getBestPRPerformance, parseUserWeight } from '../utils/workoutMath';
+import type { WorkoutSession, WorkoutExercise, Exercise, ExerciseSet, PersonalRecordPerformance } from '../types';
 
 interface WorkoutRow {
   id: string;
@@ -221,8 +221,12 @@ export const workoutService = {
 
   // --- PR CALCULATOR ---
   async getPersonalRecord(exerciseId: string): Promise<number> {
+    return (await workoutService.getPersonalRecordPerformance(exerciseId)).load;
+  },
+
+  async getPersonalRecordPerformance(exerciseId: string): Promise<PersonalRecordPerformance> {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return 0;
+    if (!user) return { load: 0, set: null };
 
     const userWeight = parseUserWeight(user.user_metadata?.weight);
 
@@ -236,27 +240,13 @@ export const workoutService = {
       .order('start_time', { ascending: false });
 
     if (error || !data) {
-      return 0;
+      // Keep the context's readiness gate closed on failure rather than treating
+      // an unavailable historical baseline as a real zero-load PR.
+      throw error ?? new Error('Unable to load historical personal records.');
     }
 
-    let maxWeight = 0;
-
-    (data as WorkoutRow[]).forEach(workout => {
-      const exercise = getWorkoutExercises(workout.exercises).find(entry => entry.exerciseId === exerciseId);
-      const def = defMap.get(exerciseId);
-
-      if (exercise && Array.isArray(exercise.sets)) {
-        exercise.sets.forEach(set => {
-          if (!shouldCountSetForPR(set, def, undefined, userWeight)) return;
-
-          const load = getSetLoad(set, def, undefined, userWeight);
-          if (load > maxWeight) {
-            maxWeight = load;
-          }
-        });
-      }
-    });
-
-    return maxWeight;
+    const sets = (data as WorkoutRow[]).flatMap(workout => getWorkoutExercises(workout.exercises)
+      .filter(entry => entry.exerciseId === exerciseId).flatMap(entry => entry.sets));
+    return getBestPRPerformance(sets, defMap.get(exerciseId), undefined, userWeight);
   }
 };
