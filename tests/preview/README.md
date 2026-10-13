@@ -1,6 +1,6 @@
 # Active workout mobile redesign review
 
-Review date: October 12, 2026. Changes remain uncommitted for user review.
+Review date: October 12, 2026. Approved for release after local user review.
 
 ## Local preview
 
@@ -89,12 +89,11 @@ mixed session had raw XP 304 (85 base + 14 volume + 85 PR + 120 cardio), with
 - TypeScript build: passed.
 - Production Vite/PWA build: passed, with existing CSS optimization and bundle
   size warnings.
-- All automated tests: 104 passed across eight files, including PR rehydration,
+- All automated tests: 107 passed across ten files after integrating current main, including PR rehydration,
   PR eligibility, cardio XP, XP replay, and the new overview tests.
 - Lint on every changed TypeScript/TSX file: passed.
-- Full-project lint: blocked by existing unused identifiers in
-  `src/pages/Profile.tsx:98` and `tests/prRehydration.test.ts:22`. Those unrelated
-  files were not changed.
+- Full-project lint: passed after removing two pre-existing unused bindings in
+  `src/pages/Profile.tsx` and `tests/prRehydration.test.ts`; no behavior changed.
 - Browser: overview and focused editor inspected at phone widths of 360px and
   430px, plus the desktop layout. The 430px DOM check found no horizontal overflow.
 - Browser: integer and sequential decimal entry (`22` then `.5`), whole-number
@@ -187,3 +186,14 @@ The connector now starts 4px below the preceding row, within the 12px gap, so it
 does not touch or run across the parent. The overview header uses equal-width
 side tracks to center its title and elapsed time independently of button width.
 Long workout names truncate on narrow screens without covering the controls.
+
+## Final integration verification
+
+Current main merged without conflicts, retaining recruiter-demo isolation and
+registered-account features. A browser check through the real app's `/demo`
+entry verified starting a fictional session, adding Bench Press, loading three
+historical ghost sets, showing PR 135 lb × 10 reps, completing the first ghost
+set as 135 lb × 8, opening the compact timer, and returning to overview with Done.
+The exercised flow logged no console errors. The review HTML and fictional
+review identifiers were absent from the production output. Real-account writes
+and physical-device checks remain outside this verification as noted above.

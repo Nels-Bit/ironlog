@@ -96,7 +96,7 @@ export const Profile = () => {
         setHeightInches(inches ? String(inches) : '');
         
         setLoading(false); // Instantly render page with stale data
-      } catch (e) {
+      } catch {
         // Ignore cache parsing errors
       }
     }
