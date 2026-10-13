@@ -1,5 +1,6 @@
 import type { User } from '@supabase/supabase-js';
 import type { DemoSeed, DemoRow } from './demo-transport';
+import { defaultNotificationPreferences } from '../utils/notifications';
 
 /** Fictional recruiter preview. Relative dates keep the activity calendar useful. */
 export function createIronLogSeed(now = Date.now()): DemoSeed {
@@ -40,9 +41,11 @@ export function createIronLogSeed(now = Date.now()): DemoSeed {
         { id: 'demo-friend-3', requester_id: 'demo-casey', addressee_id: 'demo-alex', status: 'pending', created_at, responded_at: null },
       ],
       notifications: [
-        { id: 'demo-note-1', recipient_id: 'demo-alex', actor_id: 'demo-jordan', type: 'workout_completed', message: 'Jordan Lee finished a Pull Day workout.', payload: { userId: 'demo_jordan' }, read_at: null, created_at },
-        { id: 'demo-note-2', recipient_id: 'demo-alex', actor_id: 'demo-casey', type: 'friend_request', message: 'Casey Chen sent you a friend request.', payload: { userId: 'demo_casey' }, read_at: null, created_at },
+        { id: 'demo-note-1', recipient_id: 'demo-alex', actor_id: 'demo-jordan', type: 'workout_completed', category:'friend_workout',title:'Jordan finished Pull Day',body:'3 exercises completed',message:'Jordan Lee finished a Pull Day workout.', payload: { userId: 'demo_jordan' }, read_at: null, deleted_at:null,in_app_visible:true, created_at },
+        { id: 'demo-note-2', recipient_id: 'demo-alex', actor_id: 'demo-casey', type: 'friend_request',category:'friend_request',title:'New friend request',body:'Casey Chen wants to connect.',message:'Casey Chen sent you a friend request.',payload:{userId:'demo_casey'},read_at:null,deleted_at:null,in_app_visible:true,created_at },
+        { id:'demo-note-3',recipient_id:'demo-alex',actor_id:null,type:'personal_record',category:'personal_pr',title:'New personal record!',body:'Bench Press · 135 lb × 10 reps',message:'New personal record!',read_at:null,deleted_at:null,in_app_visible:true,created_at:new Date(now-3600000).toISOString() },
       ],
+      notification_preferences:[{user_id:'demo-alex',...defaultNotificationPreferences('America/New_York')}],
     },
   };
 }

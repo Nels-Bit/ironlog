@@ -1,4 +1,4 @@
-import type { Exercise, WorkoutSession } from '../types';
+import type { Exercise, WorkoutSession } from '../types.js';
 
 export interface StreakSummary {
   currentStreak: number;
@@ -33,7 +33,6 @@ const XP_BASE = 250;
 const XP_STEP = 85;
 
 const normalizeDateKey = (value: number) => new Date(value).toISOString().slice(0, 10);
-const getDateKeyForToday = () => normalizeDateKey(Date.now());
 
 const countStreakEndingAt = (activeDays: Set<string>, endDateKey: string) => {
   let streak = 0;
@@ -110,9 +109,9 @@ const formatDateLabel = (value: number | null) => {
   });
 };
 
-export const calculateWorkoutStreak = (history: WorkoutSession[]): StreakSummary => {
-  const todayKey = getDateKeyForToday();
-  const yesterdayKey = new Date(Date.now() - DAY_MS).toISOString().slice(0, 10);
+export const calculateWorkoutStreak = (history: WorkoutSession[], referenceTime = Date.now()): StreakSummary => {
+  const todayKey = normalizeDateKey(referenceTime);
+  const yesterdayKey = new Date(referenceTime - DAY_MS).toISOString().slice(0, 10);
   const activeDays = new Set(history.filter(session => !isRestDaySession(session)).map(workout => normalizeDateKey(workout.startTime)));
   const sortedActiveDays = Array.from(activeDays).sort((a, b) => b.localeCompare(a));
   const hasWorkoutToday = sortedActiveDays.includes(todayKey);

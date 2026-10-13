@@ -1,5 +1,5 @@
-import type { WorkoutSession, Exercise } from '../types';
-import { getLevelProgress, getLevelRequirementXP } from './achievementUtils';
+import type { WorkoutSession, Exercise } from '../types.js';
+import { getLevelProgress, getLevelRequirementXP } from './achievementUtils.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

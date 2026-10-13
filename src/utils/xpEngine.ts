@@ -1,6 +1,6 @@
-import type { WorkoutSession, Exercise } from '../types';
-import { isRestDaySession } from './achievementUtils';
-import { getSetLoad, isEligibleForPR } from './workoutMath';
+import type { WorkoutSession, Exercise } from '../types.js';
+import { isRestDaySession } from './achievementUtils.js';
+import { getSetLoad, isEligibleForPR } from './workoutMath.js';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 export const BASE_XP = 85;

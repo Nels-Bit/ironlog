@@ -1,0 +1,99 @@
+# Notification Center and Web Push — local implementation report
+
+Verified October 13, 2026. Branch: `codex/notification-center-push`.
+Production upgrade and private rollback snapshots are verified, and the new app
+is deployed. GitHub submission is authorized. Current delivery limitations are
+recorded in `notification-release-status.md`.
+
+## Architecture and features
+
+The existing React/TypeScript/Vite UI, DaisyUI, React Query, Supabase Auth,
+Postgres/Realtime and Vercel Node API architecture are retained. One existing
+Workbox service worker imports the new push handler; no competing worker is added.
+
+- Notification Center: All/Unread/Friends/Personal, owned history pagination,
+  unread `9+` badge, contextual cards and authorized destinations, read/unread,
+  delete, mark-all-read, confirmed history clearing, empty/error/retry states.
+- Persisted account preferences: independent in-app/push categories, account
+  master push switch, optional friend activity sharing, reminder days/time/timezone,
+  quiet hours, and independently managed device subscriptions.
+- Saved-workout events: personal weight PRs with actual reps, XP, levels, trophies
+  and streak milestones; friend completions, optional PRs/trophies and friendship
+  requests/acceptance. Existing PR/XP/trophy rules are reused, including cardio.
+- Real Web Push implementation: standard encrypted `web-push` transport, VAPID,
+  explicit permission button, install guidance, test sends, secure click resolution,
+  device revocation on sign-out, endpoint expiration cleanup and account isolation.
+- Delivery reliability: database snapshots of first live finalizations, transactional
+  recipient fan-out, durable leased jobs, idempotency, bounded retries, expiration,
+  timezone/DST scheduling and send-time privacy/preference/reminder rechecks.
+- Privacy: recipient RLS and constrained mutations, private device credentials and
+  event snapshots, authenticated API and worker endpoint, request limits, endpoint
+  validation, generic lock-screen text and authorized read-only shared workouts.
+
+## Major files
+
+| Area | Files |
+|---|---|
+| Screens and shared state | `src/pages/Alerts.tsx`, `NotificationSettings.tsx`, `NotificationTarget.tsx`, `src/context/NotificationProvider.tsx`, `notificationContext.shared.ts`, `src/components/Navbar.tsx`, `src/App.tsx` |
+| Client services | `src/services/notificationService.ts`, `pushService.ts`, `socialService.ts`, `workoutService.ts`, `authService.ts` |
+| Rules and types | `src/utils/notificationEvents.ts`, `notifications.ts`, `workoutSchema.ts`, `achievementUtils.ts`, `src/types.ts` |
+| Backend | `api/notifications.ts`, `server/notificationWorker.ts`, `server/pushSecurity.ts` |
+| Database and scheduler | `supabase/migrations/20261013_notification_center_push.sql`, `supabase/setup/notifications-scheduler.sql` |
+| PWA and configuration | `public/push-worker.js`, `vite.config.ts`, `index.html`, `vercel.json`, `.env.example`, `tsconfig.node.json`, package files |
+| Isolated demo | `src/lib/demo-seed.ts`, `demo-transport.ts` |
+| Documentation and tests | This report, `docs/notification-plan.md`, `docs/notifications-deployment.md`, six new notification/push test files and a Postgres test helper |
+
+`web-push` is the only new runtime dependency. Its types and PGlite are
+development-only; PGlite exercises actual PostgreSQL rather than mocking SQL.
+
+## Exact local verification
+
+- Full test suite: **16 test files passed, 185 tests passed, 0 failed**.
+  This includes 78 new notification/push tests plus 107 existing regression tests.
+- Frontend and server TypeScript compilation: passed.
+- Additional NodeNext compilation and native Node invocation of the emitted API:
+  passed. Relative imports use explicit `.js` extensions for Vercel's ESM runtime.
+- Full-project ESLint: passed.
+- Production Vite/Workbox build: passed; one generated manifest and one worker
+  with the imported push handler. No private server-key names in frontend assets.
+- Git whitespace check: passed.
+- Browser review: 360px and 430px mobile viewports, no horizontal overflow,
+  minimum 44px header actions, filters, read/unread, deletion/clear, preference
+  persistence and authorized navigation in fictional demo mode. Fresh page load
+  had no captured warnings/errors after development hot-reload artifacts cleared.
+
+Database tests cover authenticated RLS and hidden credentials, independent channels,
+one account on multiple installations, logout/account rebinding, actual worker
+fan-out against PostgreSQL, privacy revocation, leases/retries/deduplication,
+expired endpoints, reminder suppression, quiet hours, timezone/DST and maintenance.
+Transport tests generate encrypted VAPID requests; network sends are mocked.
+Service-worker handlers are executed in tests, including malformed payloads and
+same-origin click routing. None of this proves display on a physical phone.
+
+## Remaining deployment and iPhone acceptance
+
+Follow `docs/notifications-deployment.md` for exact formats and commands:
+
+1. Apply the additive migration in staging after the existing social migrations.
+2. Set server-only Supabase service credentials, exact HTTPS `APP_ORIGIN`, stable
+   VAPID public/private/contact values, and a random worker secret. No secrets
+   were generated into or committed to this repository.
+3. Deploy the frontend and API together. Activate the protected minute scheduler
+   through Supabase pg_cron/pg_net/Vault and verify Realtime publications.
+4. On each supported iPhone, use Safari → Share → Add to Home Screen, launch
+   that installed app, open Notifications → settings → Enable notifications,
+   tap Allow, then send a test. Lock the phone and verify actual delivery/clicks;
+   repeat with the app closed, two devices on one account and two friend accounts.
+
+## Known limitations
+
+- Production backend/data flow, scheduler execution, physical
+  iPhones, system permission prompts and installed-PWA offline/update behavior
+  were not verified. Those are release gates, not completed acceptance claims.
+- Push-service acceptance is not phone display. Network acknowledgements can be
+  lost; transport is at-least-once, with stable topics/tags to coalesce duplicates.
+- Preview demo intentionally blocks real push and production writes.
+- Existing dependency advisories and non-failing build warnings (Browserslist
+  data, DaisyUI CSS optimization and bundle size) remain outside this feature.
+- Production rollout is now authorized but awaits the owner's private Supabase
+  service-role setting. GitHub publication remains unchanged from the local-only request.
