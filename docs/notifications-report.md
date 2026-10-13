@@ -70,9 +70,15 @@ Transport tests generate encrypted VAPID requests; network sends are mocked.
 Service-worker handlers are executed in tests, including malformed payloads and
 same-origin click routing. None of this proves display on a physical phone.
 
-## Remaining deployment and iPhone acceptance
+## Deployment reference and remaining iPhone acceptance
 
 Follow `docs/notifications-deployment.md` for exact formats and commands:
+
+The production migration, private backup, server configuration, frontend/API and
+protected scheduler are now deployed and checked. A manual worker probe and the
+first scheduled HTTP request returned 200. See `notification-release-status.md`
+for exact evidence. The infrastructure steps below are reference instructions,
+not remaining tasks; physical device and real event acceptance remain outstanding.
 
 1. Apply the additive migration in staging after the existing social migrations.
 2. Set server-only Supabase service credentials, exact HTTPS `APP_ORIGIN`, stable
@@ -87,13 +93,15 @@ Follow `docs/notifications-deployment.md` for exact formats and commands:
 
 ## Known limitations
 
-- Production backend/data flow, scheduler execution, physical
-  iPhones, system permission prompts and installed-PWA offline/update behavior
-  were not verified. Those are release gates, not completed acceptance claims.
+- Production worker connectivity and scheduled execution are verified with no
+  eligible devices/events. Real workout-to-inbox-to-push flow, physical iPhones,
+  system permission prompts and installed-PWA offline/update behavior still require
+  acceptance. Zero counters are not evidence that a phone received a push.
 - Push-service acceptance is not phone display. Network acknowledgements can be
   lost; transport is at-least-once, with stable topics/tags to coalesce duplicates.
 - Preview demo intentionally blocks real push and production writes.
 - Existing dependency advisories and non-failing build warnings (Browserslist
   data, DaisyUI CSS optimization and bundle size) remain outside this feature.
-- Production rollout is now authorized but awaits the owner's private Supabase
-  service-role setting. GitHub publication remains unchanged from the local-only request.
+- The owner corrected the server credential after confirming the earlier key came
+  from Daymark. No private credential was retrieved, displayed or committed.
+- GitHub submission is PR #31 on `codex/notification-center-push`; it is not merged.

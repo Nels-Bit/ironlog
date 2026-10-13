@@ -6,9 +6,10 @@ This implementation is on `codex/notification-center-push`. The owner has now
 approved production rollout. Preparation has configured Production-only push keys
 and verified a hosted preview; see `notification-release-status.md` for the current
 release gate and deployment evidence. The approved database upgrade and private
-rollback copies are now verified, and the production app is deployed. Scheduling
-awaits correction of a server credential rejected by Supabase. Automated tests cannot establish
-that a physical iPhone displayed a notification.
+rollback copies are now verified, and the production app is deployed. The corrected
+IronLog server credential passed the live worker test; the protected minute schedule
+is active and its first scheduled HTTP request returned 200. No phones are registered
+yet. Automated tests cannot establish that a physical iPhone displayed a notification.
 
 ## Architecture
 
@@ -42,7 +43,7 @@ keys for deduplication without showing deleted records in the inbox or unread co
 In-app and push categories are independent: push-only events retain a hidden owned
 record for authorization/deduplication, excluded from inbox pages and unread counts.
 
-## Deployment checklist (not performed)
+## Deployment checklist (reference; live status is recorded separately)
 
 1. Back up the database. Confirm existing social/workout/exercise tables and deploy
    existing social migrations first. Apply
@@ -54,7 +55,7 @@ record for authorization/deduplication, excluded from inbox pages and unread cou
    |---|---|
    | SUPABASE_URL | `https://<project-ref>.supabase.co` |
    | SUPABASE_ANON_KEY | Existing project's public anon/publishable-compatible key |
-   | SUPABASE_SERVICE_ROLE_KEY | Privileged service_role key, server only |
+   | SUPABASE_SERVICE_ROLE_KEY | IronLog privileged service_role or modern `sb_secret_` key, server only |
    | APP_ORIGIN | Exact HTTPS app origin, no trailing slash |
    | VAPID_PUBLIC_KEY | URL-safe base64 uncompressed P-256 public key, 65 bytes |
    | VAPID_PRIVATE_KEY | URL-safe base64 P-256 private key, 32 bytes, server only |
@@ -148,8 +149,9 @@ Minute-worker maintenance removes invalidated device credentials after 30 days,
 processed event rows after 90 days, and stale rate-limit windows. Inbox event keys
 remain for deduplication, including after soft deletion.
 
-The live Supabase migration and rollback snapshots are verified; actual scheduled
-delivery, installed-PWA update and physical iPhone delivery remain unverified.
+The live Supabase migration, rollback snapshots, worker connection and scheduled
+worker execution are verified. Real push-service acceptance, installed-PWA update
+and physical iPhone delivery remain unverified.
 Preview push is intentionally disabled in
 fictional demo mode. Multi-worker locking was exercised through actual Postgres
 leases; embedded tests are serial and do not reproduce real distributed transport
