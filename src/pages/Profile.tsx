@@ -1,3 +1,4 @@
+import { appStorage } from '../lib/demo-session';
 import { useState, useEffect, type ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
@@ -66,11 +67,11 @@ export const Profile = () => {
 
   useEffect(() => {
     // Stale-While-Revalidate: Load cached data immediately to skip the skeleton
-    const cachedProfile = localStorage.getItem('profile_cache_user');
-    const cachedXP = localStorage.getItem('profile_cache_xp');
-    const cachedTrophies = localStorage.getItem('profile_cache_trophies');
-    const cachedHistory = localStorage.getItem('profile_cache_history');
-    const cachedFriends = localStorage.getItem('profile_cache_friends');
+    const cachedProfile = appStorage.getItem('profile_cache_user');
+    const cachedXP = appStorage.getItem('profile_cache_xp');
+    const cachedTrophies = appStorage.getItem('profile_cache_trophies');
+    const cachedHistory = appStorage.getItem('profile_cache_history');
+    const cachedFriends = appStorage.getItem('profile_cache_friends');
 
     if (cachedProfile && cachedXP && cachedTrophies && cachedHistory) {
       try {
@@ -193,11 +194,11 @@ export const Profile = () => {
       setSocialError(socialErr);
 
       // Save to cache for instant loading next time (Stale-While-Revalidate)
-      if (user) localStorage.setItem('profile_cache_user', JSON.stringify(user));
-      localStorage.setItem('profile_cache_xp', JSON.stringify(xp));
-      localStorage.setItem('profile_cache_trophies', JSON.stringify(cabinet));
-      localStorage.setItem('profile_cache_history', JSON.stringify(history));
-      localStorage.setItem('profile_cache_friends', JSON.stringify(friendsData));
+      if (user) appStorage.setItem('profile_cache_user', JSON.stringify(user));
+      appStorage.setItem('profile_cache_xp', JSON.stringify(xp));
+      appStorage.setItem('profile_cache_trophies', JSON.stringify(cabinet));
+      appStorage.setItem('profile_cache_history', JSON.stringify(history));
+      appStorage.setItem('profile_cache_friends', JSON.stringify(friendsData));
     } catch (error) {
       console.error(error);
     } finally {
