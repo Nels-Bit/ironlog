@@ -34,6 +34,9 @@ html, body {
 */
 :root {
   color-scheme: dark;
+  --mobile-nav-content-height: 6rem;
+  /* Match the navbar content, 1px border, and safe area, then add a visible gap. */
+  --rest-timer-bottom: calc(var(--mobile-nav-content-height) + 1px + env(safe-area-inset-bottom, 0px) + 0.75rem);
 }
 
 body {

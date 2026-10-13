@@ -19,7 +19,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { calculateWorkoutXP, replayAllXP } from '../src/utils/xpEngine';
+import { replayAllXP } from '../src/utils/xpEngine';
 import { getSetLoad, shouldCountSetForPR } from '../src/utils/workoutMath';
 import type { WorkoutSession, Exercise, ExerciseSet } from '../src/types';
 

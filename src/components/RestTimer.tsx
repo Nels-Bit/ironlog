@@ -130,16 +130,15 @@ export const RestTimer = () => {
 
   if (!isOpen) return null;
 
-  const progressPct = isOvertime ? 0 : Math.min(100, (timeLeft / initialSeconds) * 100);
-
   // --- MINIMIZED DOCKED BUBBLE ---
   if (isDocked) {
     return (
-      <div className="fixed left-4 bottom-[calc(6.5rem+env(safe-area-inset-bottom,0px))] md:bottom-6 z-40 transition-all duration-300">
+      <div role="region" aria-label="Rest timer" className="fixed left-4 bottom-[var(--rest-timer-bottom)] md:bottom-6 z-40 transition-all duration-300">
         <motion.button
           initial={{ x: -50, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           onClick={undockRestTimer}
+          aria-label="Expand rest timer"
           className={cn(
             "flex items-center gap-3 px-4 py-3 rounded-full shadow-2xl backdrop-blur-md active:scale-95 transition-all",
             isOvertime ? "bg-red-950/90 border border-red-500/30 text-red-400" : "bg-zinc-900/90 border border-white/10 text-brand-orange"
@@ -154,81 +153,52 @@ export const RestTimer = () => {
     );
   }
 
-  // --- FULL REST TIMER ---
+  // All four actions share one compact row; every button stays 44px on phones.
   return (
-    <div className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom,0px))] left-0 right-0 z-40 px-4 md:bottom-6 md:left-auto md:right-6 md:w-96 md:px-0 transition-all duration-300 ease-out">
+    <div role="region" aria-label="Rest timer" className="fixed bottom-[var(--rest-timer-bottom)] left-0 right-0 z-40 px-4 md:bottom-6 md:left-auto md:right-6 md:w-96 md:px-0 transition-all duration-300 ease-out">
       <div
         className={cn(
-          'backdrop-blur-xl border rounded-3xl p-5 shadow-2xl shadow-black/50 animate-in slide-in-from-bottom-10 fade-in duration-300',
+          'grid grid-cols-[44px_44px_minmax(0,1fr)_44px_44px] items-center gap-1 rounded-2xl border px-2 py-2 backdrop-blur-xl shadow-2xl shadow-black/50 animate-in slide-in-from-bottom-10 fade-in duration-300',
           isOvertime ? 'bg-red-950/95 border-red-500/40' : 'bg-zinc-900/80 border-white/10'
         )}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4 w-full px-2">
-          {/* Minimize / Hide (Left) */}
           <button
             onClick={dockRestTimer}
-            className="btn btn-circle btn-ghost btn-sm text-zinc-400 hover:text-white"
+            aria-label="Minimize rest timer"
+            className="btn btn-circle btn-ghost h-11 w-11 min-h-11 text-zinc-400 hover:text-white"
           >
             <Minimize2 size={18} />
           </button>
           
-          {/* Label (Center) */}
-          <div className={cn('flex items-center gap-2', isOvertime ? 'text-red-400' : 'text-brand-orange')}>
-            <Timer size={18} className="animate-pulse" />
-            <span className="text-[10px] font-bold uppercase tracking-widest badge badge-ghost border-white/10 opacity-80">
-              {isOvertime ? 'Overtime' : 'Rest Timer'}
-            </span>
-          </div>
-
-          {/* Close / X (Right) */}
-          <button
-            onClick={closeRestTimer}
-            className="btn btn-circle btn-ghost btn-sm text-zinc-400 hover:text-white"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Time display + controls */}
-        <div className="flex items-center justify-between gap-4 mt-2">
           <button
             onClick={() => adjustTime(-15)}
-            className="btn btn-circle btn-ghost bg-white/5 border-white/5 text-zinc-400 hover:bg-white/10 hover:text-white"
+            aria-label="Subtract 15 seconds"
+            className="btn btn-circle btn-ghost h-11 w-11 min-h-11 bg-white/5 border-white/5 text-zinc-400 hover:bg-white/10 hover:text-white"
           >
             <Minus size={20} />
           </button>
 
-          <div className="flex-1 text-center">
-            {isOvertime ? (
-              <span className="text-5xl font-black tabular-nums tracking-tight text-red-400 animate-pulse">
-                -{formatTime(overtime)}
-              </span>
-            ) : (
-              <span className="text-5xl font-black text-white tabular-nums tracking-tight">
-                {formatTime(timeLeft)}
-              </span>
-            )}
-          </div>
+          <span
+            aria-label={isOvertime ? `Overtime ${formatTime(overtime)}` : `${formatTime(timeLeft)} remaining`}
+            className={cn('min-w-0 text-center font-mono text-xl font-black tabular-nums tracking-tight sm:text-2xl', isOvertime ? 'text-red-400' : 'text-white')}
+          >
+            {isOvertime ? '-' + formatTime(overtime) : formatTime(timeLeft)}
+          </span>
 
           <button
             onClick={() => adjustTime(15)}
-            className="btn btn-circle btn-ghost bg-white/5 border-white/5 text-zinc-400 hover:bg-white/10 hover:text-white"
+            aria-label="Add 15 seconds"
+            className="btn btn-circle btn-ghost h-11 w-11 min-h-11 bg-white/5 border-white/5 text-zinc-400 hover:bg-white/10 hover:text-white"
           >
             <Plus size={20} />
           </button>
-        </div>
-
-        {/* Progress bar */}
-        <div className="w-full h-1.5 bg-black/40 rounded-full mt-6 overflow-hidden">
-          <div
-            className={cn(
-              'h-full rounded-full transition-all duration-1000 ease-linear',
-              isOvertime ? 'w-full bg-red-500 animate-pulse' : 'bg-brand-orange'
-            )}
-            style={isOvertime ? undefined : { width: progressPct + '%' }}
-          />
-        </div>
+          <button
+            onClick={closeRestTimer}
+            aria-label="Close rest timer"
+            className="btn btn-circle btn-ghost h-11 w-11 min-h-11 text-zinc-400 hover:text-white"
+          >
+            <X size={20} />
+          </button>
       </div>
     </div>
   );

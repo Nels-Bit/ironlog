@@ -7,6 +7,8 @@ export interface WorkoutContextType {
   isActive: boolean;
   historyCache: Map<string, ExerciseSet[]>;
   prCache: Map<string, number>;
+  /** Actual historical PR set, used only to display matching reps. */
+  prSetCache: Map<string, ExerciseSet | null>;
   /** Exercise IDs whose historical PR baseline has been loaded from Supabase.
    *  Until an exercise's ID appears in this set, suppress PR indicators to prevent
    *  the false-positive flash that occurs after a cold PWA restart when prCache is empty. */
@@ -18,6 +20,7 @@ export interface WorkoutContextType {
   addExercise: (exDef: Exercise) => void;
   hydrateExerciseGhostSets: (workoutExerciseId: string, exerciseId: string, sets: ExerciseSet[]) => void;
   removeExercise: (index: number) => void;
+  moveExercise: (workoutExerciseId: string, direction: 'up' | 'down') => void;
   addSet: (exIndex: number, insertIndex?: number) => void;
   removeSet: (exIndex: number, setIndex: number) => void;
   updateSet: <K extends keyof ExerciseSet>(exIndex: number, setIndex: number, field: K, value: ExerciseSet[K]) => void;

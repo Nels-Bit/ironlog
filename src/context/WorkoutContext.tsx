@@ -14,6 +14,7 @@ import {
 } from '../utils/workoutMath';
 import type { WorkoutSession, WorkoutExercise, Exercise, ExerciseSet } from '../types';
 import { WorkoutContext } from './workoutContext.shared';
+import { moveWorkoutExercise } from '../utils/exerciseLogging';
 
 export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
   const [workout, setWorkout] = useState<WorkoutSession | null>(() => {
@@ -67,6 +68,7 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
   const [exerciseDefs, setExerciseDefs] = useState<Map<string, Exercise>>(new Map<string, Exercise>());
   const [historyCache, setHistoryCache] = useState<Map<string, ExerciseSet[]>>(new Map());
   const [prCache, setPrCache] = useState<Map<string, number>>(new Map());
+  const [prSetCache, setPrSetCache] = useState<Map<string, ExerciseSet | null>>(new Map());
   /**
    * Tracks which exercise IDs have had their historical PR baseline fetched from Supabase.
    * This is distinct from prCache to handle the "0 PR" case (exercise exists in history
@@ -106,18 +108,21 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
 
   /**
    * Shared helper: fetch the historical PR baseline for a single exercise from Supabase
-   * and update both prCache and prCacheReady. This is the ONE source of truth used by
+   * and update prCache, matching set details, and prCacheReady together. This is used by
    * both addExercise() (new exercises) and the rehydration effect (restored exercises).
    *
-   * Crucially, getPersonalRecord() scans COMPLETED workouts in Supabase — the active
+   * Crucially, getPersonalRecordPerformance() scans saved workout history — the active
    * workout is not yet saved, so it is never included in the baseline. This means
    * a 230 lb set in the active workout does NOT inflate historicPR to 230 lb;
    * the baseline correctly remains at whatever was logged in prior completed sessions.
    */
   const fetchAndCacheHistoricalPR = useCallback((exerciseId: string) => {
-    void workoutService.getPersonalRecord(exerciseId).then(prValue => {
-      setPrCache(prev => new Map(prev).set(exerciseId, prValue));
+    void workoutService.getPersonalRecordPerformance(exerciseId).then(record => {
+      setPrCache(prev => new Map(prev).set(exerciseId, record.load));
+      setPrSetCache(prev => new Map(prev).set(exerciseId, record.set));
       setPrCacheReady(prev => new Set(prev).add(exerciseId));
+    }).catch(error => {
+      console.error('Unable to load historical PR:', error);
     });
   }, []);
 
@@ -175,6 +180,7 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
     setElapsed(0);
     setHistoryCache(new Map());
     setPrCache(new Map());
+    setPrSetCache(new Map());
     setPrCacheReady(new Set());
   };
 
@@ -195,6 +201,7 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
     setWorkout(null);
     setElapsed(0);
     setPrCache(new Map());
+    setPrSetCache(new Map());
     setPrCacheReady(new Set());
     closeRestTimer();
   };
@@ -230,6 +237,7 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
     const saved = await workoutService.saveWorkout(final);
     setWorkout(null);
     setPrCache(new Map());
+    setPrSetCache(new Map());
     setPrCacheReady(new Set());
     if (saved?.id) {
       socialService.dispatchFriendMilestones(saved.id).catch(err => {
@@ -281,10 +289,12 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
       const current = prev.exercises[exerciseIndex];
       const onlyUntouchedDefault = current.sets.length === 1
         && !current.sets[0].isCompleted
-        && current.sets[0].weight === null
-        && current.sets[0].reps === null
-        && current.sets[0].distance === null
-        && current.sets[0].durationSeconds === null;
+        && current.sets[0].weight == null
+        && current.sets[0].reps == null
+        && current.sets[0].repsLeft == null
+        && current.sets[0].repsRight == null
+        && current.sets[0].distance == null
+        && current.sets[0].durationSeconds == null;
       if (!onlyUntouchedDefault) return prev;
 
       const ids = new Map<string, string>();
@@ -327,6 +337,14 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
+  const moveExercise = (workoutExerciseId: string, direction: 'up' | 'down') => {
+    setWorkout(prev => {
+      if (!prev) return null;
+      const exercises = moveWorkoutExercise(prev.exercises, workoutExerciseId, direction);
+      return exercises === prev.exercises ? prev : { ...prev, exercises };
+    });
+  };
+
   const removeSet = (exIndex: number, setIndex: number) => {
     setWorkout(prev => {
       if (!prev) return null;
@@ -352,9 +370,9 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
   return (
     <WorkoutContext.Provider value={{
       workout: resolvedWorkout, elapsed, isActive: !!resolvedWorkout,
-      historyCache, prCache, prCacheReady,
+      historyCache, prCache, prSetCache, prCacheReady,
       startWorkout, logRestDay, cancelWorkout, finishWorkout,
-      addExercise, hydrateExerciseGhostSets, removeExercise, addSet, removeSet, updateSet,
+      addExercise, hydrateExerciseGhostSets, removeExercise, moveExercise, addSet, removeSet, updateSet,
       exerciseDefs,
       restTimer: { ...restTimerState, prefs: restTimerPrefs },
       openRestTimer, closeRestTimer, dockRestTimer, undockRestTimer, updateRestTimerPref

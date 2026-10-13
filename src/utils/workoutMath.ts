@@ -1,4 +1,4 @@
-import type { Exercise, ExerciseSet, WorkoutExercise } from '../types';
+import type { Exercise, ExerciseSet, PersonalRecordPerformance, WorkoutExercise } from '../types';
 
 export const parseUserWeight = (value: unknown): number | null => {
   const parsed = typeof value === 'number'
@@ -102,6 +102,22 @@ export const shouldCountSetForPR = (
   if (!isEligibleForPR(set.type)) return false;
   return shouldCountSetForVolume(set, def, workoutBodyWeight, userWeight);
 };
+
+/** Weight remains the PR criterion. For tied loads, display the most reps
+ * actually completed at that load, never reps from a lighter set. */
+export const getBestPRPerformance = (
+  sets: ExerciseSet[],
+  def?: Exercise,
+  workoutBodyWeight?: number | null,
+  userWeight?: number | null
+): PersonalRecordPerformance => sets.reduce<PersonalRecordPerformance>((best, set) => {
+  if (!shouldCountSetForPR(set, def, workoutBodyWeight, userWeight)) return best;
+  const load = getSetLoad(set, def, workoutBodyWeight, userWeight);
+  if (load > best.load || (load === best.load && getTotalReps(set, def) > getTotalReps(best.set ?? set, def))) {
+    return { load, set };
+  }
+  return best;
+}, { load: 0, set: null });
 
 export const applyBodyWeightToExercises = (
   exercises: WorkoutExercise[],

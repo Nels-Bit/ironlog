@@ -52,7 +52,7 @@ export const Navbar = () => {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-[100] bg-iron-950/95 backdrop-blur-xl border-t border-white/10 md:left-0 md:top-0 md:bottom-0 md:w-64 md:border-r md:border-t-0 pb-safe">
-      <div className="flex justify-around items-center h-24 md:flex-col md:h-full md:justify-start md:pt-10 md:gap-5">
+      <div className="flex justify-around items-center h-[var(--mobile-nav-content-height)] md:flex-col md:h-full md:justify-start md:pt-10 md:gap-5">
         
         {/* DESKTOP LOGO */}
         <div className="hidden md:block mb-6">
