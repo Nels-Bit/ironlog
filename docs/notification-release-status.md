@@ -100,3 +100,21 @@ not a failed worker/database request. Broader dependency updates remain out of s
 4. Review and merge PR #31 separately; physical device acceptance remains outstanding.
 
 See `notifications-deployment.md` for the full operational and iPhone checklist.
+
+## Later notification / barbell refinement
+
+The owner subsequently requested removal of personal PR/level/trophy/streak
+alerts, descriptive friend push text and three canonical barbell names. This
+refinement is live: deployment `dpl_7zzvZp4MiMscNkG1yr2jfzt13EYV`, runtime commit
+`483ae3e0dcfc34f3597785304af26b594f3994e6`, Production READY, same stable origin.
+All 216 tests and build/type/lint checks pass. Manual worker request 505 and the
+independent scheduled request 506 returned HTTP 200. Only the existing Node
+DEP0169 deprecation warning appeared in the error-log scan.
+
+The new private backup contains all 253 workouts immediately before the identity
+merge. No workouts/exercises were deleted; no sets or other workout fields changed.
+The existing custom Barbell Squat owns its matching history; machine Squat is
+unchanged. Personal alerts are hidden/cancelled recoverably. See
+`notification-refinement.md` for the exact rules, migration and verification.
+This supersedes the initial personal-alert/generic-preview behavior, not the
+remaining physical phone acceptance requirement. PR #31 remains unmerged.

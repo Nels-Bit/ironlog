@@ -49,3 +49,20 @@ and cannot insert/forge them. See `notification-backup.md` for recovery rules.
 Physical lock-screen display and real two-friend/multi-device acceptance remain
 manual checks. Mocked transport and server acknowledgements do not prove display.
 GitHub changes remain on `codex/notification-center-push` / PR #31, not main.
+
+## Published verification
+
+Production deployment `dpl_7zzvZp4MiMscNkG1yr2jfzt13EYV` is READY at
+`https://iron-log-tau.vercel.app`, runtime commit
+`483ae3e0dcfc34f3597785304af26b594f3994e6` (approximately 28 seconds building).
+Protected worker request 505 returned HTTP 200; independently scheduled request
+506 at 01:41 UTC October 14 (21:41 October 13 America/New_York) also returned 200.
+Counters were zero, not evidence of delivery to a phone. The minute schedule
+remains active. The error scan found only the existing Node DEP0169 dependency
+deprecation warning, not a failed request.
+
+The published demo shows the new notification navigation and all three canonical
+trophy labels. An already-cached browser initially displayed its previous PWA
+bundle; one reload activated the new version. Users should reopen/refresh their
+installed app to pick up the new worker and interface. PR #31's description now
+reflects the corrected credential, active scheduler, 216 tests and this merge.
