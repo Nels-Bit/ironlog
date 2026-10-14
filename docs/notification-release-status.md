@@ -118,3 +118,15 @@ unchanged. Personal alerts are hidden/cancelled recoverably. See
 `notification-refinement.md` for the exact rules, migration and verification.
 This supersedes the initial personal-alert/generic-preview behavior, not the
 remaining physical phone acceptance requirement. PR #31 remains unmerged.
+
+## Latest settings simplification
+
+The four follow-up UI requests are live: single category switches, automatic
+device timezone, no app quiet hours, and sharing beside Profile Privacy.
+Deployment `dpl_4nVmek2MMez8swVpZsHkRAsAw2un` is Production READY; runtime
+commit `4387afd31e172a865818bf06914968c8db2a0b51`. All 222 tests, type/lint/build
+checks and 360px/430px browser checks pass. Worker request 549 and independent
+scheduled request 550 returned HTTP 200; the scheduler stays active. New settings
+and privacy snapshots are private, profiles/workouts remain unchanged by this
+migration, and existing opt-outs are preserved. See
+`notification-settings-simplification.md` for behavior, security and limitations.

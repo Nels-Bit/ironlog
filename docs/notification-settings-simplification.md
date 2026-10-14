@@ -51,3 +51,24 @@ silence an informational advisor notice.
   no quiet-hour block, and no horizontal overflow at 360px/430px.
 - Existing non-failing build warnings and physical phone acceptance limitations
   remain unchanged. The feature branch and PR #31 remain separate from main.
+
+## Published result
+
+Production deployment `dpl_4nVmek2MMez8swVpZsHkRAsAw2un` is READY at
+`https://iron-log-tau.vercel.app`, runtime commit
+`4387afd31e172a865818bf06914968c8db2a0b51` (about 28 seconds building).
+Manual worker request 549 and independent scheduled request 550 both returned
+HTTP 200; the minute scheduler remains active. Counters were zero, not proof of
+phone display. The runtime scan found only the existing Node DEP0169 dependency
+deprecation warning. The security advisor found no findings for either new
+function. Published demo UI has five category switches plus the account push
+master, no manual timezone/quiet/sharing controls on Notification Settings, and
+sharing beside Profile Privacy. After saving a fictional sharing opt-out and
+separately saving notification categories, that sharing opt-out was retained.
+No real-account preferences were changed for browser acceptance testing.
+
+Existing advisor follow-up references (not changes introduced here):
+[legacy privileged functions](https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable),
+[search paths](https://supabase.com/docs/guides/database/database-linter?lint=0011_function_search_path_mutable),
+[extension placement](https://supabase.com/docs/guides/database/database-linter?lint=0014_extension_in_public),
+[password protection](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection).
