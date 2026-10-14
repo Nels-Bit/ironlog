@@ -257,7 +257,7 @@ describe("actual Postgres migration, authorization and durable fan-out", () => {
     ).toBeGreaterThan(0);
     expect(await count("push_delivery_jobs")).toBe(0);
   });
-  it("push-only categories persist secure hidden records independently of inbox visibility", async () => {
+  it("legacy single-channel opt-outs disable both channels", async () => {
     await db.query(
       `UPDATE notification_preferences SET in_app=jsonb_set(in_app,'{friend_workout}','false') WHERE user_id=$1`,
       [userB],
@@ -268,13 +268,13 @@ describe("actual Postgres migration, authorization and durable fan-out", () => {
     expect(
       await count(
         "notifications",
-        `recipient_id='${userB}' AND category='friend_workout' AND in_app_visible=false`,
+        `recipient_id='${userB}' AND category='friend_workout'`,
       ),
-    ).toBe(1);
+    ).toBe(0);
     const send = vi
       .fn()
       .mockResolvedValue({ statusCode: 201, headers: {}, body: "" });
-    expect((await deliverPushJobs(client, null, send)).accepted).toBe(2);
+    expect((await deliverPushJobs(client, null, send)).accepted).toBe(0);
   });
   it("repeat registration keeps one endpoint; new installs do not overwrite old ones", async () => {
     await db.query(`SELECT register_push_install($1,$2,$3,$4,$5,false)`, [
@@ -348,6 +348,7 @@ describe("actual Postgres migration, authorization and durable fan-out", () => {
   it("read/unread/delete states are authoritative across devices, owner-only", async () => {
     await complete();
     await processNotificationEvents(databaseWorkerClient(db));
+    const initialCount = await count("notifications", `recipient_id='${userB}'`);
     const row = (
       await db.query<{ id: string }>(
         `SELECT id FROM notifications WHERE recipient_id=$1 LIMIT 1`,
@@ -360,7 +361,7 @@ describe("actual Postgres migration, authorization and durable fan-out", () => {
     await db.query("SELECT notification_state($1,$2)", [row.id, "unread"]);
     expect(await count("notifications", "read_at IS NOT NULL")).toBe(0);
     await db.query("SELECT notification_state($1,$2)", [row.id, "delete"]);
-    expect(await count("notifications", "deleted_at IS NULL")).toBe(1);
+    expect(await count("notifications", "deleted_at IS NULL")).toBe(initialCount - 1);
     await asUser(userC);
     expect(await count("notifications")).toBe(0);
     await db.query("SELECT notification_state($1,$2)", [row.id, "unread"]);
@@ -475,7 +476,7 @@ describe("actual Postgres migration, authorization and durable fan-out", () => {
     expect(result.invalidated).toBe(1);
     expect(result.accepted).toBe(1);
   });
-  it("quiet hours retain inbox entries and defer unexpired push jobs without consuming retries", async () => {
+  it("old quiet-hour settings cannot defer delivery; phone DND handles silence", async () => {
     await complete();
     const client = databaseWorkerClient(db);
     await processNotificationEvents(client);
@@ -486,12 +487,12 @@ describe("actual Postgres migration, authorization and durable fan-out", () => {
       "UPDATE notification_preferences SET quiet_enabled=true,quiet_start=$1,quiet_end=$2 WHERE user_id=$3",
       [start, end, userB],
     );
-    const send = vi.fn();
+    const send = vi.fn().mockResolvedValue({statusCode:201,headers:{},body:''});
     await deliverPushJobs(client, null, send);
-    expect(send).not.toHaveBeenCalled();
+    expect(send).toHaveBeenCalledTimes(2);
     expect(
       await count("push_delivery_jobs", `state='pending' AND attempts=0`),
-    ).toBe(2);
+    ).toBe(0);
   });
   it("friend requests and acceptance transitions are generated once on the server", async () => {
     const request = (

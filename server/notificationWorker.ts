@@ -7,7 +7,7 @@ import {
   buildWorkoutNotifications,
   type WorkoutEventSnapshot,
 } from "../src/utils/notificationEvents.js";
-import { inQuietHours, normalizePreferences } from "../src/utils/notifications.js";
+import { normalizePreferences } from "../src/utils/notifications.js";
 import {
   pushFailureDisposition,
   validatePushSubscription,
@@ -209,13 +209,6 @@ export async function deliverPushJobs(
           result.skipped++;
           continue;
         }
-      }
-      if (inQuietHours(prefs, new Date())) {
-        await finish({
-          available_at: new Date(Date.now() + 60_000).toISOString(),
-          attempts: Math.max(0, job.attempts - 1),
-        });
-        continue;
       }
       const vapid = {
         subject: process.env.VAPID_SUBJECT!,

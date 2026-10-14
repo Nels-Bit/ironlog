@@ -47,6 +47,18 @@ export function createDemoProvider(seed: DemoSeed, onExit: () => void = () => {}
         for (const row of rows) { if(action==='read') row.read_at ||= new Date().toISOString(); if(action==='unread') row.read_at=null; if(action==='delete'||action==='clear') row.deleted_at=new Date().toISOString(); }
         return response(rows.length);
       }
+      if (url.pathname === '/rest/v1/rpc/save_social_privacy') {
+        const body = JSON.parse(String(init?.body || '{}'));
+        if (typeof body.p_is_public !== 'boolean' || typeof body.p_share_activity !== 'boolean') return response({message:'Invalid privacy setting'},400);
+        const profile = state.tables.user_profiles?.find(r => r.user_id === state.user.id);
+        if (!profile) return response({message:'Demo profile missing.'},404);
+        profile.is_public = body.p_is_public;
+        const preferences = state.tables.notification_preferences ||= [];
+        const saved = preferences.find(r => r.user_id === state.user.id);
+        if (saved) saved.share_activity = body.p_share_activity;
+        else preferences.push({user_id:state.user.id,share_activity:body.p_share_activity});
+        return response(null);
+      }
       if (url.pathname === '/rest/v1/rpc/notification_target') {
         const body=JSON.parse(String(init?.body || '{}'));
         const note=state.tables.notifications?.find(r=>r.id===body.p_id && r.recipient_id===state.user.id && r.deleted_at==null);

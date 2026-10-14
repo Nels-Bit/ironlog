@@ -7,6 +7,7 @@ import { devicePushSupport, pushService } from "../services/pushService";
 import { isDemoSession } from "../lib/demo-session";
 import {
   notificationCategories,
+  deviceTimezone,
   type NotificationCategory,
   type NotificationPreferences,
 } from "../utils/notifications";
@@ -49,7 +50,7 @@ export const NotificationSettings = () => {
         setMessage(
           result.accepted
             ? `Push service accepted ${result.accepted} delivery attempt(s). Check your phone; display is not guaranteed.`
-            : "Test saved. No push was accepted yet; check subscriptions, category settings and quiet hours.",
+            : "Test saved. No push was accepted yet; check device subscriptions and account push settings.",
         );
       }
       await client.invalidateQueries({
@@ -241,42 +242,40 @@ const PreferencesForm = ({
         />
       </label>
       <div className="card border border-white/10 p-4">
-        <div className="grid grid-cols-[minmax(0,1fr)_52px_52px] gap-1 text-xs text-zinc-500">
+        <div className="flex items-center justify-between gap-3 text-xs text-zinc-500">
           <span>Categories</span>
-          <span className="text-center">In app</span>
-          <span className="text-center">Push</span>
+          <span>Enabled</span>
         </div>
         {categories.map(([key, label]) => (
           <div
             key={key}
-            className="grid min-h-14 grid-cols-[minmax(0,1fr)_52px_52px] items-center gap-1 border-b border-white/5 last:border-0"
+            className="flex min-h-14 items-center justify-between gap-3 border-b border-white/5 last:border-0"
           >
             <span className="text-sm">{label}</span>
-            {(["in_app", "push"] as const).map((channel) => (
-              <label
-                key={channel}
-                className="flex min-h-11 items-center justify-center"
-              >
+              <label className="flex min-h-11 min-w-11 items-center justify-center">
                 <input
-                  aria-label={`${label} ${channel === "in_app" ? "in app" : "push"}`}
+                  aria-label={label}
                   type="checkbox"
                   className="toggle toggle-sm border-brand-orange bg-brand-orange"
-                  checked={p[channel][key]}
-                  onChange={(e) =>
-                    set(channel, { ...p[channel], [key]: e.target.checked })
-                  }
+                  checked={p.in_app[key] && p.push[key]}
+                  onChange={(e) => {
+                    const enabled = e.target.checked;
+                    setP(current => ({ ...current,
+                      in_app: { ...current.in_app, [key]: enabled },
+                      push: { ...current.push, [key]: enabled },
+                    }));
+                  }}
                 />
               </label>
-            ))}
           </div>
         ))}
         <p className="mt-3 text-xs text-zinc-500">
           Personal PR, level, trophy and streak alerts are not sent. Friend PR
           alerts cover only Barbell Squat, Barbell Deadlift and Barbell Bench Press.
           Push previews show the sender and event details on your lock screen.
-          In-app and push categories are independent. Push also requires account
-          push and a device subscription. Changes affect future events, not old
-          history.
+          Each switch controls both in-app and push alerts. Phone delivery also
+          requires account push, system permission and a device subscription.
+          Changes affect future events, not old history.
         </p>
       </div>
       <div className="card space-y-3 border border-white/10 p-4">
@@ -312,79 +311,17 @@ const PreferencesForm = ({
             </button>
           ))}
         </div>
-        <label className="block text-sm">
-          Timezone
-          <input
-            aria-label="Reminder timezone"
-            value={p.timezone}
-            onChange={(e) => set("timezone", e.target.value)}
-            className="input mt-2 min-h-11 w-full bg-white/5"
-          />
-        </label>
-        <button
-          type="button"
-          onClick={() =>
-            set(
-              "timezone",
-              Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-            )
-          }
-          className="btn btn-ghost min-h-11 text-xs"
-        >
-          Use this device’s timezone
-        </button>
         <p className="text-xs text-zinc-500">
-          Account timezone stays fixed until you change it. Daylight-saving
-          changes are automatic. Reminders are skipped after a completed workout
-          that local day.
+          Uses this device’s timezone automatically ({deviceTimezone()}).
+          The most recently active device sets reminder times across your account.
+          Daylight-saving changes are automatic. Reminders are skipped after a
+          completed workout that local day.
         </p>
       </div>
-      <div className="card space-y-3 border border-white/10 p-4">
-        <label className="flex min-h-11 items-center justify-between gap-3">
-          <span className="font-bold">Quiet hours</span>
-          <input
-            aria-label="Quiet hours"
-            type="checkbox"
-            checked={p.quiet_enabled}
-            onChange={(e) => set("quiet_enabled", e.target.checked)}
-            className="toggle border-brand-orange bg-brand-orange"
-          />
-        </label>
-        <div className="grid grid-cols-2 gap-3">
-          {(["quiet_start", "quiet_end"] as const).map((key, i) => (
-            <label key={key} className="text-xs text-zinc-400">
-              {i ? "End" : "Start"}
-              <input
-                aria-label={`Quiet hours ${i ? "end" : "start"}`}
-                type="time"
-                value={p[key]}
-                onChange={(e) => set(key, e.target.value)}
-                className="input mt-1 min-h-11 w-full bg-white/5"
-              />
-            </label>
-          ))}
-        </div>
-        <p className="text-xs text-zinc-500">
-          Push is deferred until quiet hours end. Expired items are skipped (2
-          hours for reminders, 24 hours for milestones). In-app history is
-          always retained.
-        </p>
-      </div>
-      <label className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-white/10 p-3">
-        <span>
-          <span className="block font-bold">Share milestones with friends</span>
-          <span className="text-xs text-zinc-500">
-            Requires a public profile and an active friendship.
-          </span>
-        </span>
-        <input
-          aria-label="Share milestones with friends"
-          type="checkbox"
-          checked={p.share_activity}
-          onChange={(e) => set("share_activity", e.target.checked)}
-          className="toggle border-brand-orange bg-brand-orange"
-        />
-      </label>
+      <p className="text-xs text-zinc-500">
+        Use your phone’s Do Not Disturb or Focus settings to silence notifications.
+        Manage milestone sharing in <Link to="/profile" className="underline text-brand-orange">Profile → Edit Profile → Profile Privacy</Link>.
+      </p>
       {message && (
         <p role="status" className="text-sm text-zinc-300">
           {message}

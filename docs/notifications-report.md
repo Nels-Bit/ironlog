@@ -14,9 +14,10 @@ Workbox service worker imports the new push handler; no competing worker is adde
 - Notification Center: All/Unread/Friends/Reminders, owned history pagination,
   unread `9+` badge, contextual cards and authorized destinations, read/unread,
   delete, mark-all-read, confirmed history clearing, empty/error/retry states.
-- Persisted account preferences: independent in-app/push categories, account
-  master push switch, optional friend activity sharing, reminder days/time/timezone,
-  quiet hours, and independently managed device subscriptions.
+- Persisted account preferences: one switch per category for both channels,
+  account master push switch, sharing beside profile privacy, reminder days/time
+  with automatic device timezone, and independent device subscriptions. App-level
+  quiet hours are removed; device DND/Focus controls silence.
 - Saved-workout events: friend completions, levels, trophies and friendship
   requests/acceptance. Friend PR alerts are limited to Barbell Squat, Barbell
   Deadlift and Barbell Bench Press. Personal PR/level/trophy/streak alerts are
@@ -51,7 +52,7 @@ development-only; PGlite exercises actual PostgreSQL rather than mocking SQL.
 
 ## Exact local verification
 
-- Full test suite: **19 test files passed, 216 tests passed, 0 failed**.
+- Full test suite: **21 test files passed, 222 tests passed, 0 failed**.
   Includes exact barbell matching, removed alert suppression, descriptive push
   payloads and real Postgres exercise merges with legacy/drop-set preservation.
 - Frontend and server TypeScript compilation: passed.
@@ -69,7 +70,9 @@ development-only; PGlite exercises actual PostgreSQL rather than mocking SQL.
 Database tests cover authenticated RLS and hidden credentials, independent channels,
 one account on multiple installations, logout/account rebinding, actual worker
 fan-out against PostgreSQL, privacy revocation, leases/retries/deduplication,
-expired endpoints, reminder suppression, quiet hours, timezone/DST and maintenance.
+  expired endpoints, reminder suppression, legacy quiet-hour removal, timezone/DST
+  and maintenance. See `notification-settings-simplification.md` for the newer
+  single-switch/device-timezone/profile-privacy behavior.
 Transport tests generate encrypted VAPID requests; network sends are mocked.
 Service-worker handlers are executed in tests, including malformed payloads and
 same-origin click routing. None of this proves display on a physical phone.

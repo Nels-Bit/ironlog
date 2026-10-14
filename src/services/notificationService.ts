@@ -5,6 +5,7 @@ import {
   normalizePreferences,
   inboxCategories,
   validatePreferences,
+  deviceTimezone,
   type NotificationCategory,
   type NotificationFilter,
   type NotificationPreferences,
@@ -139,16 +140,39 @@ export const notificationService = {
       throw new Error(
         "Notification settings need the latest database migration.",
       );
-    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-    return normalizePreferences(data || {}, zone);
+    const zone = deviceTimezone();
+    return normalizePreferences({ ...data, timezone: zone }, zone);
   },
   async savePreferences(preferences: NotificationPreferences) {
     const userId = await currentUser();
-    const p = validatePreferences(preferences);
+    const p = validatePreferences(normalizePreferences({ ...preferences, timezone: deviceTimezone() }));
+    // Sharing belongs to profile privacy; this form must not overwrite it.
+    const { share_activity: _sharing, ...settings } = p;
+    void _sharing;
     const { error } = await supabase
       .from("notification_preferences")
-      .upsert({ user_id: userId, ...p }, { onConflict: "user_id" });
+      .upsert({ user_id: userId, ...settings }, { onConflict: "user_id" });
     if (error) throw new Error("Settings could not save. Please try again.");
+    notifyInboxChanged();
+  },
+  async syncDeviceTimezone() {
+    const userId = await currentUser(), timezone = deviceTimezone();
+    const { data, error } = await supabase.from("notification_preferences")
+      .select("timezone").eq("user_id", userId).maybeSingle();
+    if (error) throw new Error("Device timezone could not sync. Please retry.");
+    if (data?.timezone === timezone) return false;
+    // Partial upsert: never reset category opt-outs, reminders, push or privacy.
+    const { error: saveError } = await supabase.from("notification_preferences")
+      .upsert({ user_id: userId, timezone }, { onConflict: "user_id" });
+    if (saveError) throw new Error("Device timezone could not sync. Please retry.");
+    notifyInboxChanged();
+    return true;
+  },
+  async saveSocialPrivacy(isPublic: boolean, shareActivity: boolean) {
+    const { error } = await supabase.rpc("save_social_privacy", {
+      p_is_public: isPublic, p_share_activity: shareActivity,
+    });
+    if (error) throw new Error("Profile privacy could not save. Please retry.");
     notifyInboxChanged();
   },
   async api(body: Record<string, unknown>) {

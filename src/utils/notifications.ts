@@ -16,6 +16,7 @@ export interface NotificationPreferences {
   reminder_days: number[];
   reminder_time: string;
   timezone: string;
+  /** Retained for older clients/database rows; app-level quiet hours are disabled. */
   quiet_enabled: boolean;
   quiet_start: string;
   quiet_end: string;
@@ -46,17 +47,29 @@ export const validTimezone = (value: string) => {
     return false;
   }
 };
+export const deviceTimezone = () => {
+  try {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return zone && validTimezone(zone) ? zone : "UTC";
+  } catch { return "UTC"; }
+};
 export const normalizePreferences = (
   value: Partial<NotificationPreferences> = {},
   timezone = "UTC",
 ): NotificationPreferences => {
   const defaults = defaultNotificationPreferences(timezone);
+  // Preserve any prior opt-out when collapsing independent channel switches.
+  const categories = Object.fromEntries(Object.keys(notificationCategories).map(k => {
+    const key = k as NotificationCategory;
+    return [key, (value.in_app?.[key] ?? true) && (value.push?.[key] ?? true)];
+  })) as Record<NotificationCategory, boolean>;
   return {
     ...defaults,
     ...value,
     // Removed personal categories in old settings must never be revived.
-    in_app: Object.fromEntries(Object.keys(notificationCategories).map(k => [k, value.in_app?.[k as NotificationCategory] ?? true])) as Record<NotificationCategory, boolean>,
-    push: Object.fromEntries(Object.keys(notificationCategories).map(k => [k, value.push?.[k as NotificationCategory] ?? true])) as Record<NotificationCategory, boolean>,
+    in_app: { ...categories },
+    push: { ...categories },
+    quiet_enabled: false,
   };
 };
 export const validatePreferences = (p: NotificationPreferences) => {
@@ -136,11 +149,4 @@ export const reminderDue = (p: NotificationPreferences, now: Date) => {
     clock.time >= p.reminder_time
     ? clock.date
     : null;
-};
-export const inQuietHours = (p: NotificationPreferences, now: Date) => {
-  if (!p.quiet_enabled || p.quiet_start === p.quiet_end) return false;
-  const time = localClock(now, p.timezone).time;
-  return p.quiet_start < p.quiet_end
-    ? time >= p.quiet_start && time < p.quiet_end
-    : time >= p.quiet_start || time < p.quiet_end;
 };

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   defaultNotificationPreferences,
-  inQuietHours,
   localClock,
   normalizePreferences,
   reminderDue,
@@ -191,11 +190,16 @@ describe("preferences, timezone and daylight savings", () => {
     p.reminder_days = [2];
     expect(reminderDue(p, new Date("2026-10-13T20:00:00Z"))).toBeNull();
   });
-  it("quiet hours cross midnight and end exactly at the chosen boundary", () => {
-    const p = { ...defaultNotificationPreferences(), quiet_enabled: true };
-    expect(inQuietHours(p, new Date("2026-10-13T23:00Z"))).toBe(true);
-    expect(inQuietHours(p, new Date("2026-10-14T07:59Z"))).toBe(true);
-    expect(inQuietHours(p, new Date("2026-10-14T08:00Z"))).toBe(false);
+  it("disables legacy app quiet hours and preserves either-channel opt-outs", () => {
+    const p = defaultNotificationPreferences();
+    p.quiet_enabled = true;
+    p.in_app.friend_workout = false;
+    p.push.friend_pr = false;
+    const normalized = normalizePreferences(p);
+    expect(normalized.quiet_enabled).toBe(false);
+    expect(normalized.in_app).toEqual(normalized.push);
+    expect(normalized.in_app.friend_workout).toBe(false);
+    expect(normalized.in_app.friend_pr).toBe(false);
   });
 });
 describe("push subscription security", () => {
