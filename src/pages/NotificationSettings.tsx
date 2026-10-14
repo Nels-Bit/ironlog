@@ -271,6 +271,9 @@ const PreferencesForm = ({
           </div>
         ))}
         <p className="mt-3 text-xs text-zinc-500">
+          Personal PR, level, trophy and streak alerts are not sent. Friend PR
+          alerts cover only Barbell Squat, Barbell Deadlift and Barbell Bench Press.
+          Push previews show the sender and event details on your lock screen.
           In-app and push categories are independent. Push also requires account
           push and a device subscription. Changes affect future events, not old
           history.

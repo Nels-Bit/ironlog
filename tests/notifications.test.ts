@@ -66,8 +66,8 @@ describe("authoritative notification event planning", () => {
     "reuses valid %s PR eligibility",
     (type) => {
       const events = buildWorkoutNotifications("new", snapshot(type));
-      expect(events.find((e) => e.category === "personal_pr")?.body).toBe(
-        "Bench Press · 190 lb × 6 reps",
+      expect(events.find((e) => e.category === "friend_pr")?.body).toBe(
+        "Barbell Bench Press · 190 lb × 6 reps",
       );
       expect(
         events.find((e) => e.category === "friend_workout")?.body,
@@ -127,7 +127,7 @@ describe("authoritative notification event planning", () => {
       buildWorkoutNotifications("new", s).find(
         (e) => e.type === "streak_milestone",
       )?.title,
-    ).toBe("3-day streak!");
+    ).toBeUndefined();
     // A session started yesterday does not manufacture today's UI streak.
     s.workouts[2].end_time = Date.UTC(2026, 0, 4);
     expect(
@@ -140,7 +140,8 @@ describe("authoritative notification event planning", () => {
 describe("preferences, timezone and daylight savings", () => {
   it("defaults keep inbox enabled and external push disabled", () => {
     const p = defaultNotificationPreferences();
-    expect(p.in_app.personal_pr).toBe(true);
+    expect(p.in_app.friend_pr).toBe(true);
+    expect(p.in_app).not.toHaveProperty('personal_pr');
     expect(p.push_enabled).toBe(false);
   });
   it("partial legacy settings preserve other categories", () =>

@@ -3,6 +3,7 @@ import { isDemoSession } from "../lib/demo-session";
 import type { NotificationItem } from "../types";
 import {
   normalizePreferences,
+  inboxCategories,
   validatePreferences,
   type NotificationCategory,
   type NotificationFilter,
@@ -31,6 +32,7 @@ export const notificationService = {
       .eq("recipient_id", userId)
       .is("deleted_at", null)
       .eq("in_app_visible", true)
+      .in("category", inboxCategories)
       .order("created_at", { ascending: false })
       .order("id", { ascending: false })
       .limit(21);
@@ -44,11 +46,8 @@ export const notificationService = {
       ]);
     if (filter === "personal")
       query = query.in("category", [
-        "personal_pr",
-        "personal_level",
-        "personal_achievement",
-        "personal_streak",
         "workout_reminder",
+        "test_push",
       ]);
     if (cursor) {
       // Preserve Postgres microseconds and its +00:00 offset; rounding a cursor
@@ -103,7 +102,8 @@ export const notificationService = {
       .eq("recipient_id", userId)
       .is("read_at", null)
       .is("deleted_at", null)
-      .eq("in_app_visible", true);
+      .eq("in_app_visible", true)
+      .in("category", inboxCategories);
     if (error) throw error;
     return count || 0;
   },

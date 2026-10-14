@@ -188,7 +188,7 @@ describe("actual Postgres migration, authorization and durable fan-out", () => {
     const result = await deliverPushJobs(client, null, send);
     expect(result.accepted).toBe(2);
     expect(send).toHaveBeenCalledTimes(2);
-    expect(send.mock.calls[0][1]).not.toContain("Alice");
+    expect(JSON.parse(send.mock.calls[0][1])).toMatchObject({title:'Workout',body:expect.stringContaining('Alice')});
     expect(send.mock.calls[0][1]).not.toContain("200 lb");
     await deliverPushJobs(client, null, send);
     await processNotificationEvents(client);
@@ -234,7 +234,7 @@ describe("actual Postgres migration, authorization and durable fan-out", () => {
         "notifications",
         `recipient_id='${userA}' AND category='personal_pr'`,
       ),
-    ).toBe(1);
+    ).toBe(0);
   });
   it("disabled friend categories do not create notification rows", async () => {
     await db.query(

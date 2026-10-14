@@ -30,15 +30,15 @@ it("handles a genuine push event with a stable tag and system notification", asy
   const w = worker();
   let promise = Promise.resolve();
   w.callbacks.push({
-    data: { json: () => ({ body: "New notification", notificationId: id }) },
+    data: { json: () => ({ title: "Award", body: "Nelson received a new award", notificationId: id }) },
     waitUntil: (p: Promise<void>) => (promise = p),
   });
   await promise;
   expect(w.show).toHaveBeenCalledWith(
-    "ironLog",
+    "Award",
     expect.objectContaining({
       tag: id,
-      body: "New notification",
+      body: "Nelson received a new award",
       data: { notificationId: id },
     }),
   );
@@ -59,8 +59,8 @@ it.each([null, "malformed"])(
     });
     await promise;
     expect(w.show).toHaveBeenCalledWith(
-      "ironLog",
-      expect.objectContaining({ body: "You have a new notification." }),
+      "Notification",
+      expect.objectContaining({ body: "Open ironLog to see the details." }),
     );
   },
 );

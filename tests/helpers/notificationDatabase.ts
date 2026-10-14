@@ -4,8 +4,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export const userA = "11111111-1111-4111-8111-111111111111",
   userB = "22222222-2222-4222-8222-222222222222",
   userC = "33333333-3333-4333-8333-333333333333";
-export async function notificationDatabase(legacy = false) {
+export async function notificationDatabase(legacy = false, refinement = true) {
   const db = new PGlite();
+  // All test reminders use UTC unless a test explicitly selects another zone.
+  await db.exec("SET TIME ZONE 'UTC'");
   await db.exec(`CREATE SCHEMA auth; CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;
     CREATE TABLE auth.users(id uuid PRIMARY KEY,raw_user_meta_data jsonb DEFAULT '{}');
     CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$ SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
@@ -46,6 +48,7 @@ export async function notificationDatabase(legacy = false) {
       "utf8",
     ),
   );
+  if (refinement) await db.exec('BEGIN;'+await readFile(new URL('../../supabase/migrations/20261014005851_refine_notifications_and_barbell_exercises.sql',import.meta.url),'utf8')+'COMMIT;');
   return db;
 }
 /** Parameterized SQL adapter for exercising the actual worker against Postgres.

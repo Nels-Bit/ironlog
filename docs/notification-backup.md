@@ -42,3 +42,18 @@ These tables protect against migration/update mistakes, not deletion of the enti
 Supabase project or a database-wide failure: they share the same database. An
 independent encrypted export or provider backup is needed for disaster recovery.
 No such private-data export was performed as part of this release.
+
+## Barbell identity / notification refinement snapshot
+
+The later migration made a second private snapshot in
+`ironlog_barbell_backup_20261013`, immediately before merging exercise identities.
+It contains exercises, 253 workouts, notification rows, preferences, delivery jobs
+and the prior notification helper definitions. Client schema/table privileges are
+revoked and every backup table has RLS with no client policies.
+
+Post-migration verification: zero missing workouts/exercises, zero changes outside
+workout exercise references, zero unexpected JSON/set changes, and unchanged
+machine Squat data. The existing custom Barbell Squat is the preferred identity;
+an owner-only alias preserves older clients and active drafts. Source definitions
+are retained, not deleted. Restore only reviewed affected rows, preserving all
+newer edits; do not blindly overwrite live tables or replay historical events.

@@ -4,8 +4,11 @@ Branch: `codex/notification-center-push`. Local implementation only; no deployme
 commit, push, or production migrations are authorized by this task.
 
 Follow-up: the owner has now authorized production implementation. See
-`notification-release-status.md` for preparation and the remaining private-key gate;
+`notification-release-status.md` for completed rollout and verification;
 the original local-only restriction still describes the initial review phase.
+
+The later notification refinement supersedes the original personal-alert and
+generic lock-screen requirements below. See `notification-refinement.md`.
 
 ## Inspection
 

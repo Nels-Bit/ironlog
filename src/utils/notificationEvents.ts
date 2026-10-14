@@ -8,7 +8,8 @@ import {
   countPersonalRecords,
 } from "./friendMilestones.js";
 import { replayAllXP } from "./xpEngine.js";
-import { calculateWorkoutStreak, isRestDaySession } from "./achievementUtils.js";
+import { isRestDaySession } from "./achievementUtils.js";
+import { barbellLiftNames, getBarbellLift, type BarbellLift } from "./barbellLifts.js";
 
 export interface PlannedNotification {
   category: NotificationCategory;
@@ -100,16 +101,6 @@ export function buildWorkoutNotifications(
   )) {
     const level = milestone.kind === "level_up";
     events.push({
-      category: level ? "personal_level" : "personal_achievement",
-      type: level ? "level_up" : "achievement_unlocked",
-      event_key: milestone.eventKey,
-      title: level ? "Level up!" : "Trophy earned",
-      body: milestone.achievementName || "New milestone",
-      target_type: "progress",
-      target_id: workoutId,
-      audience: "self",
-    });
-    events.push({
       category: "friend_achievement",
       type: level ? "level_up" : "achievement_unlocked",
       event_key: milestone.eventKey,
@@ -120,12 +111,16 @@ export function buildWorkoutNotifications(
       audience: "friends",
     });
   }
-  for (const exerciseId of new Set(saved.exercises.map((e) => e.exerciseId))) {
-    const def = defs.get(exerciseId);
+  // One PR per standard lift; a merged definition cannot manufacture a record.
+  for (const lift of Object.keys(barbellLiftNames) as BarbellLift[]) {
+    const liftIds = new Set([...defs.values()].filter(def => getBarbellLift(def) === lift).map(def => def.id));
+    const currentEntries = saved.exercises.filter(exercise => liftIds.has(exercise.exerciseId));
+    if (!currentEntries.length) continue;
+    const def = defs.get(currentEntries[0].exerciseId);
     const historical = getBestPRPerformance(
       before.flatMap((w) =>
         w.exercises
-          .filter((e) => e.exerciseId === exerciseId)
+          .filter((e) => liftIds.has(e.exerciseId))
           .flatMap((e) => e.sets),
       ),
       def,
@@ -133,51 +128,22 @@ export function buildWorkoutNotifications(
       weight,
     );
     const current = getBestPRPerformance(
-      saved.exercises
-        .filter((e) => e.exerciseId === exerciseId)
-        .flatMap((e) => e.sets),
+      currentEntries.flatMap((e) => e.sets),
       def,
       saved.bodyWeight,
       weight,
     );
     if (!current.set || current.load <= historical.load) continue;
-    const body = `${def?.name || "Exercise"} · ${formatPRPerformance(current, def)}`;
-    events.push({
-      category: "personal_pr",
-      type: "personal_record",
-      event_key: `pr:${workoutId}:${exerciseId}`,
-      title: "New personal record!",
-      body,
-      target_type: "workout",
-      target_id: workoutId,
-      audience: "self",
-    });
+    const body = `${barbellLiftNames[lift]} · ${formatPRPerformance(current, def)}`;
     events.push({
       category: "friend_pr",
       type: "personal_record",
-      event_key: `pr:${workoutId}:${exerciseId}`,
+      event_key: `pr:${workoutId}:${lift}`,
       title: "set a personal record",
       body,
       target_type: "friend_profile",
       target_id: workoutId,
       audience: "friends",
-    });
-  }
-  // Same UI streak rules at completion time, not the possibly delayed worker clock.
-  const streak = calculateWorkoutStreak(after, saved.endTime).currentStreak;
-  if (
-    [3, 7, 14, 30, 60, 100, 365].includes(streak) &&
-    streak > calculateWorkoutStreak(before, saved.endTime).currentStreak
-  ) {
-    events.push({
-      category: "personal_streak",
-      type: "streak_milestone",
-      event_key: `streak:${workoutId}:${streak}`,
-      title: `${streak}-day streak!`,
-      body: "Your consistency is paying off.",
-      target_type: "progress",
-      target_id: workoutId,
-      audience: "self",
     });
   }
   return events.map((event) => ({

@@ -1,8 +1,4 @@
 export const notificationCategories = {
-  personal_pr: "Personal records",
-  personal_level: "XP and level-ups",
-  personal_achievement: "Achievements",
-  personal_streak: "Workout streaks",
   workout_reminder: "Workout reminders",
   friend_workout: "Friends’ workouts",
   friend_request: "Friend requests",
@@ -10,6 +6,7 @@ export const notificationCategories = {
   friend_achievement: "Friends’ achievements",
 } as const;
 export type NotificationCategory = keyof typeof notificationCategories;
+export const inboxCategories = [...Object.keys(notificationCategories), "test_push"];
 export type NotificationFilter = "all" | "unread" | "friends" | "personal";
 export interface NotificationPreferences {
   push_enabled: boolean;
@@ -57,8 +54,9 @@ export const normalizePreferences = (
   return {
     ...defaults,
     ...value,
-    in_app: { ...defaults.in_app, ...value.in_app },
-    push: { ...defaults.push, ...value.push },
+    // Removed personal categories in old settings must never be revived.
+    in_app: Object.fromEntries(Object.keys(notificationCategories).map(k => [k, value.in_app?.[k as NotificationCategory] ?? true])) as Record<NotificationCategory, boolean>,
+    push: Object.fromEntries(Object.keys(notificationCategories).map(k => [k, value.push?.[k as NotificationCategory] ?? true])) as Record<NotificationCategory, boolean>,
   };
 };
 export const validatePreferences = (p: NotificationPreferences) => {

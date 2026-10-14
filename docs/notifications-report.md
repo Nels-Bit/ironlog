@@ -11,15 +11,16 @@ The existing React/TypeScript/Vite UI, DaisyUI, React Query, Supabase Auth,
 Postgres/Realtime and Vercel Node API architecture are retained. One existing
 Workbox service worker imports the new push handler; no competing worker is added.
 
-- Notification Center: All/Unread/Friends/Personal, owned history pagination,
+- Notification Center: All/Unread/Friends/Reminders, owned history pagination,
   unread `9+` badge, contextual cards and authorized destinations, read/unread,
   delete, mark-all-read, confirmed history clearing, empty/error/retry states.
 - Persisted account preferences: independent in-app/push categories, account
   master push switch, optional friend activity sharing, reminder days/time/timezone,
   quiet hours, and independently managed device subscriptions.
-- Saved-workout events: personal weight PRs with actual reps, XP, levels, trophies
-  and streak milestones; friend completions, optional PRs/trophies and friendship
-  requests/acceptance. Existing PR/XP/trophy rules are reused, including cardio.
+- Saved-workout events: friend completions, levels, trophies and friendship
+  requests/acceptance. Friend PR alerts are limited to Barbell Squat, Barbell
+  Deadlift and Barbell Bench Press. Personal PR/level/trophy/streak alerts are
+  removed; PR tracking and XP for other exercises remain available in the app.
 - Real Web Push implementation: standard encrypted `web-push` transport, VAPID,
   explicit permission button, install guidance, test sends, secure click resolution,
   device revocation on sign-out, endpoint expiration cleanup and account isolation.
@@ -28,7 +29,9 @@ Workbox service worker imports the new push handler; no competing worker is adde
   timezone/DST scheduling and send-time privacy/preference/reminder rechecks.
 - Privacy: recipient RLS and constrained mutations, private device credentials and
   event snapshots, authenticated API and worker endpoint, request limits, endpoint
-  validation, generic lock-screen text and authorized read-only shared workouts.
+  validation, descriptive opt-in lock-screen text and authorized shared workouts.
+  Push titles are Workout/Award/Milestone with actor and event details in the
+  body; the operating system controls the app/source label.
 
 ## Major files
 
@@ -48,8 +51,9 @@ development-only; PGlite exercises actual PostgreSQL rather than mocking SQL.
 
 ## Exact local verification
 
-- Full test suite: **16 test files passed, 185 tests passed, 0 failed**.
-  This includes 78 new notification/push tests plus 107 existing regression tests.
+- Full test suite: **19 test files passed, 216 tests passed, 0 failed**.
+  Includes exact barbell matching, removed alert suppression, descriptive push
+  payloads and real Postgres exercise merges with legacy/drop-set preservation.
 - Frontend and server TypeScript compilation: passed.
 - Additional NodeNext compilation and native Node invocation of the emitted API:
   passed. Relative imports use explicit `.js` extensions for Vercel's ESM runtime.

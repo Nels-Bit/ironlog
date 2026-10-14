@@ -3,6 +3,7 @@ import { exerciseService } from './exerciseService';
 import { getBestPRPerformance, parseUserWeight } from '../utils/workoutMath';
 import type { WorkoutSession, WorkoutExercise, Exercise, PersonalRecordPerformance } from '../types';
 import { getWorkoutExercises } from '../utils/workoutSchema';
+import { combineExerciseLogs } from '../utils/barbellLifts';
 export { getWorkoutExercises } from '../utils/workoutSchema';
 
 interface WorkoutRow {
@@ -129,6 +130,7 @@ export const workoutService = {
   async getLastLog(exerciseId: string): Promise<WorkoutExercise | null | undefined> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
+    exerciseId = (await exerciseService.getAliases()).get(exerciseId) ?? exerciseId;
 
     // The normal path is a JSONB containment query: one newest completed workout
     // that contains this exercise, without a date window or arbitrary history cap.
@@ -142,8 +144,7 @@ export const workoutService = {
       .maybeSingle();
 
     if (!targetedError && targetedData) {
-      return getWorkoutExercises((targetedData as WorkoutRow).exercises)
-        .find(exercise => exercise.exerciseId === exerciseId) ?? null;
+      return combineExerciseLogs(getWorkoutExercises((targetedData as WorkoutRow).exercises), exerciseId);
     }
 
     // Older installations can have stringified JSON or a legacy key shape that
@@ -161,7 +162,7 @@ export const workoutService = {
     }
 
     for (const workout of data) {
-      const ex = getWorkoutExercises((workout as WorkoutRow).exercises).find(e => e.exerciseId === exerciseId);
+      const ex = combineExerciseLogs(getWorkoutExercises((workout as WorkoutRow).exercises), exerciseId);
       if (ex) return ex;
     }
 
@@ -176,6 +177,7 @@ export const workoutService = {
   async getPersonalRecordPerformance(exerciseId: string): Promise<PersonalRecordPerformance> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { load: 0, set: null };
+    exerciseId = (await exerciseService.getAliases()).get(exerciseId) ?? exerciseId;
 
     const userWeight = parseUserWeight(user.user_metadata?.weight);
 

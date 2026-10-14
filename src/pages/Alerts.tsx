@@ -11,14 +11,12 @@ import {
   BellOff,
   CheckCheck,
   Dumbbell,
-  Flame,
   Loader2,
   MoreHorizontal,
   Settings,
   Trash2,
   Trophy,
   UserPlus,
-  Zap,
 } from "lucide-react";
 import {
   notificationService,
@@ -38,7 +36,7 @@ const emptyText: Record<NotificationFilter, string> = {
   all: "You’re all caught up.",
   unread: "No unread notifications.",
   friends: "No friend activity yet.",
-  personal: "Your next milestone will appear here.",
+  personal: "No reminders or test notifications yet.",
 };
 export const Alerts = () => {
   const navigate = useNavigate(),
@@ -91,7 +89,7 @@ export const Alerts = () => {
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-bold">Notifications</h1>
           <p className="text-xs text-zinc-400">
-            {unread ? unread + " unread" : "Your progress and your people"}
+            {unread ? unread + " unread" : "Your workouts and your people"}
           </p>
         </div>
         <button
@@ -127,7 +125,7 @@ export const Alerts = () => {
                   "bg-brand-orange text-white hover:bg-brand-orange",
               )}
             >
-              {f}
+              {f === "personal" ? "Reminders" : f}
             </button>
           ))}
         </div>
@@ -170,13 +168,9 @@ export const Alerts = () => {
                   : n.category?.includes("pr") ||
                       n.category?.includes("achievement")
                     ? Trophy
-                    : n.category === "personal_streak"
-                      ? Flame
-                      : n.category === "personal_level"
-                        ? Zap
-                        : n.category === "friend_workout"
-                          ? Dumbbell
-                          : Bell;
+                    : n.category === "friend_workout"
+                      ? Dumbbell
+                      : Bell;
               return (
                 <article
                   key={n.id}

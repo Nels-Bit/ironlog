@@ -16,11 +16,12 @@ self.addEventListener("push", (event) => {
     ? payload.notificationId
     : null;
   event.waitUntil(
-    self.registration.showNotification("ironLog", {
+    self.registration.showNotification(
+      typeof payload.title === "string" && payload.title.trim() ? payload.title.slice(0, 80) : "Notification", {
       body:
         typeof payload.body === "string"
-          ? payload.body.slice(0, 180)
-          : "You have a new notification.",
+          ? payload.body.slice(0, 600)
+          : "Open ironLog to see the details.",
       icon: "/pwa-192x192.png",
       badge: "/pwa-192x192.png",
       tag: id || "ironlog-notification",

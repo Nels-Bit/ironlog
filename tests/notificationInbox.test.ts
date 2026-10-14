@@ -7,8 +7,8 @@ it("real service pagination, filters, counts and state operations remain isolate
   seed.tables.notifications = Array.from({ length: 25 }, (_, i) => ({
     id: crypto.randomUUID(),
     recipient_id: "demo-alex",
-    type: "personal_record",
-    category: i % 2 ? "personal_pr" : "friend_workout",
+    type: i % 2 ? "workout_reminder" : "workout_completed",
+    category: i % 2 ? "workout_reminder" : "friend_workout",
     title: "Test",
     message: "Test",
     created_at: time,
@@ -19,7 +19,7 @@ it("real service pagination, filters, counts and state operations remain isolate
   seed.tables.notifications.push({
     id: crypto.randomUUID(),
     recipient_id: "other-user",
-    category: "personal_pr",
+    category: "workout_reminder",
     read_at: null,
     deleted_at: null,
     created_at: time,

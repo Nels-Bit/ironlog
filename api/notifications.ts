@@ -156,24 +156,18 @@ export default async function handler(req: ApiRequest, res: ApiReply) {
       return;
     }
     if (body.action === "test") {
-      const { data: visible, error: visibilityError } = await db.rpc(
-        "notification_category_enabled",
-        { p_user: user.id, p_category: "personal_achievement", p_push: false },
-      );
-      if (visibilityError)
-        throw new RequestError(503, "Notification preferences unavailable.");
       const { error } = await db
         .from("notifications")
         .insert({
           recipient_id: user.id,
           type: "test_push",
-          category: "personal_achievement",
+          category: "test_push",
           event_key: `test:${user.id}:${Math.floor(Date.now() / 60000)}`,
           title: "Push test",
           body: "This test was queued for your eligible devices.",
           message: "Push test",
           target_type: "notifications",
-          in_app_visible: visible === true,
+          in_app_visible: true,
         });
       if (error && error.code !== "23505")
         throw new RequestError(503, "Unable to queue test.");

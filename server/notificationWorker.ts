@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import webpush from "web-push";
+import { pushPresentation } from "./pushPresentation.js";
+import { inboxCategories } from "../src/utils/notifications.js";
 import {
   buildWorkoutNotifications,
   type WorkoutEventSnapshot,
@@ -136,6 +138,16 @@ export async function deliverPushJobs(
         result.skipped++;
         continue;
       }
+      if (!inboxCategories.includes(n.category)) {
+        await finish({ state: "skipped" });
+        result.skipped++;
+        continue;
+      }
+      if (n.category === 'friend_pr' && !['Barbell Squat','Barbell Deadlift','Barbell Bench Press'].includes((n.body || '').split(' · ')[0])) {
+        await finish({ state: 'skipped' });
+        result.skipped++;
+        continue;
+      }
       const { data: rawPrefs, error: pe } = await db
         .from("notification_preferences")
         .select("*")
@@ -145,7 +157,7 @@ export async function deliverPushJobs(
       const prefs = normalizePreferences(rawPrefs || {});
       if (
         !prefs.push_enabled ||
-        prefs.push[n.category as keyof typeof prefs.push] === false
+        (n.type !== "test_push" && prefs.push[n.category as keyof typeof prefs.push] === false)
       ) {
         await finish({ state: "skipped" });
         result.skipped++;
@@ -228,15 +240,9 @@ export async function deliverPushJobs(
         .eq("lease_id", job.lease_id);
       if (attemptError) throw new Error("Unable to record push attempt.");
       result.attempted++;
-      // Lock-screen privacy: detailed titles/bodies stay behind account authentication.
+      // Descriptive text is opt-in through push; privacy/friendship was checked above.
       const payload = JSON.stringify({
-        title: "ironLog",
-        body:
-          n.type === "test_push"
-            ? "Your test notification is ready."
-            : n.type === "workout_reminder"
-              ? "Time for your scheduled workout."
-              : "You have a new notification.",
+        ...pushPresentation(n),
         notificationId: n.id,
       });
       const accepted = await send(subscription, payload, {
