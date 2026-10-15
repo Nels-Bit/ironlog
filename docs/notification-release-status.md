@@ -130,3 +130,31 @@ scheduled request 550 returned HTTP 200; the scheduler stays active. New setting
 and privacy snapshots are private, profiles/workouts remain unchanged by this
 migration, and existing opt-outs are preserved. See
 `notification-settings-simplification.md` for behavior, security and limitations.
+
+## Matching lift awards and decimal workout entry — October 14
+
+The matching-only grouping requested by the owner is live: a PR and trophy for
+the same lift in one workout become one alert, while different lifts and unrelated
+awards remain separate. Category switches are checked again at push-send time.
+New exercise tiles jiggle/highlight once, with reduced-motion support. Fractional
+weight and reps work in active logging, unilateral sets and historical editing.
+
+Production deployment `dpl_HEKhSjB1J7egJcai49P2qEHLAtJy` is READY at the stable
+origin, from runtime commit `dd6c85648e1f325697caee6e076bc4fe78d7c501` on the
+existing feature branch. Source-upload digest:
+`dd5d4a985158fc7b40d03294590ed778aeca58ba6cd4cb62f24d160fd40157e6`.
+All 248 tests across 23 files, frontend/API TypeScript, ESLint and production
+Vite/PWA build pass. Hosted fictional-demo editing, saving and reopening retained
+`145.75` weight and `5.5` reps without captured console warnings/errors. The PWA
+needed one reload to activate the new cached assets.
+
+The live migration preserved 256 workouts, 23 notifications and 6 events, with
+the prior service-only emitter saved in private
+`ironlog_combined_alert_backup_20261014.functions`. Manual worker request 2056
+returned HTTP 200, with no timeout/error and zero eligible deliveries. Independent
+scheduled request 2057 at 03:30 UTC also returned 200. The minute scheduler remains
+active and recent scheduled executions succeeded. The runtime
+error-log scan only found the pre-existing Node DEP0169 deprecation warning.
+These checks establish deployment/database connectivity, not physical-phone push
+display. PR #31 remains unmerged; no real workout or fake production alert was
+created for acceptance. See `matching-record-awards-and-decimal-logging.md`.
