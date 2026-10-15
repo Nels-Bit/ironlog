@@ -20,6 +20,8 @@ export interface PlannedNotification {
   target_type: string;
   target_id: string;
   audience: "self" | "friends";
+  /** Matching lift trophy only; the server rechecks each recipient's switches. */
+  award_body?: string;
 }
 export interface WorkoutEventSnapshot {
   workouts: Record<string, unknown>[];
@@ -135,6 +137,8 @@ export function buildWorkoutNotifications(
     );
     if (!current.set || current.load <= historical.load) continue;
     const body = `${barbellLiftNames[lift]} · ${formatPRPerformance(current, def)}`;
+    const trophyIndex = events.findIndex(event => event.event_key.startsWith(`trophy:${workoutId}:${lift}:`));
+    const trophy = trophyIndex >= 0 ? events.splice(trophyIndex, 1)[0] : undefined;
     events.push({
       category: "friend_pr",
       type: "personal_record",
@@ -144,6 +148,7 @@ export function buildWorkoutNotifications(
       target_type: "friend_profile",
       target_id: workoutId,
       audience: "friends",
+      ...(trophy ? {award_body: trophy.body} : {}),
     });
   }
   return events.map((event) => ({

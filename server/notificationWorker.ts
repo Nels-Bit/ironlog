@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import webpush from "web-push";
-import { pushPresentation } from "./pushPresentation.js";
+import { notificationPushPresentation } from "./pushPresentation.js";
 import { inboxCategories } from "../src/utils/notifications.js";
 import {
   buildWorkoutNotifications,
@@ -155,10 +155,8 @@ export async function deliverPushJobs(
         .maybeSingle();
       if (pe) throw new Error("Preferences lookup failed.");
       const prefs = normalizePreferences(rawPrefs || {});
-      if (
-        !prefs.push_enabled ||
-        (n.type !== "test_push" && prefs.push[n.category as keyof typeof prefs.push] === false)
-      ) {
+      const presentation = notificationPushPresentation(n, prefs);
+      if (!presentation) {
         await finish({ state: "skipped" });
         result.skipped++;
         continue;
@@ -235,7 +233,7 @@ export async function deliverPushJobs(
       result.attempted++;
       // Descriptive text is opt-in through push; privacy/friendship was checked above.
       const payload = JSON.stringify({
-        ...pushPresentation(n),
+        ...presentation,
         notificationId: n.id,
       });
       const accepted = await send(subscription, payload, {

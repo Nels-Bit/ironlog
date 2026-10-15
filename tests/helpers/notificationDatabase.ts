@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export const userA = "11111111-1111-4111-8111-111111111111",
   userB = "22222222-2222-4222-8222-222222222222",
   userC = "33333333-3333-4333-8333-333333333333";
-export async function notificationDatabase(legacy = false, refinement = true, simplified = true) {
+export async function notificationDatabase(legacy = false, refinement = true, simplified = true, combined = true) {
   const db = new PGlite();
   // All test reminders use UTC unless a test explicitly selects another zone.
   await db.exec("SET TIME ZONE 'UTC'");
@@ -50,6 +50,7 @@ export async function notificationDatabase(legacy = false, refinement = true, si
   );
   if (refinement) await db.exec('BEGIN;'+await readFile(new URL('../../supabase/migrations/20261014005851_refine_notifications_and_barbell_exercises.sql',import.meta.url),'utf8')+'COMMIT;');
   if (refinement && simplified) await db.exec('BEGIN;'+await readFile(new URL('../../supabase/migrations/20261014020956_simplify_notification_preferences.sql',import.meta.url),'utf8')+'COMMIT;');
+  if (refinement && simplified && combined) await db.exec('BEGIN;'+await readFile(new URL('../../supabase/migrations/20261015030803_combine_matching_record_award_alerts.sql',import.meta.url),'utf8')+'COMMIT;');
   return db;
 }
 /** Parameterized SQL adapter for exercising the actual worker against Postgres.

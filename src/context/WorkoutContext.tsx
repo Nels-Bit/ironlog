@@ -276,6 +276,7 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
 
     // Use the shared helper so addExercise and rehydration share the same fetch logic
     fetchAndCacheHistoricalPR(exDef.id);
+    return newExercise.id;
   };
 
   const hydrateExerciseGhostSets = useCallback((

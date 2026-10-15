@@ -30,7 +30,7 @@ describe('barbell-only friend PRs and removed personal alerts', () => {
     expect(plan('Dumbbell Curl').some(n => n.type==='personal_record')).toBe(false));
   it('never emits the four self milestone types even when awards are earned', () => {
     const events=plan();
-    expect(events.some(n => n.category==='friend_achievement')).toBe(true);
+    expect(events.some(n => n.category==='friend_achievement' || n.award_body)).toBe(true);
     expect(events.every(n => n.audience==='friends')).toBe(true);
     expect(events.some(n => n.type==='streak_milestone')).toBe(false);
     expect(Object.keys(notificationCategories)).toHaveLength(5);

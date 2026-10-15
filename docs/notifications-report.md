@@ -52,7 +52,7 @@ development-only; PGlite exercises actual PostgreSQL rather than mocking SQL.
 
 ## Exact local verification
 
-- Full test suite: **21 test files passed, 222 tests passed, 0 failed**.
+- Full test suite: **23 test files passed, 248 tests passed, 0 failed**.
   Includes exact barbell matching, removed alert suppression, descriptive push
   payloads and real Postgres exercise merges with legacy/drop-set preservation.
 - Frontend and server TypeScript compilation: passed.
@@ -73,6 +73,9 @@ fan-out against PostgreSQL, privacy revocation, leases/retries/deduplication,
   expired endpoints, reminder suppression, legacy quiet-hour removal, timezone/DST
   and maintenance. See `notification-settings-simplification.md` for the newer
   single-switch/device-timezone/profile-privacy behavior.
+  See `matching-record-awards-and-decimal-logging.md` for matching-lift alert
+  grouping, send-time preference rechecks, fractional logging/editing and the
+  once-only exercise-added cue.
 Transport tests generate encrypted VAPID requests; network sends are mocked.
 Service-worker handlers are executed in tests, including malformed payloads and
 same-origin click routing. None of this proves display on a physical phone.
