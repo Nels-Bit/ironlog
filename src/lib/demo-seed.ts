@@ -1,5 +1,6 @@
 import type { User } from '@supabase/supabase-js';
 import type { DemoSeed, DemoRow } from './demo-transport';
+import { defaultNotificationPreferences } from '../utils/notifications';
 
 /** Fictional recruiter preview. Relative dates keep the activity calendar useful. */
 export function createIronLogSeed(now = Date.now()): DemoSeed {
@@ -12,7 +13,7 @@ export function createIronLogSeed(now = Date.now()): DemoSeed {
   ];
   const exercises = [
     ['bench', 'Barbell Bench Press', 'Chest', 'Chest'], ['squat', 'Barbell Squat', 'Legs', 'Quads'],
-    ['deadlift', 'Deadlift', 'Back', 'Back'], ['row', 'Dumbbell Row', 'Back', 'Back'],
+    ['deadlift', 'Barbell Deadlift', 'Back', 'Back'], ['row', 'Dumbbell Row', 'Back', 'Back'],
     ['press', 'Overhead Press', 'Shoulders', 'Shoulders'], ['curl', 'Dumbbell Curl', 'Arms', 'Biceps'],
     ['pullup', 'Pull Up', 'Back', 'Back'], ['run', 'Treadmill Run', 'Cardio', 'Cardio'],
   ].map(([id, name, category, target_muscle]) => ({ id: `demo-${id}`, name, category, target_muscle, user_id: null, is_unilateral: id === 'row' || id === 'curl' }));
@@ -34,15 +35,18 @@ export function createIronLogSeed(now = Date.now()): DemoSeed {
     profileTable: 'user_profiles',
     tables: {
       user_profiles: people, workouts, exercises,
+      exercise_id_aliases: [],
       friendships: [
         { id: 'demo-friend-1', requester_id: 'demo-alex', addressee_id: 'demo-jordan', status: 'accepted', created_at, responded_at: created_at },
         { id: 'demo-friend-2', requester_id: 'demo-taylor', addressee_id: 'demo-alex', status: 'accepted', created_at, responded_at: created_at },
         { id: 'demo-friend-3', requester_id: 'demo-casey', addressee_id: 'demo-alex', status: 'pending', created_at, responded_at: null },
       ],
       notifications: [
-        { id: 'demo-note-1', recipient_id: 'demo-alex', actor_id: 'demo-jordan', type: 'workout_completed', message: 'Jordan Lee finished a Pull Day workout.', payload: { userId: 'demo_jordan' }, read_at: null, created_at },
-        { id: 'demo-note-2', recipient_id: 'demo-alex', actor_id: 'demo-casey', type: 'friend_request', message: 'Casey Chen sent you a friend request.', payload: { userId: 'demo_casey' }, read_at: null, created_at },
+        { id: 'demo-note-1', recipient_id: 'demo-alex', actor_id: 'demo-jordan', type: 'workout_completed', category:'friend_workout',title:'Jordan finished Pull Day',body:'3 exercises completed',message:'Jordan Lee finished a Pull Day workout.', payload: { userId: 'demo_jordan' }, read_at: null, deleted_at:null,in_app_visible:true, created_at },
+        { id: 'demo-note-2', recipient_id: 'demo-alex', actor_id: 'demo-casey', type: 'friend_request',category:'friend_request',title:'New friend request',body:'Casey Chen wants to connect.',message:'Casey Chen sent you a friend request.',payload:{userId:'demo_casey'},read_at:null,deleted_at:null,in_app_visible:true,created_at },
+        { id:'demo-note-3',recipient_id:'demo-alex',actor_id:'demo-jordan',type:'personal_record',category:'friend_pr',title:'Jordan Lee set a personal record',body:'Barbell Bench Press · 135 lb × 10 reps',message:'Jordan Lee hit a new PR',read_at:null,deleted_at:null,in_app_visible:true,created_at:new Date(now-3600000).toISOString() },
       ],
+      notification_preferences:[{user_id:'demo-alex',...defaultNotificationPreferences('America/New_York')}],
     },
   };
 }

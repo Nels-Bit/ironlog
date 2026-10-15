@@ -18,6 +18,9 @@ import { FriendProfile } from './pages/FriendProfile';
 // Components
 import { Navbar } from './components/Navbar';
 import { RestTimer } from './components/RestTimer';
+import { NotificationProvider } from './context/NotificationProvider';
+import { NotificationSettings } from './pages/NotificationSettings';
+import { NotificationTarget } from './pages/NotificationTarget';
 import { cn } from './lib/utils';
 
 // Resets scroll position to top on every route change (fixes PWA scroll retention)
@@ -30,12 +33,13 @@ const ScrollToTop = () => {
 };
 
 // Wrapper component to handle location-based logic
-const AppContent = () => {
+const AppContent = ({userId}:{userId:string}) => {
   const location = useLocation();
   const [missingWeight, setMissingWeight] = useState(false);
   
   // Define which paths should be "Full Screen" (No padding/container)
   const isFullScreen = location.pathname === '/workout' || 
+    location.pathname === '/alerts' || location.pathname === '/settings/notifications' ||
     location.pathname.startsWith('/history/') ||
     location.pathname.startsWith('/summary') ||
     location.pathname.startsWith('/workout/summary');
@@ -52,7 +56,7 @@ const AppContent = () => {
   }, []);
 
   return (
-    <WorkoutProvider>
+    <NotificationProvider userId={userId}><WorkoutProvider>
       <ScrollToTop />
       <RestTimer />
       <div className="min-h-screen bg-black text-white font-sans selection:bg-brand-orange selection:text-white pb-20 md:pb-0 md:pl-64">
@@ -96,11 +100,13 @@ const AppContent = () => {
             <Route path="/friends/:userId" element={<FriendProfile />} />
             <Route path="/alerts" element={<Alerts />} />
             <Route path="/notifications" element={<Navigate to="/alerts" replace />} />
+            <Route path="/settings/notifications" element={<NotificationSettings />} />
+            <Route path="/notifications/open/:id" element={<NotificationTarget />} />
             <Route path="*" element={<Navigate to="/profile" replace />} />
           </Routes>
         </main>
       </div>
-    </WorkoutProvider>
+    </WorkoutProvider></NotificationProvider>
   );
 };
 
@@ -131,7 +137,7 @@ export default function App() {
           <Route path="*" element={<Auth />} />
         </Routes>
       ) : (
-        <AppContent />
+        <AppContent key={session?.user.id || 'demo'} userId={session?.user.id || 'demo'} />
       )}
       <Analytics />
     </BrowserRouter>

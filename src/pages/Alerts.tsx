@@ -1,199 +1,311 @@
-import { useEffect, useState } from 'react';
-import { Bell, Loader2, Trophy, Zap, CheckCircle, UserPlus } from 'lucide-react';
-import { socialService } from '../services/socialService';
-import type { NotificationItem } from '../types';
-import { cn } from '../lib/utils';
-
+import { useRef, useState } from "react";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  ArrowLeft,
+  Bell,
+  BellOff,
+  CheckCheck,
+  Dumbbell,
+  Loader2,
+  MoreHorizontal,
+  Settings,
+  Trash2,
+  Trophy,
+  UserPlus,
+} from "lucide-react";
+import {
+  notificationService,
+  type InboxCursor,
+} from "../services/notificationService";
+import {
+  relativeNotificationTime,
+  type NotificationFilter,
+} from "../utils/notifications";
+import {
+  useUnreadNotifications,
+  useNotificationIdentity,
+} from "../context/notificationContext.shared";
+import { cn } from "../lib/utils";
+const filters: NotificationFilter[] = ["all", "unread", "friends", "personal"];
+const emptyText: Record<NotificationFilter, string> = {
+  all: "You’re all caught up.",
+  unread: "No unread notifications.",
+  friends: "No friend activity yet.",
+  personal: "No reminders or test notifications yet.",
+};
 export const Alerts = () => {
-  const [loading, setLoading] = useState(true);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
-    let cancelled = false;
-    const loadNotifications = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await socialService.getNotifications();
-        setNotifications(data);
-      } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : 'Failed to load alerts.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    void loadNotifications();
-    void socialService.subscribeToNotifications(() => {
-      void loadNotifications();
-    }).then(stop => {
-      if (cancelled) stop();
-      else unsubscribe = stop;
-    }).catch(subscriptionError => {
-      // Alerts still work through their initial fetch if Realtime is unavailable.
-      console.error('Unable to subscribe to live alerts.', subscriptionError);
-    });
-
-    return () => {
-      cancelled = true;
-      unsubscribe?.();
-    };
-  }, []);
-
-
-
-  const handleMarkAllRead = async () => {
-    try {
-      await socialService.markAllNotificationsAsRead();
-      setNotifications((current) => current.map((item) => ({ ...item, readAt: item.readAt ?? Date.now() })));
-    } catch (markError) {
-      setError(markError instanceof Error ? markError.message : 'Failed to update alerts.');
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <Loader2 className="animate-spin text-white" />
-      </div>
-    );
-  }
-
-  const unreadCount = notifications.filter((item) => item.readAt === null).length;
-
-  const renderAlertIcon = (type: NotificationItem['type']) => {
-    switch (type) {
-      case 'achievement_unlocked':
-        return <Trophy size={18} className="text-yellow-500" />;
-      case 'workout_completed':
-        return <Zap size={18} className="text-orange-500" />;
-      case 'friend_request_accepted':
-        return <CheckCircle size={18} className="text-emerald-500" />;
-      case 'friend_request':
-        return <UserPlus size={18} className="text-blue-400" />;
-      default:
-        return <Bell size={18} className="text-neutral-400" />;
-    }
-  };
-
-  const renderAlertContent = (notification: NotificationItem, isRead: boolean) => {
-    const name = notification.actor?.name || 'A friend';
-    
-    const nameColor = isRead ? "text-neutral-400" : "text-white";
-    const eventColor = isRead ? "text-neutral-500" : "text-neutral-300";
-    const highlightColor = isRead ? "text-neutral-400" : "text-white";
-
-    const friendNameEl = <span className={`font-bold ${nameColor}`}>{name}</span>;
-
-    if (notification.type === 'achievement_unlocked') {
-      const achName = notification.payload?.achievementName || 'a trophy';
-      return (
-        <p className={`text-sm ${eventColor} leading-snug`}>
-          {friendNameEl} unlocked the <span className={`font-medium ${highlightColor}`}>{String(achName)}</span>
-        </p>
-      );
-    }
-
-    if (notification.type === 'workout_completed') {
-      const workoutName = notification.payload?.workoutName || 'a workout';
-      return (
-        <p className={`text-sm ${eventColor} leading-snug`}>
-          {friendNameEl} logged: <span className={`font-medium ${highlightColor}`}>{String(workoutName)}</span>
-        </p>
-      );
-    }
-
-    if (notification.type === 'friend_request') {
-      return (
-        <p className={`text-sm ${eventColor} leading-snug`}>
-          {friendNameEl} sent you a friend request.
-        </p>
-      );
-    }
-
-    if (notification.type === 'friend_request_accepted') {
-      return (
-        <p className={`text-sm ${eventColor} leading-snug`}>
-          {friendNameEl} is now your friend.
-        </p>
-      );
-    }
-
-    return (
-      <p className={`text-sm ${eventColor} leading-snug`}>
-        {friendNameEl} {notification.message.replace(name, '').trim()}
-      </p>
-    );
-  };
-
-  const formatTimeAgo = (timestamp: number) => {
-    const diff = Math.floor((Date.now() - timestamp) / 1000);
-    if (diff < 60) return 'just now';
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    return `${Math.floor(diff / 86400)}d ago`;
-  };
-
+  const navigate = useNavigate(),
+    client = useQueryClient(),
+    clearDialog = useRef<HTMLDialogElement>(null);
+  const [filter, setFilter] = useState<NotificationFilter>("all"),
+    [error, setError] = useState("");
+  const unread = useUnreadNotifications();
+  const userId = useNotificationIdentity();
+  const inbox = useInfiniteQuery({
+    queryKey: ["notification-inbox", userId, filter],
+    queryFn: ({ pageParam }) => notificationService.page(filter, pageParam),
+    initialPageParam: undefined as InboxCursor | undefined,
+    getNextPageParam: (page) => page.next,
+    staleTime: 30_000,
+    retry: 1,
+    gcTime: 0,
+    refetchInterval: 120_000,
+    refetchOnWindowFocus: true,
+  });
+  const mutation = useMutation({
+    mutationFn: ({
+      action,
+      id,
+    }: {
+      action: "read" | "unread" | "delete" | "clear";
+      id?: string;
+    }) => notificationService.mutate(action, id),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ["notification-inbox"] });
+      void client.invalidateQueries({ queryKey: ["notification-count"] });
+      setError("");
+    },
+    onError: (e) => setError(e.message),
+  });
+  const items = inbox.data?.pages.flatMap((p) => p.items) || [];
+  const open = (id: string) => navigate("/notifications/open/" + id);
   return (
-    <div className="min-h-screen bg-black pb-32 animate-in fade-in duration-500">
-      <header className="flex justify-between items-center px-4 py-3 border-b border-white/10 sticky top-0 z-50 bg-black/80 backdrop-blur-md">
-        <h1 className="text-xl font-bold text-white tracking-tight">Alerts</h1>
-        <div className="flex gap-2 items-center">
-          <button
-            className="btn btn-ghost btn-xs text-white hover:bg-white/10 font-semibold tracking-wide disabled:opacity-50 disabled:bg-transparent"
-            onClick={handleMarkAllRead}
-            disabled={unreadCount === 0}
-          >
-            Mark all as read
-          </button>
+    <section className="min-h-screen pb-36 text-white">
+      <header className="sticky top-0 z-40 flex items-center gap-2 border-b border-white/10 bg-iron-950/95 px-3 py-3 backdrop-blur-md">
+        <button
+          aria-label="Back"
+          onClick={() =>
+            window.history.state?.idx > 0 ? navigate(-1) : navigate("/profile")
+          }
+          className="btn btn-ghost btn-square min-h-11 min-w-11"
+        >
+          <ArrowLeft size={20} />
+        </button>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-xl font-bold">Notifications</h1>
+          <p className="text-xs text-zinc-400">
+            {unread ? unread + " unread" : "Your workouts and your people"}
+          </p>
         </div>
+        <button
+          aria-label="Mark all as read"
+          title="Mark all as read"
+          disabled={!unread || mutation.isPending}
+          onClick={() => mutation.mutate({ action: "read" })}
+          className="btn btn-ghost btn-square min-h-11 min-w-11 text-brand-orange"
+        >
+          <CheckCheck size={21} />
+        </button>
+        <Link
+          aria-label="Notification settings"
+          to="/settings/notifications"
+          className="btn btn-ghost btn-square min-h-11 min-w-11"
+        >
+          <Settings size={21} />
+        </Link>
       </header>
-
-      <div className="max-w-2xl mx-auto">
-        {error && (
-          <div className="m-4 rounded-2xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200">
-            {error}
+      <div className="mx-auto max-w-2xl space-y-4 p-4">
+        <div
+          className="grid grid-cols-4 gap-1 rounded-2xl bg-white/5 p-1"
+          aria-label="Notification filters"
+        >
+          {filters.map((f) => (
+            <button
+              key={f}
+              aria-pressed={filter === f}
+              onClick={() => setFilter(f)}
+              className={cn(
+                "btn btn-ghost min-h-11 px-1 text-sm capitalize",
+                filter === f &&
+                  "bg-brand-orange text-white hover:bg-brand-orange",
+              )}
+            >
+              {f === "personal" ? "Reminders" : f}
+            </button>
+          ))}
+        </div>
+        {(error || inbox.isError) && (
+          <div
+            role="alert"
+            className="rounded-xl border border-error/30 bg-error/10 p-3 text-sm text-error"
+          >
+            {error || "Could not load notifications. You may be offline."}
+            <button
+              onClick={() => {
+                setError("");
+                void inbox.refetch();
+              }}
+              className="btn btn-ghost min-h-11 ml-2"
+            >
+              Retry
+            </button>
           </div>
         )}
-        
-        {notifications.length === 0 ? (
-          <div className="p-10 text-center">
-            <Bell className="mx-auto text-zinc-500 mb-3" />
-            <p className="text-zinc-400">No alerts yet.</p>
+        {inbox.isPending ? (
+          <div className="flex justify-center p-12" role="status">
+            <Loader2 className="animate-spin text-brand-orange" />
+            <span className="sr-only">Loading notifications</span>
+          </div>
+        ) : !items.length ? (
+          <div className="py-14 text-center">
+            <BellOff size={32} className="mx-auto mb-4 text-zinc-500" />
+            <p className="font-semibold">{emptyText[filter]}</p>
+            <p className="mt-2 text-sm text-zinc-500">
+              Your notification history stays synced across devices.
+            </p>
           </div>
         ) : (
-          <div className="flex flex-col">
-            {notifications.map((notification) => {
-              const isRead = Boolean(notification.readAt);
+          <div className="space-y-3">
+            {items.map((n) => {
+              const Icon =
+                n.category === "friend_request"
+                  ? UserPlus
+                  : n.category?.includes("pr") ||
+                      n.category?.includes("achievement")
+                    ? Trophy
+                    : n.category === "friend_workout"
+                      ? Dumbbell
+                      : Bell;
               return (
-                <div
-                  key={notification.id}
+                <article
+                  key={n.id}
                   className={cn(
-                    "flex gap-3 px-4 py-4 border-b border-white/5 items-center cursor-default",
-                    !isRead ? 'bg-neutral-800' : 'bg-neutral-950/40 opacity-60'
+                    "card flex-row items-start rounded-2xl border",
+                    n.readAt
+                      ? "border-white/5 bg-white/[0.025]"
+                      : "border-brand-orange/25 bg-brand-orange/[0.06]",
                   )}
                 >
-                  <div className="shrink-0 w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 object-cover overflow-hidden">
-                    {renderAlertIcon(notification.type)}
-                  </div>
-                  
-                  <div className="flex-1 min-w-0 flex flex-col justify-center">
-                    {renderAlertContent(notification, isRead)}
-                  </div>
-
-                  <div className="shrink-0 ml-2">
-                    <p className={cn("text-xs", !isRead ? "text-neutral-300" : "text-neutral-500")}>
-                      {formatTimeAgo(notification.createdAt)}
-                    </p>
-                  </div>
-                </div>
+                  <button
+                    onClick={() => open(n.id)}
+                    className="flex min-w-0 flex-1 gap-3 rounded-2xl p-4 text-left focus-visible:outline-2 focus-visible:outline-brand-orange"
+                  >
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-orange/10 text-brand-orange">
+                      <Icon size={20} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-2">
+                        <span className="break-words text-sm font-bold">
+                          {n.title || n.message}
+                        </span>
+                        {!n.readAt && (
+                          <span
+                            aria-label="Unread"
+                            className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-orange"
+                          />
+                        )}
+                      </span>
+                      <span className="mt-1 block break-words text-sm leading-relaxed text-zinc-400">
+                        {n.body || n.message}
+                      </span>
+                      <time
+                        dateTime={new Date(n.createdAt).toISOString()}
+                        className="mt-2 block text-xs text-zinc-500"
+                      >
+                        {relativeNotificationTime(n.createdAt)}
+                      </time>
+                    </span>
+                  </button>
+                  <details className="dropdown dropdown-end mr-1 mt-2">
+                    <summary
+                      aria-label={"Actions for " + (n.title || "notification")}
+                      className="btn btn-ghost btn-square min-h-11 min-w-11 list-none text-zinc-400"
+                    >
+                      <MoreHorizontal size={20} />
+                    </summary>
+                    <ul className="menu dropdown-content z-30 w-48 rounded-xl border border-white/10 bg-iron-950 p-2 shadow-xl">
+                      <li>
+                        <button
+                          disabled={mutation.isPending}
+                          className="min-h-11"
+                          onClick={(event) => {
+                            event.currentTarget
+                              .closest("details")
+                              ?.removeAttribute("open");
+                            mutation.mutate({
+                              action: n.readAt ? "unread" : "read",
+                              id: n.id,
+                            });
+                          }}
+                        >
+                          Mark {n.readAt ? "unread" : "read"}
+                        </button>
+                      </li>
+                      <li>
+                        <button
+                          disabled={mutation.isPending}
+                          className="min-h-11 text-error"
+                          onClick={(event) => {
+                            event.currentTarget
+                              .closest("details")
+                              ?.removeAttribute("open");
+                            mutation.mutate({ action: "delete", id: n.id });
+                          }}
+                        >
+                          <Trash2 size={16} />
+                          Delete notification
+                        </button>
+                      </li>
+                    </ul>
+                  </details>
+                </article>
               );
             })}
           </div>
         )}
+        {inbox.hasNextPage && (
+          <button
+            disabled={inbox.isFetchingNextPage}
+            onClick={() => void inbox.fetchNextPage()}
+            className="btn btn-ghost min-h-11 w-full"
+          >
+            {inbox.isFetchingNextPage ? "Loading…" : "Load older notifications"}
+          </button>
+        )}
+        {items.length > 0 && (
+          <button
+            onClick={() => clearDialog.current?.showModal()}
+            className="btn btn-ghost min-h-11 w-full text-zinc-500"
+          >
+            <Trash2 size={16} />
+            Clear notification history
+          </button>
+        )}
       </div>
-    </div>
+      <dialog
+        ref={clearDialog}
+        className="modal"
+        aria-labelledby="clear-notifications-title"
+      >
+        <div className="modal-box max-w-sm border border-white/10 bg-iron-950">
+          <h2 id="clear-notifications-title" className="text-lg font-bold">
+            Clear notification history?
+          </h2>
+          <p className="mt-2 text-sm text-zinc-400">
+            This hides your notifications on all devices. Your workouts and
+            milestones are not affected.
+          </p>
+          <form method="dialog" className="modal-action">
+            <button className="btn btn-ghost min-h-11" autoFocus>
+              Keep history
+            </button>
+            <button
+              className="btn btn-error min-h-11"
+              onClick={() => mutation.mutate({ action: "clear" })}
+            >
+              Clear history
+            </button>
+          </form>
+        </div>
+        <form method="dialog" className="modal-backdrop">
+          <button>Close</button>
+        </form>
+      </dialog>
+    </section>
   );
 };

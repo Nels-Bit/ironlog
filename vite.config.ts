@@ -8,8 +8,13 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+      workbox: { importScripts: ['push-worker.js'], navigateFallbackDenylist: [/^\/api\//] },
+      // JavaScript is already covered by Workbox's generated precache glob.
+      includeAssets: ['pwa-192x192.png', 'pwa-512x512.png'],
       manifest: {
+        id: '/',
+        start_url: '/',
+        scope: '/',
         name: 'IronLog Workout Tracker',
         short_name: 'IronLog',
         description: 'High-performance workout tracking',

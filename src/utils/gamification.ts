@@ -1,5 +1,6 @@
-import type { WorkoutSession, Exercise } from '../types';
-import { getLevelProgress, getLevelRequirementXP } from './achievementUtils';
+import type { WorkoutSession, Exercise } from '../types.js';
+import { getLevelProgress, getLevelRequirementXP } from './achievementUtils.js';
+import { getBarbellLift } from './barbellLifts.js';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -137,7 +138,6 @@ interface LiftConfig {
   category: TrophyCategory;
   label: string;
   emoji: string;
-  names: string[];
   ladder: readonly number[];
 }
 
@@ -146,12 +146,12 @@ function calcLiftTrophy(
   history: WorkoutSession[],
   exerciseDefs: Map<string, Exercise>
 ): CategoryTrophy {
-  const { category, label, emoji, names, ladder } = config;
+  const { category, label, emoji, ladder } = config;
 
   // Match exercise IDs for this lift type
   const matchedIds = new Set(
     Array.from(exerciseDefs.values())
-      .filter(ex => names.some(n => ex.name.toLowerCase().includes(n)))
+      .filter(ex => getBarbellLift(ex) === category)
       .map(ex => ex.id)
   );
 
@@ -451,23 +451,20 @@ export function calculateTrophyCabinet(input: TrophyCabinetInput): CategoryTroph
   const liftConfigs: LiftConfig[] = [
     {
       category: 'bench_press',
-      label: 'Bench Press',
+      label: 'Barbell Bench Press',
       emoji: '🏋️',
-      names: ['bench press', 'barbell bench press', 'dumbbell bench press', 'weighted bench press', 'incline bench'],
       ladder: BENCH_LADDER,
     },
     {
       category: 'squat',
-      label: 'Squat',
+      label: 'Barbell Squat',
       emoji: '🦵',
-      names: ['squat', 'back squat', 'front squat', 'barbell squat', 'goblet squat'],
       ladder: SQUAT_LADDER,
     },
     {
       category: 'deadlift',
-      label: 'Deadlift',
+      label: 'Barbell Deadlift',
       emoji: '💪',
-      names: ['deadlift', 'barbell deadlift', 'romanian deadlift', 'sumo deadlift', 'rdl'],
       ladder: DEADLIFT_LADDER,
     },
   ];

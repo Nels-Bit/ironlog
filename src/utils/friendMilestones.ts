@@ -1,7 +1,7 @@
-import { getLevelProgress, isRestDaySession } from './achievementUtils';
-import { calculateTrophyCabinet, getRankLabel } from './gamification';
-import { getSetLoad, shouldCountSetForPR } from './workoutMath';
-import type { Exercise, WorkoutSession } from '../types';
+import { getLevelProgress, isRestDaySession } from './achievementUtils.js';
+import { calculateTrophyCabinet, getRankLabel } from './gamification.js';
+import { getSetLoad, shouldCountSetForPR } from './workoutMath.js';
+import type { Exercise, WorkoutSession } from '../types.js';
 
 export type FriendMilestoneKind = 'workout_completed' | 'level_up' | 'trophy_unlocked';
 

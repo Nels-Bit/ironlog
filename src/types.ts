@@ -1,5 +1,5 @@
 // Re-export trophy types from gamification so consumers can import from types.ts
-export type { TrophyCategory, TrophyRank, TrophyTier, CategoryTrophy } from './utils/gamification';
+export type { TrophyCategory, TrophyRank, TrophyTier, CategoryTrophy } from './utils/gamification.js';
 
 export interface UserProfile {
   id: string;
@@ -50,7 +50,13 @@ export interface FriendRequest {
 
 export interface NotificationItem {
   id: string;
-  type: 'friend_request' | 'friend_request_accepted' | 'workout_completed' | 'achievement_unlocked';
+  type: string;
+  category?: import('./utils/notifications.js').NotificationCategory;
+  title?: string;
+  body?: string;
+  targetId?: string | null;
+  targetType?: string | null;
+  deletedAt?: number | null;
   message: string;
   createdAt: number;
   readAt: number | null;
@@ -70,7 +76,7 @@ export interface FriendProfileData {
   streak?: number;
   achievements?: { lift: string; label: string; currentWeight: number; threshold: number }[];
   /** Pre-computed trophy cabinet for display in the friend profile view. */
-  trophies?: import('./utils/gamification').CategoryTrophy[];
+  trophies?: import('./utils/gamification.js').CategoryTrophy[];
   recentWorkouts?: WorkoutSession[];
 }
 

@@ -17,6 +17,7 @@ import {
   Circle
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
+import { WorkoutNumberInput } from '../components/WorkoutNumberInput';
 
 import { Button } from '../components/ui/Button';
 import { ExerciseSelector } from '../components/ExerciseSelector';
@@ -374,8 +375,8 @@ export const EditWorkout = () => {
                                 {isCardio ? (
                                   <>
                                     <div className="col-span-3">
-                                        <input 
-                                            type="number" step="any" onKeyDown={blockInvalidNumberChars} 
+                                        <WorkoutNumberInput label={`Exercise ${exIndex + 1} set ${setIndex + 1} distance in miles`}
+                                            step="any" onKeyDown={blockInvalidNumberChars}
                                             min={0}
                                             placeholder="-"
                                             value={formatNumberInputValue(set.distance)} 
@@ -384,8 +385,8 @@ export const EditWorkout = () => {
                                         />
                                     </div>
                                     <div className="col-span-3">
-                                        <input 
-                                            type="number" step="any" onKeyDown={blockInvalidNumberChars} 
+                                        <WorkoutNumberInput label={`Exercise ${exIndex + 1} set ${setIndex + 1} duration in minutes`}
+                                            step="any" onKeyDown={blockInvalidNumberChars}
                                             min={0}
                                             placeholder="-"
                                             value={formatNumberInputValue(set.durationSeconds ? Math.round((set.durationSeconds / 60) * 10) / 10 : null)} 
@@ -400,8 +401,8 @@ export const EditWorkout = () => {
                                 ) : (
                                   <>
                                     <div className="col-span-3">
-                                        <input 
-                                            type="number" onKeyDown={blockInvalidNumberChars} 
+                                        <WorkoutNumberInput label={`Exercise ${exIndex + 1} set ${setIndex + 1} weight in pounds`}
+                                            step="any" onKeyDown={blockInvalidNumberChars}
                                             min={0}
                                             placeholder="-"
                                             value={formatNumberInputValue(set.weight)} 
@@ -413,12 +414,12 @@ export const EditWorkout = () => {
                                     <div className="col-span-3">
                                         {def?.isUnilateral ? (
                                             <div className="flex gap-1">
-                                              <input type="number" onKeyDown={blockInvalidNumberChars} min={0} placeholder="L" className="w-1/2 bg-white/5 rounded-lg py-2 text-center text-white text-xs font-bold outline-none focus:bg-white/10" value={formatNumberInputValue(set.repsLeft)} onChange={e => updateSet(exIndex, setIndex, 'repsLeft', parseNumberInputValue(e.target.value))}/>
-                                              <input type="number" onKeyDown={blockInvalidNumberChars} min={0} placeholder="R" className="w-1/2 bg-white/5 rounded-lg py-2 text-center text-white text-xs font-bold outline-none focus:bg-white/10" value={formatNumberInputValue(set.repsRight)} onChange={e => updateSet(exIndex, setIndex, 'repsRight', parseNumberInputValue(e.target.value))}/>
+                                              <WorkoutNumberInput label={`Exercise ${exIndex + 1} set ${setIndex + 1} left reps`} step="any" onKeyDown={blockInvalidNumberChars} min={0} placeholder="L" className="w-1/2 bg-white/5 rounded-lg py-2 text-center text-white text-xs font-bold outline-none focus:bg-white/10" value={formatNumberInputValue(set.repsLeft)} onChange={e => updateSet(exIndex, setIndex, 'repsLeft', parseNumberInputValue(e.target.value))}/>
+                                              <WorkoutNumberInput label={`Exercise ${exIndex + 1} set ${setIndex + 1} right reps`} step="any" onKeyDown={blockInvalidNumberChars} min={0} placeholder="R" className="w-1/2 bg-white/5 rounded-lg py-2 text-center text-white text-xs font-bold outline-none focus:bg-white/10" value={formatNumberInputValue(set.repsRight)} onChange={e => updateSet(exIndex, setIndex, 'repsRight', parseNumberInputValue(e.target.value))}/>
                                             </div>
                                         ) : (
-                                            <input 
-                                                type="number" onKeyDown={blockInvalidNumberChars} 
+                                            <WorkoutNumberInput label={`Exercise ${exIndex + 1} set ${setIndex + 1} reps`}
+                                                step="any" onKeyDown={blockInvalidNumberChars}
                                                 min={0}
                                                 placeholder="-"
                                                 value={formatNumberInputValue(set.reps)} 
