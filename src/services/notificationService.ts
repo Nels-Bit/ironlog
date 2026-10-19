@@ -117,6 +117,24 @@ export const notificationService = {
       throw new Error("Unable to update notifications. Please try again.");
     notifyInboxChanged();
   },
+  async markRead(ids?: string[], expectedUserId?: string) {
+    const userId = await currentUser();
+    if (expectedUserId && userId !== expectedUserId && !isDemoSession())
+      throw new Error("Your account changed. Please reopen notifications.");
+    if (ids === undefined) return notificationService.mutate("read");
+    const unique = [...new Set(ids)];
+    if (!unique.length) return;
+    // Use the existing owner-scoped RPC: clients cannot directly update rows.
+    // A finite list never acknowledges older/unloaded or newly arriving items.
+    try {
+      for (let offset = 0; offset < unique.length; offset += 4) {
+        const results = await Promise.all(unique.slice(offset, offset + 4).map(id =>
+          supabase.rpc("notification_state", {p_id: id, p_action: "read"})));
+        if (results.some(result => result.error))
+          throw new Error("Unable to update notifications. Please try again.");
+      }
+    } finally { notifyInboxChanged(); }
+  },
   async target(id: string) {
     const { data, error } = await supabase.rpc("notification_target", {
       p_id: id,

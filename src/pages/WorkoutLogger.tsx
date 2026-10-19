@@ -396,7 +396,7 @@ export const WorkoutLogger = () => {
                       <p className="mt-2 text-sm leading-relaxed text-zinc-500 break-words">{progress.summary}</p>
                     </button>
                     <details className="dropdown dropdown-end self-start mr-2 mt-2">
-                      <summary aria-label={`Actions for ${def?.name || 'exercise'}`} className="btn btn-ghost btn-square list-none min-h-11 min-w-11 text-zinc-400"><MoreHorizontal size={20} /></summary>
+                      <summary aria-label={`Actions for ${def?.name || 'exercise'}`} className="btn btn-ghost btn-square list-none min-h-11 min-w-11 text-zinc-400"><MoreHorizontal size={24} /></summary>
                       <ul className="menu dropdown-content z-30 w-48 rounded-xl border border-white/10 bg-iron-950 p-2 shadow-xl">
                         {exIndex > 0 && <li><button onClick={event => { event.currentTarget.closest('details')?.removeAttribute('open'); moveExercise(ex.id, 'up'); }} className="min-h-11 text-zinc-300"><ArrowUp size={16} /> Move up</button></li>}
                         {exIndex < workout.exercises.length - 1 && <li><button onClick={event => { event.currentTarget.closest('details')?.removeAttribute('open'); moveExercise(ex.id, 'down'); }} className="min-h-11 text-zinc-300"><ArrowDown size={16} /> Move down</button></li>}

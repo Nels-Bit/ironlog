@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   useInfiniteQuery,
   useMutation,
@@ -29,6 +29,7 @@ import {
 import {
   useUnreadNotifications,
   useNotificationIdentity,
+  useNotificationReadReceipts,
 } from "../context/notificationContext.shared";
 import { cn } from "../lib/utils";
 const filters: NotificationFilter[] = ["all", "unread", "friends", "personal"];
@@ -46,6 +47,7 @@ export const Alerts = () => {
     [error, setError] = useState("");
   const unread = useUnreadNotifications();
   const userId = useNotificationIdentity();
+  const {readAll, retryRead, observe, keepUnread, readFeedback} = useNotificationReadReceipts();
   const inbox = useInfiniteQuery({
     queryKey: ["notification-inbox", userId, filter],
     queryFn: ({ pageParam }) => notificationService.page(filter, pageParam),
@@ -73,6 +75,9 @@ export const Alerts = () => {
     onError: (e) => setError(e.message),
   });
   const items = inbox.data?.pages.flatMap((p) => p.items) || [];
+  useEffect(() => {
+    observe(inbox.data?.pages.flatMap(page => page.items) || []);
+  }, [inbox.data, observe]);
   const open = (id: string) => navigate("/notifications/open/" + id);
   return (
     <section className="min-h-screen pb-36 text-white">
@@ -95,11 +100,13 @@ export const Alerts = () => {
         <button
           aria-label="Mark all as read"
           title="Mark all as read"
-          disabled={!unread || mutation.isPending}
-          onClick={() => mutation.mutate({ action: "read" })}
-          className="btn btn-ghost btn-square min-h-11 min-w-11 text-brand-orange"
+          aria-busy={readFeedback.markingAll}
+          disabled={!unread || mutation.isPending || readFeedback.busy}
+          onClick={() => { setError(''); void readAll(); }}
+          className="btn btn-ghost min-h-11 gap-1.5 px-2 text-brand-orange"
         >
-          <CheckCheck size={21} />
+          {readFeedback.markingAll ? <span aria-hidden="true" className="loading loading-spinner loading-xs" /> : <CheckCheck size={20} />}
+          <span className="text-xs">{readFeedback.markingAll ? 'Saving…' : !unread ? 'All read' : 'Read all'}</span>
         </button>
         <Link
           aria-label="Notification settings"
@@ -110,6 +117,10 @@ export const Alerts = () => {
         </Link>
       </header>
       <div className="mx-auto max-w-2xl space-y-4 p-4">
+        {(readFeedback.markingAll || (!readFeedback.error && !unread && readFeedback.message)) && <div
+          role="status" className="alert border-white/10 bg-white/5 py-3 text-sm text-zinc-300">
+          {readFeedback.markingAll ? 'Marking all as read…' : readFeedback.message}
+        </div>}
         <div
           className="grid grid-cols-4 gap-1 rounded-2xl bg-white/5 p-1"
           aria-label="Notification filters"
@@ -129,16 +140,17 @@ export const Alerts = () => {
             </button>
           ))}
         </div>
-        {(error || inbox.isError) && (
+        {(error || inbox.isError || readFeedback.error) && (
           <div
             role="alert"
             className="rounded-xl border border-error/30 bg-error/10 p-3 text-sm text-error"
           >
-            {error || "Could not load notifications. You may be offline."}
+            {error || (readFeedback.error ? readFeedback.message : "Could not load notifications. You may be offline.")}
             <button
               onClick={() => {
                 setError("");
-                void inbox.refetch();
+                if (readFeedback.error) void retryRead();
+                else void inbox.refetch();
               }}
               className="btn btn-ghost min-h-11 ml-2"
             >
@@ -221,12 +233,13 @@ export const Alerts = () => {
                     <ul className="menu dropdown-content z-30 w-48 rounded-xl border border-white/10 bg-iron-950 p-2 shadow-xl">
                       <li>
                         <button
-                          disabled={mutation.isPending}
+                          disabled={mutation.isPending || readFeedback.busy}
                           className="min-h-11"
                           onClick={(event) => {
                             event.currentTarget
                               .closest("details")
                               ?.removeAttribute("open");
+                            if (n.readAt) keepUnread(n.id);
                             mutation.mutate({
                               action: n.readAt ? "unread" : "read",
                               id: n.id,
@@ -238,7 +251,7 @@ export const Alerts = () => {
                       </li>
                       <li>
                         <button
-                          disabled={mutation.isPending}
+                          disabled={mutation.isPending || readFeedback.busy}
                           className="min-h-11 text-error"
                           onClick={(event) => {
                             event.currentTarget

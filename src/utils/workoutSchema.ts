@@ -5,6 +5,9 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
     : null;
 
 const asNumber = (value: unknown): number | null => {
+  // Empty saved inputs are not zero-valued logged measurements.
+  if (value == null || (typeof value !== 'number' && typeof value !== 'string') ||
+    (typeof value === 'string' && value.trim() === '')) return null;
   const number = typeof value === "number" ? value : Number(value);
   return Number.isFinite(number) ? number : null;
 };

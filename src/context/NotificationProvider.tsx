@@ -1,5 +1,6 @@
-import { useEffect, type ReactNode } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import { useLocation } from 'react-router-dom';
 import {
   notificationService,
   NOTIFICATION_CHANGED,
@@ -7,6 +8,7 @@ import {
 import { InboxContext } from "./notificationContext.shared";
 import { pushService } from "../services/pushService";
 import { deviceTimezone } from "../utils/notifications";
+import { createNotificationReadReceipts, idleReadFeedback } from '../utils/notificationReadReceipts';
 export const NotificationProvider = ({
   children,
   userId,
@@ -15,6 +17,47 @@ export const NotificationProvider = ({
   userId: string;
 }) => {
   const client = useQueryClient();
+  const {pathname} = useLocation();
+  const previousPath = useRef(pathname);
+  const [readFeedback, setReadFeedback] = useState(idleReadFeedback);
+  const receipts = useMemo(() => createNotificationReadReceipts({
+    write: ids => notificationService.markRead(ids, userId),
+    refresh: async ids => {
+      const key = ['notification-inbox', userId];
+      await client.cancelQueries({queryKey: key});
+      const readAt = Date.now(), selected = ids ? new Set(ids) : undefined;
+      type Pages = InfiniteData<Awaited<ReturnType<typeof notificationService.page>>>;
+      for (const [queryKey, data] of client.getQueriesData<Pages>({queryKey: key})) {
+        if (!data) continue;
+        client.setQueryData(queryKey, {...data, pages: data.pages.map(page => ({
+          ...page, items: page.items.map(item => !item.readAt && (!selected || selected.has(item.id))
+            ? {...item, readAt} : item).filter(item => queryKey[2] !== 'unread' || !item.readAt),
+        }))});
+      }
+      if (!ids) client.setQueryData(['notification-count', userId], 0);
+      await Promise.all([
+        client.invalidateQueries({queryKey: key}),
+        client.invalidateQueries({queryKey: ['notification-count', userId]}),
+      ]);
+    },
+    onChange: setReadFeedback,
+  }), [client, userId]);
+  useEffect(() => {
+    const leaving = previousPath.current === '/alerts' && pathname !== '/alerts';
+    previousPath.current = pathname;
+    if (leaving) void receipts.leave();
+  }, [pathname, receipts]);
+  useEffect(() => {
+    if (pathname !== '/alerts') return;
+    const onHidden = () => { if (document.visibilityState === 'hidden') void receipts.leave(); };
+    const onPageHide = () => { void receipts.leave(); };
+    document.addEventListener('visibilitychange', onHidden);
+    window.addEventListener('pagehide', onPageHide);
+    return () => {
+      document.removeEventListener('visibilitychange', onHidden);
+      window.removeEventListener('pagehide', onPageHide);
+    };
+  }, [pathname, receipts]);
   const count = useQuery({
     queryKey: ["notification-count", userId],
     queryFn: notificationService.count,
@@ -86,8 +129,16 @@ export const NotificationProvider = ({
     };
   }, [client, userId]);
   return (
-    <InboxContext.Provider value={{ unread: count.data || 0, userId }}>
+    <InboxContext.Provider value={{ unread: count.data || 0, userId, readFeedback,
+      readAll: receipts.readAll, retryRead: receipts.retry,
+      observe: receipts.observe, keepUnread: receipts.keepUnread }}>
       {children}
+      {readFeedback.error && pathname !== '/alerts' && <div
+        role="alert" className="alert fixed bottom-[var(--rest-timer-bottom)] left-4 right-4 z-[120] w-auto border-error/30 bg-iron-950 text-sm text-error md:left-72">
+        <span>{readFeedback.message}</span>
+        <button className="btn btn-ghost min-h-11" disabled={readFeedback.busy}
+          onClick={() => void receipts.retry()}>Retry</button>
+      </div>}
     </InboxContext.Provider>
   );
 };
