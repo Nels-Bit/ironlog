@@ -5,6 +5,7 @@ import type { Exercise } from '../types';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
+import { filterExercises, getExerciseFilterOptions } from '../utils/exerciseSearch';
 
 interface Props {
   isOpen: boolean;
@@ -15,6 +16,8 @@ interface Props {
 export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
   const [mode, setMode] = useState<'search' | 'create'>('search');
   const [search, setSearch] = useState('');
+  const [muscleFilter, setMuscleFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -116,6 +119,8 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
     setFormSuccess(null);
     setMode('search');
     setSearch('');
+    setMuscleFilter('');
+    setTypeFilter('');
   };
 
   const switchToCreate = () => {
@@ -123,10 +128,9 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
     setMode('create');
   };
 
-  const filtered = exercises.filter(ex =>
-    ex.name.toLowerCase().includes(search.toLowerCase())
-  );
-
+  const filterOptions = getExerciseFilterOptions(exercises);
+  const filtered = filterExercises(exercises, search, muscleFilter, typeFilter);
+  const hasFilters = muscleFilter !== '' || typeFilter !== '';
   const hasNoResults = search.trim() !== '' && filtered.length === 0;
 
   if (!isOpen) return null;
@@ -203,6 +207,7 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
                 autoFocus
                 type="text"
                 placeholder="Find movement..."
+                aria-label="Search exercises"
                 className="w-full bg-iron-950 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-lg text-white placeholder:text-zinc-600 focus:border-brand-orange outline-none transition-all shadow-sm"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -210,6 +215,33 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
                 transition={{ type: "spring", stiffness: 300 }}
               />
             </div>
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:gap-4">
+              <label className="min-w-0 space-y-1.5">
+                <span className="pl-1 text-[11px] font-bold uppercase tracking-wider text-base-content/60">Muscle</span>
+                <select
+                  aria-label="Filter by muscle"
+                  value={muscleFilter}
+                  onChange={event => setMuscleFilter(event.target.value)}
+                  className="select min-h-11 w-full min-w-0 rounded-xl border-white/10 bg-iron-950 text-base text-white focus:border-brand-orange focus:outline-brand-orange"
+                >
+                  <option value="">All muscles</option>
+                  {filterOptions.muscles.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </label>
+              <label className="min-w-0 space-y-1.5">
+                <span className="pl-1 text-[11px] font-bold uppercase tracking-wider text-base-content/60">Type</span>
+                <select
+                  aria-label="Filter by exercise type"
+                  value={typeFilter}
+                  onChange={event => setTypeFilter(event.target.value)}
+                  className="select min-h-11 w-full min-w-0 rounded-xl border-white/10 bg-iron-950 text-base text-white focus:border-brand-orange focus:outline-brand-orange"
+                >
+                  <option value="">All types</option>
+                  {filterOptions.types.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </label>
+            </div>
+            <p role="status" className="sr-only">{loading ? 'Loading exercises' : `${filtered.length} exercises found`}</p>
           </div>
 
           {/* Scrollable List */}
@@ -285,6 +317,10 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
                       <Dumbbell className="text-zinc-700" size={32} />
                     </div>
                     <p className="text-zinc-500 font-medium">No exercises found.</p>
+                    {hasFilters && <button
+                      onClick={() => { setMuscleFilter(''); setTypeFilter(''); }}
+                      className="btn btn-ghost mt-3 min-h-11 text-brand-orange"
+                    >Clear filters</button>}
                     {search && (
                       <button 
                         onClick={switchToCreate}

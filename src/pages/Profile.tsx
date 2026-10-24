@@ -8,6 +8,9 @@ import {
 import { Button } from '../components/ui/Button';
 import { cn } from '../lib/utils';
 import { authService } from '../services/authService';
+import { notificationService } from '../services/notificationService';
+import { useQuery } from '@tanstack/react-query';
+import { useNotificationIdentity } from '../context/notificationContext.shared';
 import { workoutService } from '../services/workoutService';
 import { exerciseService } from '../services/exerciseService';
 import { socialService } from '../services/socialService';
@@ -39,6 +42,15 @@ export const Profile = () => {
   const [actingOnRequest, setActingOnRequest] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<Partial<UserProfile>>({});
+  const userId = useNotificationIdentity();
+  const privacyPreferences = useQuery({
+    queryKey: ['notification-preferences', userId],
+    queryFn: notificationService.preferences,
+    enabled: isEditing,
+    gcTime: 0,
+  });
+  const [shareActivity, setShareActivity] = useState<boolean | undefined>();
+  const [profileSaveError, setProfileSaveError] = useState('');
   const [heightFeet, setHeightFeet] = useState('');
   const [heightInches, setHeightInches] = useState('');
   const [xpResult, setXpResult] = useState<TotalXPResult | null>(null);
@@ -262,7 +274,8 @@ export const Profile = () => {
   };
 
   const handleSave = async () => {
-    if (!profile) return;
+    if (!profile || !privacyPreferences.isSuccess) return;
+    setProfileSaveError('');
     setLoading(true);
     try {
       const nextHeight = buildHeightInInches(heightFeet, heightInches);
@@ -272,11 +285,15 @@ export const Profile = () => {
         height: nextHeight
       } as UserProfile;
 
-      await authService.updateProfile(updated);
+      // Privacy and milestone consent commit together, with owner RLS checks.
+      await authService.updateProfile({ ...updated, isPublic: undefined });
+      await notificationService.saveSocialPrivacy(updated.isPublic, shareActivity ?? privacyPreferences.data.share_activity);
       setProfile(updated);
+      appStorage.setItem('profile_cache_user', JSON.stringify(updated));
       setIsEditing(false);
     } catch (error) {
       console.error(error);
+      setProfileSaveError(error instanceof Error ? error.message : 'Profile could not save. Please retry.');
     } finally {
       setLoading(false);
     }
@@ -359,7 +376,7 @@ export const Profile = () => {
                 {/* Action Bar / Top Row */}
                 <div className="flex justify-end mb-4">
                   <button
-                    onClick={() => { setIsEditing(true); setShowSignOutConfirm(false); }}
+                    onClick={() => { setShareActivity(undefined); setProfileSaveError(''); setIsEditing(true); setShowSignOutConfirm(false); }}
                     className="flex items-center gap-1.5 text-neutral-400 hover:text-white border border-white/10 rounded-full px-3 py-1 text-xs transition-colors bg-transparent"
                   >
                     <Edit2 size={12} />
@@ -491,6 +508,25 @@ export const Profile = () => {
               <p className="text-xs text-zinc-500 px-1">
                 Public profiles can send and receive friend requests. Private profiles keep your user-id but disable friend requests.
               </p>
+              {privacyPreferences.isError ? (
+                <p role="alert" className="text-sm text-error">
+                  Milestone settings could not load. <button type="button" className="btn btn-ghost min-h-11" onClick={() => void privacyPreferences.refetch()}>Retry</button>
+                </p>
+              ) : (
+                <label className="flex min-h-14 items-center justify-between gap-3 rounded-xl border border-white/10 p-3">
+                  <span>
+                    <span className="block text-sm font-bold">Share milestones with friends</span>
+                    <span className="block text-xs text-zinc-500">
+                      {privacyPreferences.isPending ? 'Loading saved setting…' : formData.isPublic ? 'Share workouts, records and awards with accepted friends.' : 'Private profiles never share milestones.'}
+                    </span>
+                  </span>
+                  <input aria-label="Share milestones with friends" type="checkbox"
+                    className="toggle toggle-sm border-brand-orange bg-brand-orange"
+                    disabled={!privacyPreferences.isSuccess || !formData.isPublic}
+                    checked={Boolean(formData.isPublic && (shareActivity ?? privacyPreferences.data?.share_activity))}
+                    onChange={e => setShareActivity(e.target.checked)} />
+                </label>
+              )}
             </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -598,6 +634,7 @@ export const Profile = () => {
               </div>
             </div>
 
+            {profileSaveError && <p role="alert" className="text-sm text-error">{profileSaveError}</p>}
             {!showSignOutConfirm ? (
               <div className="grid grid-cols-2 gap-3 mt-6 pt-4 border-t border-white/10">
                 {/* Left Action: Sign Out (Red) */}
@@ -613,6 +650,7 @@ export const Profile = () => {
                 <button
                   type="button"
                   onClick={handleSave}
+                  disabled={!privacyPreferences.isSuccess}
                   className="w-full h-11 rounded-xl font-semibold text-sm transition-colors bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-900/30 flex items-center justify-center"
                 >
                   Save Profile

@@ -1,5 +1,5 @@
-import type { Exercise, ExerciseSet, PersonalRecordPerformance, WorkoutExercise } from '../types';
-import { getTotalReps, isAssistedExercise, isBodyweightExercise, isCardioExercise } from './workoutMath';
+import type { Exercise, ExerciseSet, PersonalRecordPerformance, WorkoutExercise } from '../types.js';
+import { getTotalReps, isAssistedExercise, isBodyweightExercise, isCardioExercise } from './workoutMath.js';
 
 /** Placeholder values never count as logged data or trigger deletion warnings. */
 export const hasSetData = (set: ExerciseSet) => set.isCompleted || [

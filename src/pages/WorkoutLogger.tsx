@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef, type ComponentProps, type ReactNode } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Plus, Check, Trash2, Dumbbell, X, Save, ArrowUp, ArrowDown, Flame, Skull, Circle, Play, MoreHorizontal, Trophy
 } from 'lucide-react';
 import { Button } from '../components/ui/Button';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
+import { WorkoutNumberInput as NumericInput } from '../components/WorkoutNumberInput';
 import { ExerciseSelector } from '../components/ExerciseSelector';
 import { GhostSetHydrator } from '../components/GhostSetHydrator';
 import { cn } from '../lib/utils';
@@ -55,6 +56,9 @@ export const WorkoutLogger = () => {
   const [isFinishing, setIsFinishing] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
+  const [recentlyAddedId, setRecentlyAddedId] = useState<string | null>(null);
+  const addedCardRef = useRef<HTMLDivElement>(null);
+  const reduceMotion = useReducedMotion();
   // Tracks which set-sides have been manually edited to break unilateral auto-mirror
   // Key format: `${setId}-left` or `${setId}-right`
   const [manualOverrides, setManualOverrides] = useState<Set<string>>(new Set());
@@ -103,9 +107,17 @@ export const WorkoutLogger = () => {
   };
 
   const handleAddExercise = (ex: Exercise) => {
-    addExercise(ex);
+    const id = addExercise(ex);
+    if (id) setRecentlyAddedId(id);
     setIsSelectorOpen(false);
+    if (focusedId) showOverview();
   };
+
+  useEffect(() => {
+    if (recentlyAddedId && !focusedId) addedCardRef.current?.scrollIntoView({
+      behavior: reduceMotion ? 'instant' : 'smooth', block: 'center',
+    });
+  }, [recentlyAddedId, focusedId, reduceMotion]);
 
   const handleFinish = async () => {
     if (isFinishing || !confirm("Finish workout?")) return;
@@ -360,7 +372,18 @@ export const WorkoutLogger = () => {
               if (!isFocused) {
                 const progress = getExerciseProgress(ex, def);
                 return (
-                  <div key={ex.id} className="card flex-row items-center rounded-2xl border border-white/10 bg-zinc-900/60">
+                  <motion.div key={ex.id} ref={recentlyAddedId === ex.id ? addedCardRef : undefined}
+                    initial={false}
+                    data-added-exercise={recentlyAddedId === ex.id || undefined}
+                    animate={recentlyAddedId === ex.id ? {
+                      x: reduceMotion ? 0 : [0, -5, 5, -3, 3, 0],
+                      boxShadow: ['0 0 0 2px rgba(234,88,12,0)', '0 0 0 2px rgba(234,88,12,0.65)', '0 0 0 2px rgba(234,88,12,0)'],
+                    } : {x: 0, boxShadow: '0 0 0 2px rgba(234,88,12,0)'}}
+                    transition={{duration: 0.65, ease: 'easeOut'}}
+                    onAnimationComplete={() => {
+                      if (recentlyAddedId === ex.id) setRecentlyAddedId(current => current === ex.id ? null : current);
+                    }}
+                    className="card flex-row items-center rounded-2xl border border-white/10 bg-zinc-900/60">
                     <button onClick={() => openExercise(ex.id)} className="min-w-0 flex-1 p-4 text-left rounded-2xl focus-visible:outline-2 focus-visible:outline-brand-orange">
                       <div className="flex items-start justify-between gap-3">
                         <h3 className="text-lg font-bold text-white break-words">{def?.name || 'Loading exercise…'}</h3>
@@ -373,14 +396,14 @@ export const WorkoutLogger = () => {
                       <p className="mt-2 text-sm leading-relaxed text-zinc-500 break-words">{progress.summary}</p>
                     </button>
                     <details className="dropdown dropdown-end self-start mr-2 mt-2">
-                      <summary aria-label={`Actions for ${def?.name || 'exercise'}`} className="btn btn-ghost btn-square list-none min-h-11 min-w-11 text-zinc-400"><MoreHorizontal size={20} /></summary>
+                      <summary aria-label={`Actions for ${def?.name || 'exercise'}`} className="btn btn-ghost btn-square list-none min-h-11 min-w-11 text-zinc-400"><MoreHorizontal size={24} /></summary>
                       <ul className="menu dropdown-content z-30 w-48 rounded-xl border border-white/10 bg-iron-950 p-2 shadow-xl">
                         {exIndex > 0 && <li><button onClick={event => { event.currentTarget.closest('details')?.removeAttribute('open'); moveExercise(ex.id, 'up'); }} className="min-h-11 text-zinc-300"><ArrowUp size={16} /> Move up</button></li>}
                         {exIndex < workout.exercises.length - 1 && <li><button onClick={event => { event.currentTarget.closest('details')?.removeAttribute('open'); moveExercise(ex.id, 'down'); }} className="min-h-11 text-zinc-300"><ArrowDown size={16} /> Move down</button></li>}
                         <li><button onClick={event => { event.currentTarget.closest('details')?.removeAttribute('open'); handleRemoveExercise(exIndex); }} className="min-h-11 text-error"><Trash2 size={16} /> Remove exercise</button></li>
                       </ul>
                     </details>
-                  </div>
+                  </motion.div>
                 );
               }
 
@@ -515,7 +538,7 @@ export const WorkoutLogger = () => {
                                             <div className="flex gap-1 w-full">
                                               <NumericInput
                                                 label={`Set ${setIndex + 1} left reps`}
-                                                inputMode="numeric" step="1" onKeyDown={blockInvalidNumberChars}
+                                                inputMode="decimal" step="any" onKeyDown={blockInvalidNumberChars}
                                                 min={0}
                                                 placeholder={getNumberPlaceholder(ghostSet?.repsLeft, "L")}
                                                 value={formatNumberInputValue(set.repsLeft)}
@@ -526,7 +549,7 @@ export const WorkoutLogger = () => {
                                               />
                                               <NumericInput
                                                 label={`Set ${setIndex + 1} right reps`}
-                                                inputMode="numeric" step="1" onKeyDown={blockInvalidNumberChars}
+                                                inputMode="decimal" step="any" onKeyDown={blockInvalidNumberChars}
                                                 min={0}
                                                 placeholder={getNumberPlaceholder(ghostSet?.repsRight, "R")}
                                                 value={formatNumberInputValue(set.repsRight)}
@@ -539,7 +562,7 @@ export const WorkoutLogger = () => {
                                           ) : (
                                             <NumericInput
                                               label={`Set ${setIndex + 1} reps`}
-                                              inputMode="numeric" step="1" onKeyDown={blockInvalidNumberChars}
+                                              inputMode="decimal" step="any" onKeyDown={blockInvalidNumberChars}
                                               min={0}
                                               placeholder={getNumberPlaceholder(ghostSet?.reps, "-")}
                                               value={formatNumberInputValue(set.reps)}
@@ -704,44 +727,5 @@ const LoggerDialog = ({ label, onClose, children }: { label: string; onClose: ()
       <div className="modal-box max-w-xs rounded-3xl border border-white/10 bg-iron-950 p-4">{children}</div>
       <form method="dialog" className="modal-backdrop"><button onClick={onClose}>Close</button></form>
     </dialog>
-  );
-};
-
-type NumericInputProps = Omit<ComponentProps<typeof motion.input>, 'value' | 'inputMode' | 'type'> & {
-  label: string;
-  value: number | '';
-  inputMode: 'decimal' | 'numeric';
-};
-
-/** Keep the in-progress decimal (e.g. "22.") visible while the context stores 22.
- * This is an input draft only, never a second source of workout state. */
-const NumericInput = ({ label, value, inputMode, onChange, onKeyDown, className, ...props }: NumericInputProps) => {
-  const [draft, setDraft] = useState<string | null>(null);
-  return (
-    <motion.input
-      {...props}
-      type="text"
-      inputMode={inputMode}
-      pattern={inputMode === 'numeric' ? '[0-9]*' : '[0-9]*[.]?[0-9]*'}
-      aria-label={label}
-      autoComplete="off"
-      enterKeyHint="done"
-      value={draft ?? value}
-      onFocus={() => setDraft(String(value))}
-      onBlur={() => setDraft(null)}
-      onKeyDown={event => {
-        onKeyDown?.(event);
-        if (inputMode === 'numeric' && ['.', ','].includes(event.key)) event.preventDefault();
-        if (event.key === 'Enter') event.currentTarget.blur();
-      }}
-      onChange={event => {
-        const raw = event.target.value;
-        const valid = inputMode === 'numeric' ? /^\d*$/.test(raw) : /^\d*\.?\d*$/.test(raw);
-        if (!valid || (raw !== '' && raw !== '.' && !Number.isFinite(Number(raw)))) return;
-        setDraft(raw);
-        onChange?.(event);
-      }}
-      className={cn(className, 'min-h-11 min-w-0 text-base')}
-    />
   );
 };

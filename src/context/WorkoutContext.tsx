@@ -15,6 +15,7 @@ import {
 import type { WorkoutSession, WorkoutExercise, Exercise, ExerciseSet } from '../types';
 import { WorkoutContext } from './workoutContext.shared';
 import { moveWorkoutExercise } from '../utils/exerciseLogging';
+import { remapWorkoutExerciseIds } from '../utils/barbellLifts';
 
 export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
   const [workout, setWorkout] = useState<WorkoutSession | null>(() => {
@@ -88,8 +89,11 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
       const map = new Map<string, Exercise>();
       all.forEach(ex => map.set(ex.id, ex));
       setExerciseDefs(map);
+      const aliases = await exerciseService.getAliases();
+      // A restored/offline session can still reference a pre-merge default ID.
+      setWorkout(current => current && aliases.size ? { ...current, exercises: remapWorkoutExerciseIds(current.exercises, aliases) } : current);
     };
-    loadDefs();
+    void loadDefs().catch(error => console.error('Unable to load exercise definitions:', error));
   }, []);
 
   useEffect(() => {
@@ -272,6 +276,7 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
 
     // Use the shared helper so addExercise and rehydration share the same fetch logic
     fetchAndCacheHistoricalPR(exDef.id);
+    return newExercise.id;
   };
 
   const hydrateExerciseGhostSets = useCallback((

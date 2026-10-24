@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import type { Exercise } from '../types';
+import { canonicalBarbellName, getBarbellLift } from '../utils/barbellLifts';
 
 interface ExerciseRow {
   id: string;
@@ -12,6 +13,17 @@ interface ExerciseRow {
 }
 
 export const exerciseService = {
+
+  async getAliases(): Promise<Map<string, string>> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return new Map();
+    const { data, error } = await supabase.from('exercise_id_aliases')
+      .select('old_exercise_id,exercise_id').eq('user_id', user.id);
+    // Allow a rolling release against a schema that has not gained aliases yet.
+    if (error && ['PGRST205', '42P01'].includes(error.code)) return new Map();
+    if (error) throw new Error('Unable to load merged exercise identities. Please retry.');
+    return new Map((data || []).map(row => [row.old_exercise_id, row.exercise_id]));
+  },
   
   async getAllExercises(): Promise<Exercise[]> {
     const { data: { user } } = await supabase.auth.getUser();
@@ -29,12 +41,13 @@ export const exerciseService = {
       return [];
     }
 
-    return (data as ExerciseRow[]).map(ex => {
+    const aliases = await exerciseService.getAliases();
+    return (data as ExerciseRow[]).filter(ex => !aliases.has(ex.id)).map(ex => {
       const categoryLower = (ex.category || '').toLowerCase();
       const exerciseCategory = ex.exercise_category || (categoryLower === 'cardio' ? 'cardio' : 'strength');
       return {
         id: ex.id,
-        name: ex.name,
+        name: canonicalBarbellName({ name: ex.name, category: ex.category, isUnilateral: ex.is_unilateral }),
         category: ex.category,
         exerciseCategory,
         target: ex.target_muscle || null,
@@ -48,8 +61,14 @@ export const exerciseService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('You must be signed in to create an exercise.');
 
-    const name = ex.name?.trim();
+    let name = ex.name?.trim();
     if (!name) throw new Error('Enter an exercise name before saving.');
+    const lift = getBarbellLift({ name, category: ex.category || '', isUnilateral: ex.isUnilateral });
+    if (lift) {
+      name = canonicalBarbellName({ name, category: ex.category || '' });
+      const existing = (await exerciseService.getAllExercises()).find(candidate => getBarbellLift(candidate) === lift);
+      if (existing) return existing; // Reuse rather than creating another barbell identity.
+    }
 
     // The deployed table classifies exercises through `category`; it has no
     // `exercise_category` column. Keep the cardio behavior in the app from

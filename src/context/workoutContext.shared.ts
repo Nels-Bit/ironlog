@@ -17,7 +17,7 @@ export interface WorkoutContextType {
   logRestDay: () => Promise<string | null>;
   cancelWorkout: () => void;
   finishWorkout: () => Promise<string | null>;
-  addExercise: (exDef: Exercise) => void;
+  addExercise: (exDef: Exercise) => string | undefined;
   hydrateExerciseGhostSets: (workoutExerciseId: string, exerciseId: string, sets: ExerciseSet[]) => void;
   removeExercise: (index: number) => void;
   moveExercise: (workoutExerciseId: string, direction: 'up' | 'down') => void;
