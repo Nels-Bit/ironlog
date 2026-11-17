@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 import type { Exercise } from '../types';
 import { canonicalBarbellName, getBarbellLift } from '../utils/barbellLifts';
+import { EXERCISE_CHANGED, validateExerciseSettings } from '../utils/exerciseDetails';
 
 interface ExerciseRow {
   id: string;
@@ -10,7 +11,24 @@ interface ExerciseRow {
   target_muscle: string | null;
   user_id: string | null;
   is_unilateral: boolean | null;
+  starting_resistance?: number | string;
+  notes?: string;
 }
+
+const mapExercise = (row: ExerciseRow, userId: string): Exercise => ({
+  id: row.id, name: canonicalBarbellName({name:row.name,category:row.category,isUnilateral:row.is_unilateral}),
+  category: row.category, exerciseCategory: row.exercise_category || (row.category.toLowerCase()==='cardio'?'cardio':'strength'),
+  target: row.target_muscle, isCustom: row.user_id===userId, isUnilateral: row.is_unilateral ?? undefined,
+  startingResistance: Number(row.starting_resistance ?? 0), notes: row.notes ?? '', settingsAvailable: true,
+});
+const changed = (exercise: Exercise) => {
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(EXERCISE_CHANGED,{detail:exercise}));
+  return exercise;
+};
+const saveError = (error: {code?:string;message?:string} | null) => new Error(
+  error?.code === 'PGRST202' || error?.code === '42883'
+    ? 'Exercise details are not installed on the database yet. Your existing workouts are safe.'
+    : error?.message || 'Unable to save exercise details. Please retry.');
 
 export const exerciseService = {
 
@@ -41,19 +59,13 @@ export const exerciseService = {
       return [];
     }
 
-    const aliases = await exerciseService.getAliases();
+    const [aliases, settings] = await Promise.all([exerciseService.getAliases(),
+      supabase.from('exercise_settings').select('exercise_id,starting_resistance,notes').eq('user_id',user.id)]);
+    const unavailable = settings.error && ['PGRST205','42P01'].includes(settings.error.code);
+    if (settings.error && !unavailable) throw new Error('Unable to load your exercise notes and resistance. Please retry.');
+    const personal = new Map((settings.data || []).map(row => [row.exercise_id,row]));
     return (data as ExerciseRow[]).filter(ex => !aliases.has(ex.id)).map(ex => {
-      const categoryLower = (ex.category || '').toLowerCase();
-      const exerciseCategory = ex.exercise_category || (categoryLower === 'cardio' ? 'cardio' : 'strength');
-      return {
-        id: ex.id,
-        name: canonicalBarbellName({ name: ex.name, category: ex.category, isUnilateral: ex.is_unilateral }),
-        category: ex.category,
-        exerciseCategory,
-        target: ex.target_muscle || null,
-        isCustom: ex.user_id === user.id, // If it has a user_id, it's custom
-        isUnilateral: ex.is_unilateral ?? undefined // <--- Map from DB column
-      };
+      return {...mapExercise({...ex,...personal.get(ex.id)},user.id),settingsAvailable: !unavailable};
     });
   },
 
@@ -63,11 +75,13 @@ export const exerciseService = {
 
     let name = ex.name?.trim();
     if (!name) throw new Error('Enter an exercise name before saving.');
+    validateExerciseSettings(ex);
     const lift = getBarbellLift({ name, category: ex.category || '', isUnilateral: ex.isUnilateral });
     if (lift) {
       name = canonicalBarbellName({ name, category: ex.category || '' });
       const existing = (await exerciseService.getAllExercises()).find(candidate => getBarbellLift(candidate) === lift);
-      if (existing) return existing; // Reuse rather than creating another barbell identity.
+      if (existing) return ex.notes !== undefined || ex.startingResistance !== undefined
+        ? exerciseService.savePersonalSettings(existing,ex) : existing;
     }
 
     // The deployed table classifies exercises through `category`; it has no
@@ -75,36 +89,52 @@ export const exerciseService = {
     // that stable category value instead of writing an unsupported field.
     const isCardio = (ex.category || '').toLowerCase() === 'cardio';
 
-    const { data, error } = await supabase
-      .from('exercises')
-      .insert({
-        user_id: user.id, // Link to user
-        name,
-        category: ex.category,
-        target_muscle: isCardio ? 'Cardio' : (ex.target || 'Other'),
-        is_unilateral: isCardio ? false : (ex.isUnilateral ?? false)
-      })
-      .select()
-      .single();
+    const { data, error } = await supabase.rpc('save_custom_exercise', {
+      p_id:null, p_name:name, p_category:ex.category || 'Other', p_target:isCardio?'Cardio':(ex.target || 'Other'),
+      p_unilateral:isCardio?false:(ex.isUnilateral ?? false), p_starting_resistance:ex.startingResistance ?? 0, p_notes:ex.notes ?? '',
+    });
 
     if (error) {
       console.error('Error creating exercise:', error);
-      throw new Error(error.message || 'Unable to create this exercise. Please try again.');
+      throw saveError(error);
     }
 
     if (!data) throw new Error('The exercise was not returned after saving. Please try again.');
 
-    const row = data as ExerciseRow;
+    return changed(mapExercise(data as ExerciseRow,user.id));
+  },
 
-    return {
-      id: row.id,
-      name: row.name,
-      category: row.category,
-      exerciseCategory: row.exercise_category || (row.category.toLowerCase() === 'cardio' ? 'cardio' : 'strength'),
-      target: row.target_muscle || null,
-      isCustom: true,
-      isUnilateral: row.is_unilateral ?? undefined
-    };
+  async updateExercise(id: string, ex: Partial<Exercise>): Promise<Exercise> {
+    validateExerciseSettings(ex);
+    const {data:{user}} = await supabase.auth.getUser();
+    if (!user) throw new Error('Sign in to edit an exercise.');
+    const all = await exerciseService.getAllExercises(), existing = all.find(candidate => candidate.id===id);
+    if (!existing?.isCustom) throw new Error('Only exercises you created can be edited.');
+    const merged = {...existing,...ex}, name = canonicalBarbellName(merged).trim();
+    if (!name || name.length>100) throw new Error('Exercise names must be 1–100 characters.');
+    const lift = getBarbellLift({...merged,name});
+    if (lift && all.some(candidate=>candidate.id!==id && getBarbellLift(candidate)===lift))
+      throw new Error('That barbell lift already exists in your library. Use the existing exercise.');
+    const cardio = merged.category.toLowerCase()==='cardio';
+    const {data,error} = await supabase.rpc('save_custom_exercise',{
+      p_id:id,p_name:name,p_category:merged.category,p_target:cardio?'Cardio':merged.target || 'Other',
+      p_unilateral:cardio?false:merged.isUnilateral ?? false,p_starting_resistance:merged.startingResistance ?? 0,p_notes:ex.notes ?? null,
+    });
+    if (error || !data) throw saveError(error);
+    return changed(mapExercise(data as ExerciseRow,user.id));
+  },
+
+  async savePersonalSettings(exercise: Exercise, patch: {notes?:string;startingResistance?:number}, expectedUserId?: string): Promise<Exercise> {
+    validateExerciseSettings(patch);
+    if (expectedUserId) {
+      const {data:{user}} = await supabase.auth.getUser();
+      if (user?.id !== expectedUserId) throw new Error('Sign in to your account to finish saving notes.');
+    }
+    const {data,error} = await supabase.rpc('save_exercise_settings',{
+      p_exercise:exercise.id,p_starting_resistance:patch.startingResistance ?? null,p_notes:patch.notes ?? null,
+    });
+    if (error || !data) throw saveError(error);
+    return changed({...exercise,startingResistance:Number(data.starting_resistance),notes:data.notes,settingsAvailable:true});
   },
 
   async deleteCustomExercise(id: string): Promise<void> {

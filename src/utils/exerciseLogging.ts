@@ -1,5 +1,6 @@
 import type { Exercise, ExerciseSet, PersonalRecordPerformance, WorkoutExercise } from '../types.js';
 import { getTotalReps, isAssistedExercise, isBodyweightExercise, isCardioExercise } from './workoutMath.js';
+import { enteredSetWeight } from './exerciseDetails.js';
 
 /** Placeholder values never count as logged data or trigger deletion warnings. */
 export const hasSetData = (set: ExerciseSet) => set.isCompleted || [
@@ -50,8 +51,9 @@ export const getExerciseProgress = (exercise: WorkoutExercise, def?: Exercise) =
       const time = seconds == null ? '—' : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
       return `${display(set.distance)} mi · ${time}`;
     }
-    const load = isAssistedExercise(def) ? `${display(set.weight)} assist`
-      : isBodyweightExercise(def) ? `BW + ${display(set.weight)} lb` : `${display(set.weight)} lb`;
+    const entered = enteredSetWeight(set);
+    const load = isAssistedExercise(def) ? `${display(entered)} assist`
+      : isBodyweightExercise(def) ? `BW + ${display(entered)} lb` : `${display(entered)} lb`;
     const reps = def?.isUnilateral ? `${display(set.repsLeft)}/${display(set.repsRight)}` : display(set.reps);
     return `${load} × ${reps}`;
   }).join(' · ');

@@ -40,6 +40,8 @@ import {
   parseNumberInputValue
 } from '../utils/numberInput';
 import type { WorkoutSession, WorkoutExercise, Exercise, ExerciseSet } from '../types';
+import { EXERCISE_CHANGED, startingResistanceFor, enteredSetWeight, totalSetWeight, removeWorkoutSet, changeWorkoutSetType } from '../utils/exerciseDetails';
+import { ExerciseNotes } from '../components/ExerciseNotes';
 
 export const EditWorkout = () => {
   const { id } = useParams();
@@ -62,6 +64,15 @@ export const EditWorkout = () => {
   
   const [workout, setWorkout] = useState<WorkoutSession | null>(null);
   const [typeSheetOpen, setTypeSheetOpen] = useState<{ exIndex: number; setIndex: number } | null>(null);
+
+  useEffect(() => {
+    const updateDefinition = (event: Event) => {
+      const exercise = (event as CustomEvent<Exercise>).detail;
+      setExerciseDefs(previous=>new Map(previous).set(exercise.id,exercise));
+    };
+    window.addEventListener(EXERCISE_CHANGED,updateDefinition);
+    return () => window.removeEventListener(EXERCISE_CHANGED,updateDefinition);
+  },[]);
 
 
   // --- EFFECTS ---
@@ -123,7 +134,7 @@ export const EditWorkout = () => {
       id: uuidv4(),
       exerciseId: exDef.id,
       sets: [{ 
-        id: uuidv4(), type: 'normal', weight: null, reps: null, isCompleted: false 
+        id: uuidv4(), type: 'normal', weight: null, reps: null, isCompleted: false, startingResistance:startingResistanceFor(exDef)
       }]
     };
     setWorkout({ ...workout, exercises: [...workout.exercises, newExercise] });
@@ -132,21 +143,20 @@ export const EditWorkout = () => {
 
   const updateSet = <K extends keyof ExerciseSet>(exIndex: number, setIndex: number, field: K, value: ExerciseSet[K]) => {
     if (!workout) return;
-    const updated = { ...workout };
-    updated.exercises[exIndex].sets[setIndex] = {
-      ...updated.exercises[exIndex].sets[setIndex],
-      [field]: value
-    } as ExerciseSet;
-    setWorkout(updated);
+    const exercises = workout.exercises.map((exercise,index)=>index===exIndex?{...exercise,sets:exercise.sets.map((set,i)=>i===setIndex?{
+      ...set,[field]:value,...(field==='isCompleted' && value===true && set.weight==null && (set.startingResistance ?? 0)>0 ? {weight:set.startingResistance} : {}),
+    }:set)}:exercise);
+    setWorkout({...workout,exercises});
   };
 
   const addSet = (exIndex: number) => {
     if (!workout) return;
     const updated = { ...workout };
     const prev = updated.exercises[exIndex].sets[updated.exercises[exIndex].sets.length - 1];
-    updated.exercises[exIndex].sets.push({ 
-        ...prev, id: uuidv4(), isCompleted: false 
-    });
+    const startingResistance=startingResistanceFor(exerciseDefs.get(updated.exercises[exIndex].exerciseId));
+    const next: ExerciseSet={...(prev ?? {weight:null,reps:null}),id:uuidv4(),type:'normal',parentSetId:undefined,isCompleted:false,startingResistance};
+    next.weight=totalSetWeight(next,prev?enteredSetWeight(prev):null);
+    updated.exercises=updated.exercises.map((exercise,index)=>index===exIndex?{...exercise,sets:[...exercise.sets,next]}:exercise);
     setWorkout(updated);
   };
 
@@ -157,25 +167,7 @@ export const EditWorkout = () => {
       const set = exercises[exIndex]?.sets[setIndex];
       if (!set) return current;
 
-      if (type === 'dropset' && set.type !== 'dropset') {
-        const parent = { ...set, type: 'dropset' as const };
-        const child: ExerciseSet = {
-          ...set,
-          id: uuidv4(),
-          type: 'dropset_child',
-          parentSetId: parent.id,
-          isCompleted: false
-        };
-        exercises[exIndex].sets.splice(setIndex, 1, parent, child);
-      } else if (set.type === 'dropset' && type !== 'dropset') {
-        const childIndex = exercises[exIndex].sets.findIndex(
-          (candidate, index) => index > setIndex && candidate.type === 'dropset_child' && candidate.parentSetId === set.id
-        );
-        if (childIndex >= 0) exercises[exIndex].sets.splice(childIndex, 1);
-        exercises[exIndex].sets[setIndex] = { ...set, type };
-      } else {
-        exercises[exIndex].sets[setIndex] = { ...set, type };
-      }
+      exercises[exIndex].sets = changeWorkoutSetType(exercises[exIndex].sets,setIndex,type,uuidv4());
       return { ...current, exercises };
     });
     setTypeSheetOpen(null);
@@ -183,9 +175,7 @@ export const EditWorkout = () => {
 
   const removeSet = (exIndex: number, setIndex: number) => {
       if (!workout) return;
-      const updated = { ...workout };
-      updated.exercises[exIndex].sets.splice(setIndex, 1);
-      setWorkout(updated);
+      setWorkout({...workout,exercises:workout.exercises.map((exercise,index)=>index===exIndex?{...exercise,sets:removeWorkoutSet(exercise.sets,setIndex)}:exercise)});
   };
 
   const removeExercise = (exIndex: number) => {
@@ -329,6 +319,7 @@ export const EditWorkout = () => {
                 </div>
 
                 {/* HEADER ROW */}
+                {def && <ExerciseNotes key={def.id} exercise={def} />}
                 <div className="grid grid-cols-10 gap-2 text-[10px] text-zinc-500 uppercase font-bold text-center px-2">
                     <div className="col-span-1">#</div>
                     <div className="col-span-3">{weightLabel}</div>
@@ -401,12 +392,12 @@ export const EditWorkout = () => {
                                 ) : (
                                   <>
                                     <div className="col-span-3">
-                                        <WorkoutNumberInput label={`Exercise ${exIndex + 1} set ${setIndex + 1} weight in pounds`}
+                                        <WorkoutNumberInput label={`Exercise ${exIndex + 1} set ${setIndex + 1} ${(set.startingResistance ?? 0)>0?'added weight':'weight'} in pounds`}
                                             step="any" onKeyDown={blockInvalidNumberChars}
                                             min={0}
                                             placeholder="-"
-                                            value={formatNumberInputValue(set.weight)} 
-                                            onChange={e => updateSet(exIndex, setIndex, 'weight', parseNumberInputValue(e.target.value))}
+                                            value={formatNumberInputValue(enteredSetWeight(set))}
+                                            onChange={e => updateSet(exIndex, setIndex, 'weight', totalSetWeight(set,parseNumberInputValue(e.target.value)))}
                                             className="w-full bg-white/5 rounded-lg py-2 text-center text-white font-bold outline-none focus:bg-white/10"
                                         />
                                     </div>

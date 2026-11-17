@@ -3,7 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation, Link } from 'react
 import type { Session } from '@supabase/supabase-js';
 import { Analytics } from '@vercel/analytics/react';
 import { supabase, demoMode } from './lib/supabase';
-import { exitDemo, startDemo } from './lib/demo-session';
+import { DEMO_USER_ID, exitDemo, startDemo } from './lib/demo-session';
+import { checkAppUpdate } from './lib/app-updates';
 import { WorkoutProvider } from './context/WorkoutContext';
 import { authService } from './services/authService';
 
@@ -28,6 +29,7 @@ const ScrollToTop = () => {
   const { pathname } = useLocation();
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+    checkAppUpdate();
   }, [pathname]);
   return null;
 };
@@ -121,8 +123,9 @@ export default function App() {
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
+      if (event === 'SIGNED_IN') checkAppUpdate(true);
     });
 
     return () => subscription.unsubscribe();
@@ -137,7 +140,7 @@ export default function App() {
           <Route path="*" element={<Auth />} />
         </Routes>
       ) : (
-        <AppContent key={session?.user.id || 'demo'} userId={session?.user.id || 'demo'} />
+        <AppContent key={session?.user.id || DEMO_USER_ID} userId={session?.user.id || DEMO_USER_ID} />
       )}
       <Analytics />
     </BrowserRouter>

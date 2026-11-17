@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { getBarbellLift, remapWorkoutExerciseIds, combineExerciseLogs } from '../src/utils/barbellLifts';
 import { buildWorkoutNotifications } from '../src/utils/notificationEvents';
-import { normalizePreferences, notificationCategories } from '../src/utils/notifications';
-import { pushPresentation } from '../server/pushPresentation';
+import { defaultNotificationPreferences, normalizePreferences, notificationCategories } from '../src/utils/notifications';
+import { notificationPushPresentation, pushPresentation } from '../server/pushPresentation';
 import type { WorkoutExercise } from '../src/types';
 import { calculateTrophyCabinet } from '../src/utils/gamification';
 
@@ -63,14 +63,53 @@ describe('merge preserves logs and drop relationships', () => {
     expect(entries[0].exerciseId).toBe('old');
   });
 });
-describe('descriptive push presentation', () => {
+describe('concise phone notifications with detailed in-app history', () => {
   it.each([
     ['achievement_unlocked','Award','Nelson received a new award','Gold Barbell Squat Trophy'],
     ['personal_record','Milestone','Nelson hit a new PR','Barbell Bench Press · 225 lb × 5 reps'],
     ['workout_completed','Workout','Nelson finished a workout','Push Day · 3 exercises completed'],
     ['level_up','Milestone','Nelson reached a new level','Level 10'],
-  ])('formats %s with actor/details', (type,title,heading,body) =>
-    expect(pushPresentation({type,title:heading,body})).toEqual({title,body:heading+' · '+body}));
-  it('friend request text is not redundantly prefixed', () =>
-    expect(pushPresentation({type:'friend_request',title:'Friend request',body:'Nelson sent you a friend request.'})).toEqual({title:'Friend request',body:'Nelson sent you a friend request.'}));
+    ['personal_record','Milestone','Nelson hit a new PR and received a new award','Barbell Bench Press · 225 lb × 5 reps · Silver MAX Barbell Bench Press Trophy'],
+  ])('formats %s without appending workout, weight, rep, trophy or level details', (type,title,heading,body) => {
+    const row = Object.freeze({type,title:heading,body});
+    expect(pushPresentation(row)).toEqual({title,body:heading});
+    expect(row.body).toBe(body);
+  });
+  it('uses the exact short workout reminder', () =>
+    expect(pushPresentation({type:'workout_reminder',title:'Time for your workout',body:'Your scheduled workout is ready when you are.'})).toEqual({title:'Workout reminder',body:'Time for your workout'}));
+  it.each([
+    ['friend_request', 'Nelson sent you a friend request.'],
+    ['friend_request_accepted', 'Nelson accepted your friend request.'],
+  ])('keeps %s text unchanged', (type, body) =>
+    expect(pushPresentation({type,title:'Friend request',body})).toEqual({title:'Friend request',body}));
+  it('leaves the manual test notification unchanged', () =>
+    expect(pushPresentation({type:'test_push',title:'Push test',body:'This test was queued for your eligible devices.'})).toEqual({title:'Test notification',body:'Your ironLog test notification is ready.'}));
+  it('does not fall back to detailed measurements when a social heading is missing', () =>
+    expect(pushPresentation({type:'personal_record',body:'Barbell Bench Press · 225 lb × 5 reps'})).toEqual({title:'Milestone',body:'Open ironLog to see the details.'}));
+  const combined = Object.freeze({
+    type:'personal_record', category:'friend_pr', title:'Nelson hit a new PR and received a new award',
+    body:'Barbell Bench Press · 225 lb × 5 reps · Silver MAX Barbell Bench Press Trophy',
+    payload:Object.freeze({actorName:'Nelson',recordBody:'Barbell Bench Press · 225 lb × 5 reps',awardBody:'Silver MAX Barbell Bench Press Trophy'}),
+  });
+  it.each([
+    [true, true, 'Milestone', 'Nelson hit a new PR and received a new award'],
+    [true, false, 'Milestone', 'Nelson hit a new PR'],
+    [false, true, 'Award', 'Nelson received a new award'],
+  ] as const)('keeps a combined alert short while respecting PR=%s and award=%s', (record, award, title, body) => {
+    const prefs = defaultNotificationPreferences();
+    prefs.push_enabled = true;
+    prefs.push.friend_pr = record;
+    prefs.push.friend_achievement = award;
+    expect(notificationPushPresentation(combined,prefs)).toEqual({title,body});
+    expect(combined.payload.recordBody).toContain('225 lb × 5 reps');
+    expect(combined.payload.awardBody).toBe('Silver MAX Barbell Bench Press Trophy');
+  });
+  it('still suppresses combined alerts when both categories or account push are disabled', () => {
+    const prefs = defaultNotificationPreferences();
+    expect(notificationPushPresentation(combined,prefs)).toBeNull();
+    prefs.push_enabled = true;
+    prefs.push.friend_pr = false;
+    prefs.push.friend_achievement = false;
+    expect(notificationPushPresentation(combined,prefs)).toBeNull();
+  });
 });

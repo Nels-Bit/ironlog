@@ -1,6 +1,7 @@
 import type { Exercise, ExerciseSet, WorkoutExercise } from '../types';
 import { hasSetData } from './exerciseLogging';
 import { isAssistedExercise, isBodyweightExercise, isCardioExercise } from './workoutMath';
+import { enteredSetWeight } from './exerciseDetails';
 
 const number = (value: number | null | undefined) =>
   value != null && Number.isFinite(value) ? String(value) : '—';
@@ -10,7 +11,7 @@ const setTypes: Record<ExerciseSet['type'], string> = {
   dropset_child: 'Drop', failure: 'Failure',
 };
 
-/** Display saved values, not calculated loads or historical placeholder hints. */
+/** Show the weight the user entered; total load remains available to XP/volume. */
 export function getSummarySets(exercise: WorkoutExercise, def?: Exercise) {
   return exercise.sets.flatMap((set, index) => {
     if (!hasSetData(set)) return [];
@@ -18,9 +19,10 @@ export function getSummarySets(exercise: WorkoutExercise, def?: Exercise) {
     const seconds = set.durationSeconds;
     const duration = seconds != null && Number.isFinite(seconds) && seconds >= 0
       ? `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}` : '—';
-    const weight = isAssistedExercise(def) ? `${number(set.weight)} lb assist`
-      : isBodyweightExercise(def) ? `BW${set.weight === 0 ? '' : ` + ${number(set.weight)} lb`}`
-        : `${number(set.weight)} lb`;
+    const entered = enteredSetWeight(set);
+    const weight = isAssistedExercise(def) ? `${number(entered)} lb assist`
+      : isBodyweightExercise(def) ? `BW${entered === 0 ? '' : ` + ${number(entered)} lb`}`
+        : `${number(entered)} lb`;
     return [{
       id: set.id,
       label: `Set ${index + 1}`,

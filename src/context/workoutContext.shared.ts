@@ -23,6 +23,7 @@ export interface WorkoutContextType {
   moveExercise: (workoutExerciseId: string, direction: 'up' | 'down') => void;
   addSet: (exIndex: number, insertIndex?: number) => void;
   removeSet: (exIndex: number, setIndex: number) => void;
+  changeSetType: (exIndex: number, setIndex: number, type: ExerciseSet['type']) => void;
   updateSet: <K extends keyof ExerciseSet>(exIndex: number, setIndex: number, field: K, value: ExerciseSet[K]) => void;
   exerciseDefs: Map<string, Exercise>;
 

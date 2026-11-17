@@ -91,6 +91,9 @@ export interface Exercise {
   target?: string | null;
   isCustom?: boolean;
   isUnilateral?: boolean | null;
+  startingResistance?: number;
+  notes?: string;
+  settingsAvailable?: boolean;
 }
 
 export interface ExerciseSet {
@@ -109,6 +112,8 @@ export interface ExerciseSet {
   previousBest?: number;
   parentSetId?: string;
   bodyWeight?: number;
+  /** Snapshot: weight is stored as total load, including this starting resistance. */
+  startingResistance?: number;
 }
 
 export interface WorkoutExercise {

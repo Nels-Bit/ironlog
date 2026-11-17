@@ -7,8 +7,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
-      workbox: { importScripts: ['push-worker.js'], navigateFallbackDenylist: [/^\/api\//] },
+      registerType: 'prompt',
+      injectRegister: null,
+      workbox: { clientsClaim:true, importScripts: ['push-worker.js'], navigateFallbackDenylist: [/^\/api\//] },
       // JavaScript is already covered by Workbox's generated precache glob.
       includeAssets: ['pwa-192x192.png', 'pwa-512x512.png'],
       manifest: {

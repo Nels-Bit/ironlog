@@ -66,7 +66,7 @@ it('persists one combined inbox row and one push attempt per device, with retry 
   expect((await db.query("SELECT id FROM notifications WHERE event_key LIKE $1",[`trophy:${workoutId}:bench_press:%`])).rows).toHaveLength(0);
   const transport=send();await deliverPushJobs(databaseWorkerClient(db),null,transport);await deliverPushJobs(databaseWorkerClient(db),null,transport);await processNotificationEvents(databaseWorkerClient(db));
   const payloads=transport.mock.calls.map(args=>JSON.parse(args[1])).filter(p=>p.notificationId===n.id);
-  expect(payloads).toHaveLength(1);expect(payloads[0]).toMatchObject({title:'Milestone',body:expect.stringContaining('PR and received a new award')});
+  expect(payloads).toHaveLength(1);expect(payloads[0]).toMatchObject({title:'Milestone',body:'Nelson hit a new PR and received a new award'});
 });
 it.each([['friend_pr','friend_achievement'],['friend_achievement','friend_pr']])('respects %s opt-outs when creating the combined event',async(disabled,category)=>{
   await db.query('UPDATE notification_preferences SET in_app=jsonb_set(in_app,ARRAY[$1],\'false\'),push=jsonb_set(push,ARRAY[$1],\'false\') WHERE user_id=$2',[disabled,userB]);
@@ -80,7 +80,7 @@ it('rechecks changed switches before sending without dropping the still-enabled 
   await db.query("UPDATE notification_preferences SET in_app=jsonb_set(in_app,'{friend_pr}','false'),push=jsonb_set(push,'{friend_pr}','false') WHERE user_id=$1",[userB]);
   const transport=send();await deliverPushJobs(databaseWorkerClient(db),null,transport);
   const payload=transport.mock.calls.map(args=>JSON.parse(args[1])).find(p=>p.notificationId===n.id);
-  expect(payload.title).toBe('Award');expect(payload.body).toContain('Nelson received a new award');expect(payload.body).not.toContain('PR');expect(payload.body).not.toContain('225.5');
+  expect(payload).toMatchObject({title:'Award',body:'Nelson received a new award'});
 });
 it('does not send the combined alert after both categories are disabled',async()=>{
   await complete();const n=await row();

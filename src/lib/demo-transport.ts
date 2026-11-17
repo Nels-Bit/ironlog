@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
+import { validateExerciseSettings } from '../utils/exerciseDetails';
 
 export type DemoRow = Record<string, unknown>;
 export type DemoSeed = { user: User; tables: Record<string, DemoRow[]>; profileTable?: string };
@@ -38,6 +39,33 @@ export function createDemoProvider(seed: DemoSeed, onExit: () => void = () => {}
       if (url.pathname === '/rest/v1/rpc/ensure_current_user_profile') {
         const profile = state.tables[state.profileTable ?? 'user_profiles']?.find(r => r.user_id === state.user.id);
         return profile ? response(profile) : response({ message: 'Demo profile missing.' }, 404);
+      }
+      if (['/rest/v1/rpc/save_custom_exercise','/rest/v1/rpc/save_exercise_settings'].includes(url.pathname)) {
+        const body = JSON.parse(String(init?.body || '{}'));
+        validateExerciseSettings({notes:body.p_notes ?? undefined,startingResistance:body.p_starting_resistance ?? undefined});
+        const custom = url.pathname.endsWith('save_custom_exercise');
+        const exerciseId = custom ? body.p_id : body.p_exercise;
+        const existing = state.tables.exercises.find(row=>row.id===exerciseId && (row.user_id==null || row.user_id===state.user.id));
+        if ((!custom || exerciseId) && !existing) return response({message:'Exercise is not available to this account.'},403);
+        let exercise = existing;
+        if (custom) {
+          if (exerciseId && existing?.user_id!==state.user.id) return response({message:'Only exercises you created can be edited.'},403);
+          const name = typeof body.p_name==='string'?body.p_name.trim():'';
+          if (!name || name.length>100 || typeof body.p_category!=='string' || !body.p_category.trim() || body.p_category.length>60)
+            return response({message:'Invalid exercise name or type.'},400);
+          if (existing && (existing.category!==body.p_category || Boolean(existing.is_unilateral)!==Boolean(body.p_unilateral)) &&
+            state.tables.workouts.some(row=>row.user_id===state.user.id && JSON.stringify(row.exercises).includes(String(existing.id))))
+            return response({message:'This exercise has workout history. Keep its type and left/right tracking unchanged; you can still edit its name, muscle, notes and starting resistance.'},400);
+          exercise={...existing,id:existing?.id ?? crypto.randomUUID(),user_id:state.user.id,name,category:body.p_category,target_muscle:body.p_target,is_unilateral:body.p_unilateral};
+        }
+        const settings = state.tables.exercise_settings ||= [];
+        const previous = settings.find(row=>row.exercise_id===exercise!.id && row.user_id===state.user.id);
+        const saved={...previous,user_id:state.user.id,exercise_id:exercise!.id,
+          starting_resistance:body.p_starting_resistance ?? previous?.starting_resistance ?? 0,
+          notes:body.p_notes ?? previous?.notes ?? '',updated_at:new Date().toISOString()};
+        if (custom) { if (existing) Object.assign(existing,exercise); else state.tables.exercises.push(exercise!); }
+        if (previous) Object.assign(previous,saved); else settings.push(saved);
+        return response(custom?{...exercise,starting_resistance:saved.starting_resistance,notes:saved.notes}:saved);
       }
       if (url.pathname === '/rest/v1/rpc/notification_state') {
         const body=JSON.parse(String(init?.body || '{}'));

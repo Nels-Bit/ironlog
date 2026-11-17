@@ -27,6 +27,8 @@ import {
 } from '../utils/numberInput';
 import type { Exercise, ExerciseSet } from '../types';
 import { formatPRPerformance, getDisplayedPRPerformance, getExerciseProgress, hasSetData } from '../utils/exerciseLogging';
+import { enteredSetWeight, totalSetWeight, ghostEnteredWeight } from '../utils/exerciseDetails';
+import { ExerciseNotes } from '../components/ExerciseNotes';
 
 export const WorkoutLogger = () => {
   const navigate = useNavigate();
@@ -44,7 +46,7 @@ export const WorkoutLogger = () => {
   const {
     workout, elapsed, isActive, historyCache, prCache, prSetCache, prCacheReady,
     startWorkout, logRestDay, cancelWorkout, finishWorkout,
-    addExercise, hydrateExerciseGhostSets, removeExercise, moveExercise, addSet, removeSet, updateSet, exerciseDefs, restTimer
+    addExercise, hydrateExerciseGhostSets, removeExercise, moveExercise, addSet, removeSet, updateSet, changeSetType, exerciseDefs, restTimer
   } = useWorkout();
 
   // Keep the screen awake while an active workout session is running
@@ -156,26 +158,7 @@ export const WorkoutLogger = () => {
     if (isCardioExercise(exerciseDefs.get(workout.exercises[exIndex]?.exerciseId))) return;
     const currentSet = workout.exercises[exIndex].sets[setIndex];
     if (!currentSet) return;
-    const currentType = currentSet.type;
-
-    if (newType === 'dropset' && currentType !== 'dropset') {
-      updateSet(exIndex, setIndex, 'type', 'dropset');
-      setTimeout(() => {
-        addSet(exIndex, setIndex + 1);
-        setTimeout(() => {
-          updateSet(exIndex, setIndex + 1, 'type', 'dropset_child');
-          updateSet(exIndex, setIndex + 1, 'parentSetId', currentSet.id);
-        }, 0);
-      }, 0);
-    } else if (currentType === 'dropset' && newType !== 'dropset') {
-      const childIndex = workout.exercises[exIndex].sets.findIndex(
-        (s, i) => i > setIndex && s.type === 'dropset_child' && s.parentSetId === currentSet.id
-      );
-      if (childIndex !== undefined && childIndex > -1) removeSet(exIndex, childIndex);
-      updateSet(exIndex, setIndex, 'type', newType);
-    } else {
-      updateSet(exIndex, setIndex, 'type', newType);
-    }
+    changeSetType(exIndex, setIndex, newType);
     setTypeSheetOpen(null);
   };
 
@@ -190,13 +173,6 @@ export const WorkoutLogger = () => {
   };
 
   const handleDeleteSet = (exIndex: number, setIndex: number) => {
-    const set = workout?.exercises[exIndex].sets[setIndex];
-    if (set?.type === 'dropset') {
-      const childIndex = workout?.exercises[exIndex].sets.findIndex(
-        (s, i) => i > setIndex && s.type === 'dropset_child' && s.parentSetId === set.id
-      );
-      if (childIndex !== undefined && childIndex > -1) removeSet(exIndex, childIndex);
-    }
     removeSet(exIndex, setIndex);
   };
 
@@ -245,7 +221,7 @@ export const WorkoutLogger = () => {
         (currentSet.repsRight === null || currentSet.repsRight === undefined);
 
       if (isWeightEmpty && ghostSet.weight !== null && ghostSet.weight !== undefined) {
-        updateSet(exIndex, setIndex, 'weight', ghostSet.weight);
+        updateSet(exIndex, setIndex, 'weight', totalSetWeight(currentSet,ghostEnteredWeight(currentSet,ghostSet)));
       }
       if (isRepsEmpty) {
         if (ghostSet.reps !== null && ghostSet.reps !== undefined) updateSet(exIndex, setIndex, 'reps', ghostSet.reps);
@@ -260,6 +236,8 @@ export const WorkoutLogger = () => {
       }
     }
 
+    if (isNowComplete && currentSet.weight == null && !ghostSet?.weight && (currentSet.startingResistance ?? 0)>0)
+      updateSet(exIndex,setIndex,'weight',currentSet.startingResistance!);
     // 2. Toggle Completion
     updateSet(exIndex, setIndex, 'isCompleted', isNowComplete);
 
@@ -434,6 +412,7 @@ export const WorkoutLogger = () => {
 
                     </div>
 
+                    {def && <ExerciseNotes key={def.id} exercise={def} />}
                     {/* CONTENT */}
                     <div>
                       <div>
@@ -521,12 +500,12 @@ export const WorkoutLogger = () => {
                                       <>
                                         <div className="min-w-0">
                                           <NumericInput
-                                            label={`Set ${setIndex + 1} ${isAssisted ? 'assistance' : isBodyweightMovement ? 'extra weight' : 'weight'} in pounds`}
+                                            label={`Set ${setIndex + 1} ${(set.startingResistance ?? 0)>0?'added weight':isAssisted ? 'assistance' : isBodyweightMovement ? 'extra weight' : 'weight'} in pounds`}
                                             inputMode="decimal" step="any" onKeyDown={blockInvalidNumberChars}
                                             min={0}
-                                            placeholder={getNumberPlaceholder(ghostSet?.weight, "-")}
-                                            value={formatNumberInputValue(set.weight)}
-                                            onChange={(e) => updateSet(exIndex, setIndex, 'weight', parseNumberInputValue(e.target.value))}
+                                            placeholder={getNumberPlaceholder(ghostEnteredWeight(set,ghostSet), "-")}
+                                            value={formatNumberInputValue(enteredSetWeight(set))}
+                                            onChange={(e) => updateSet(exIndex, setIndex, 'weight', totalSetWeight(set,parseNumberInputValue(e.target.value)))}
                                             whileFocus={{ scale: 1.02, boxShadow: "0 0 0 2px rgba(234, 88, 12, 0.2)" }}
                                             transition={{ type: "spring", stiffness: 300 }}
                                             className="w-full bg-white/5 rounded-lg py-2 text-center font-bold text-white text-lg outline-none focus:bg-white/10 disabled:opacity-50"

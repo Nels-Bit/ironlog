@@ -1,4 +1,5 @@
 const DEMO_KEY = 'ironlog-demo-v1';
+export const DEMO_USER_ID = 'demo-alex';
 let activeDemo = false;
 export function isDemoSession() {
   if (typeof window === 'undefined') return false;

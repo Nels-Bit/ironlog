@@ -1,11 +1,12 @@
 import type { User } from '@supabase/supabase-js';
 import type { DemoSeed, DemoRow } from './demo-transport';
 import { defaultNotificationPreferences } from '../utils/notifications';
+import { DEMO_USER_ID } from './demo-session';
 
 /** Fictional recruiter preview. Relative dates keep the activity calendar useful. */
 export function createIronLogSeed(now = Date.now()): DemoSeed {
   const people = [
-    { user_id: 'demo-alex', user_code: 'demo_alex', display_name: 'Alex Morgan', is_public: true, weight: 178, height: 71, age: 27, goal: 'Hypertrophy', level: 'Intermediate', environment: 'Gym' },
+    { user_id: DEMO_USER_ID, user_code: 'demo_alex', display_name: 'Alex Morgan', is_public: true, weight: 178, height: 71, age: 27, goal: 'Hypertrophy', level: 'Intermediate', environment: 'Gym' },
     { user_id: 'demo-jordan', user_code: 'demo_jordan', display_name: 'Jordan Lee', is_public: true, weight: 165 },
     { user_id: 'demo-taylor', user_code: 'demo_taylor', display_name: 'Taylor Reed', is_public: true, weight: 145 },
     { user_id: 'demo-casey', user_code: 'demo_casey', display_name: 'Casey Chen', is_public: true, weight: 170 },
@@ -31,11 +32,11 @@ export function createIronLogSeed(now = Date.now()): DemoSeed {
   }));
   const created_at = new Date(now - 2 * 86400_000).toISOString();
   return {
-    user: { id: 'demo-alex', email: 'alex@example.invalid', aud: 'demo', created_at, app_metadata: {}, user_metadata: { name: 'Alex Morgan', weight: 178, height: 71, age: 27, goal: 'Hypertrophy', level: 'Intermediate', environment: 'Gym' } } as User,
+    user: { id: DEMO_USER_ID, email: 'alex@example.invalid', aud: 'demo', created_at, app_metadata: {}, user_metadata: { name: 'Alex Morgan', weight: 178, height: 71, age: 27, goal: 'Hypertrophy', level: 'Intermediate', environment: 'Gym' } } as User,
     profileTable: 'user_profiles',
     tables: {
       user_profiles: people, workouts, exercises,
-      exercise_id_aliases: [],
+      exercise_id_aliases: [], exercise_settings: [],
       friendships: [
         { id: 'demo-friend-1', requester_id: 'demo-alex', addressee_id: 'demo-jordan', status: 'accepted', created_at, responded_at: created_at },
         { id: 'demo-friend-2', requester_id: 'demo-taylor', addressee_id: 'demo-alex', status: 'accepted', created_at, responded_at: created_at },

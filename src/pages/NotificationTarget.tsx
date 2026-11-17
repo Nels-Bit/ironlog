@@ -3,6 +3,7 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import { ArrowLeft, Loader2, Lock } from "lucide-react";
 import { notificationService } from "../services/notificationService";
 import { getWorkoutExercises } from "../utils/workoutSchema";
+import { enteredSetWeight } from "../utils/exerciseDetails";
 import { useNotificationIdentity } from "../context/notificationContext.shared";
 /** Resolve an owned notification after sign-in; SQL rechecks sharing access. */
 export const NotificationTarget = () => {
@@ -102,7 +103,7 @@ export const NotificationTarget = () => {
                   {String(defs.get(ex.exerciseId)?.category).toLowerCase() ===
                   "cardio"
                     ? `${s.distance ?? "—"} mi · ${Math.floor((s.durationSeconds || 0) / 60)} min`
-                    : `${s.weight ?? "—"} lb × ${s.reps ?? `${s.repsLeft ?? "—"}L / ${s.repsRight ?? "—"}R`} reps`}
+                    : `${enteredSetWeight(s) ?? "—"} lb × ${s.reps ?? `${s.repsLeft ?? "—"}L / ${s.repsRight ?? "—"}R`} reps`}
                 </p>
               ))}
           </div>

@@ -47,6 +47,7 @@ export const getWorkoutExercises = (value: unknown): WorkoutExercise[] =>
                 ? (type as ExerciseSet["type"])
                 : "normal",
             weight: asNumber(set.weight),
+            startingResistance: asNumber(set.startingResistance ?? set.starting_resistance) ?? undefined,
             reps: asNumber(set.reps),
             repsLeft: asNumber(set.repsLeft ?? set.reps_left),
             repsRight: asNumber(set.repsRight ?? set.reps_right),
