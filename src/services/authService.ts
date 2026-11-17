@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase'; // <--- THIS WAS MISSING
 import type { UserProfile } from '../types';
+import { pushService } from './pushService';
 
 const normalizeHeightInInches = (height: unknown): number | undefined => {
   const parsed = typeof height === 'number' ? height : typeof height === 'string' ? parseFloat(height) : NaN;
@@ -110,6 +111,7 @@ export const authService = {
   },
 
   async signOut() {
+    try { await pushService.disableDevice(); } catch { /* Local unsubscribe still runs; never block sign-out. */ }
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   }

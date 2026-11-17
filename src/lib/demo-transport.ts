@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
+import { validateExerciseSettings } from '../utils/exerciseDetails';
 
 export type DemoRow = Record<string, unknown>;
 export type DemoSeed = { user: User; tables: Record<string, DemoRow[]>; profileTable?: string };
@@ -39,6 +40,58 @@ export function createDemoProvider(seed: DemoSeed, onExit: () => void = () => {}
         const profile = state.tables[state.profileTable ?? 'user_profiles']?.find(r => r.user_id === state.user.id);
         return profile ? response(profile) : response({ message: 'Demo profile missing.' }, 404);
       }
+      if (['/rest/v1/rpc/save_custom_exercise','/rest/v1/rpc/save_exercise_settings'].includes(url.pathname)) {
+        const body = JSON.parse(String(init?.body || '{}'));
+        validateExerciseSettings({notes:body.p_notes ?? undefined,startingResistance:body.p_starting_resistance ?? undefined});
+        const custom = url.pathname.endsWith('save_custom_exercise');
+        const exerciseId = custom ? body.p_id : body.p_exercise;
+        const existing = state.tables.exercises.find(row=>row.id===exerciseId && (row.user_id==null || row.user_id===state.user.id));
+        if ((!custom || exerciseId) && !existing) return response({message:'Exercise is not available to this account.'},403);
+        let exercise = existing;
+        if (custom) {
+          if (exerciseId && existing?.user_id!==state.user.id) return response({message:'Only exercises you created can be edited.'},403);
+          const name = typeof body.p_name==='string'?body.p_name.trim():'';
+          if (!name || name.length>100 || typeof body.p_category!=='string' || !body.p_category.trim() || body.p_category.length>60)
+            return response({message:'Invalid exercise name or type.'},400);
+          if (existing && (existing.category!==body.p_category || Boolean(existing.is_unilateral)!==Boolean(body.p_unilateral)) &&
+            state.tables.workouts.some(row=>row.user_id===state.user.id && JSON.stringify(row.exercises).includes(String(existing.id))))
+            return response({message:'This exercise has workout history. Keep its type and left/right tracking unchanged; you can still edit its name, muscle, notes and starting resistance.'},400);
+          exercise={...existing,id:existing?.id ?? crypto.randomUUID(),user_id:state.user.id,name,category:body.p_category,target_muscle:body.p_target,is_unilateral:body.p_unilateral};
+        }
+        const settings = state.tables.exercise_settings ||= [];
+        const previous = settings.find(row=>row.exercise_id===exercise!.id && row.user_id===state.user.id);
+        const saved={...previous,user_id:state.user.id,exercise_id:exercise!.id,
+          starting_resistance:body.p_starting_resistance ?? previous?.starting_resistance ?? 0,
+          notes:body.p_notes ?? previous?.notes ?? '',updated_at:new Date().toISOString()};
+        if (custom) { if (existing) Object.assign(existing,exercise); else state.tables.exercises.push(exercise!); }
+        if (previous) Object.assign(previous,saved); else settings.push(saved);
+        return response(custom?{...exercise,starting_resistance:saved.starting_resistance,notes:saved.notes}:saved);
+      }
+      if (url.pathname === '/rest/v1/rpc/notification_state') {
+        const body=JSON.parse(String(init?.body || '{}'));
+        const action=body.p_action;
+        if (!['read','unread','delete','clear'].includes(action) || (['unread','delete'].includes(action) && !body.p_id)) return response({message:'Invalid notification action'},400);
+        const rows=(state.tables.notifications || []).filter(r=>r.recipient_id===state.user.id && r.deleted_at==null && (!body.p_id || r.id===body.p_id));
+        for (const row of rows) { if(action==='read') row.read_at ||= new Date().toISOString(); if(action==='unread') row.read_at=null; if(action==='delete'||action==='clear') row.deleted_at=new Date().toISOString(); }
+        return response(rows.length);
+      }
+      if (url.pathname === '/rest/v1/rpc/save_social_privacy') {
+        const body = JSON.parse(String(init?.body || '{}'));
+        if (typeof body.p_is_public !== 'boolean' || typeof body.p_share_activity !== 'boolean') return response({message:'Invalid privacy setting'},400);
+        const profile = state.tables.user_profiles?.find(r => r.user_id === state.user.id);
+        if (!profile) return response({message:'Demo profile missing.'},404);
+        profile.is_public = body.p_is_public;
+        const preferences = state.tables.notification_preferences ||= [];
+        const saved = preferences.find(r => r.user_id === state.user.id);
+        if (saved) saved.share_activity = body.p_share_activity;
+        else preferences.push({user_id:state.user.id,share_activity:body.p_share_activity});
+        return response(null);
+      }
+      if (url.pathname === '/rest/v1/rpc/notification_target') {
+        const body=JSON.parse(String(init?.body || '{}'));
+        const note=state.tables.notifications?.find(r=>r.id===body.p_id && r.recipient_id===state.user.id && r.deleted_at==null);
+        return response(note?{route:note.category==='friend_request'?'/profile?tab=friends':note.category==='friend_workout'?'/friends/demo-jordan':'/profile?tab=overview'}:{unavailable:true});
+      }
       const match = /^\/rest\/v1\/([a-z_]+)$/.exec(url.pathname);
       const table = match?.[1];
       if (!table || !Object.hasOwn(state.tables, table)) return response({ message: 'Unavailable in Demo Mode.' }, 403);
@@ -47,10 +100,11 @@ export function createDemoProvider(seed: DemoSeed, onExit: () => void = () => {}
       const reserved = new Set(['select', 'order', 'limit', 'offset', 'on_conflict', 'columns']);
       const filter = (row: DemoRow) => [...parameters].every(([key, value]) => {
         if (reserved.has(key)) return true;
-        if (key === 'or') return value.replace(/^\(|\)$/g, '').split(',').some(term => {
-          const dot = term.indexOf('.');
-          return matches(row, term.slice(0, dot), term.slice(dot + 1));
-        });
+        if (key === 'or') {
+          const terms=value.slice(1,-1).match(/and\([^)]*\)|[^,]+/g) || [];
+          const matchTerm=(term:string)=>{const dot=term.indexOf('.');return matches(row,term.slice(0,dot),term.slice(dot+1));};
+          return terms.some(term=>term.startsWith('and(')?term.slice(4,-1).split(',').every(matchTerm):matchTerm(term));
+        }
         return matches(row, key, value);
       });
       const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
@@ -59,13 +113,13 @@ export function createDemoProvider(seed: DemoSeed, onExit: () => void = () => {}
       if (method === 'POST') {
         const body = JSON.parse(String(init?.body ?? '{}'));
         const values: DemoRow[] = Array.isArray(body) ? body : [body];
-        const primaryKey = ['heights', 'public_profiles', 'user_profiles'].includes(table) ? ['user_id'] : ['id'];
+        const primaryKey = ['heights', 'public_profiles', 'user_profiles','notification_preferences'].includes(table) ? ['user_id'] : ['id'];
         const conflict = parameters.get('on_conflict')?.split(',') ?? (headers.get('prefer')?.includes('resolution=merge-duplicates') ? primaryKey : []);
         result = values.map(value => {
           const existing = conflict.length ? rows.find(r => conflict.every(k => r[k] === value[k])) : undefined;
           const now = new Date().toISOString();
           if (existing) { Object.assign(existing, value, { updated_at: now }); return existing; }
-          const row = { id: crypto.randomUUID(), created_at: now, updated_at: now, read_at: null, responded_at: null, ...value };
+          const row = { id: crypto.randomUUID(), created_at: now, updated_at: now, read_at: null, responded_at: null, ...(table==='notifications'?{in_app_visible:true}:{}), ...value };
           rows.push(row); return row;
         });
       } else if (method === 'PATCH') {

@@ -14,6 +14,7 @@ vi.mock('../src/lib/supabase', () => ({ supabase: {
   from: () => query
 } }));
 vi.mock('../src/services/exerciseService', () => ({ exerciseService: {
+  getAliases: async () => new Map<string,string>(),
   getAllExercises: async () => [
     { id: 'bench', name: 'Bench', category: 'Free Weights' },
     { id: 'run', name: 'Run', category: 'Cardio', exerciseCategory: 'cardio' }

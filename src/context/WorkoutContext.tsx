@@ -15,6 +15,8 @@ import {
 import type { WorkoutSession, WorkoutExercise, Exercise, ExerciseSet } from '../types';
 import { WorkoutContext } from './workoutContext.shared';
 import { moveWorkoutExercise } from '../utils/exerciseLogging';
+import { remapWorkoutExerciseIds } from '../utils/barbellLifts';
+import { EXERCISE_CHANGED, startingResistanceFor, updateActiveStartingResistance, removeWorkoutSet, changeWorkoutSetType } from '../utils/exerciseDetails';
 
 export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
   const [workout, setWorkout] = useState<WorkoutSession | null>(() => {
@@ -88,8 +90,11 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
       const map = new Map<string, Exercise>();
       all.forEach(ex => map.set(ex.id, ex));
       setExerciseDefs(map);
+      const aliases = await exerciseService.getAliases();
+      // A restored/offline session can still reference a pre-merge default ID.
+      setWorkout(current => current && aliases.size ? { ...current, exercises: remapWorkoutExerciseIds(current.exercises, aliases) } : current);
     };
-    loadDefs();
+    void loadDefs().catch(error => console.error('Unable to load exercise definitions:', error));
   }, []);
 
   useEffect(() => {
@@ -125,6 +130,17 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
       console.error('Unable to load historical PR:', error);
     });
   }, []);
+
+  useEffect(() => {
+    const onChanged = (event: Event) => {
+      const exercise = (event as CustomEvent<Exercise>).detail;
+      setExerciseDefs(previous => new Map(previous).set(exercise.id, exercise));
+      setWorkout(previous => updateActiveStartingResistance(previous, exercise));
+      fetchAndCacheHistoricalPR(exercise.id);
+    };
+    window.addEventListener(EXERCISE_CHANGED, onChanged);
+    return () => window.removeEventListener(EXERCISE_CHANGED, onChanged);
+  }, [fetchAndCacheHistoricalPR]);
 
   /**
    * PWA Rehydration Effect: when the app cold-starts and restores an active workout from
@@ -247,7 +263,7 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
     return saved?.id ?? null;
   };
 
-  const createSet = (historySet?: ExerciseSet): ExerciseSet => ({
+  const createSet = (historySet?: ExerciseSet, startingResistance = 0): ExerciseSet => ({
     id: uuidv4(),
     type: 'normal',
     weight: null,
@@ -255,7 +271,8 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
     repsLeft: null,
     repsRight: null,
     isCompleted: false,
-    previousBest: historySet?.weight ?? undefined
+    previousBest: historySet?.weight ?? undefined,
+    startingResistance,
   });
 
   const addExercise = (exDef: Exercise) => {
@@ -265,13 +282,14 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
     const newExercise: WorkoutExercise = {
       id: uuidv4(),
       exerciseId: exDef.id,
-      sets: [createSet()]
+      sets: [createSet(undefined, startingResistanceFor(exDef))]
     };
 
     setWorkout(prev => prev ? ({ ...prev, exercises: [...prev.exercises, newExercise] }) : null);
 
     // Use the shared helper so addExercise and rehydration share the same fetch logic
     fetchAndCacheHistoricalPR(exDef.id);
+    return newExercise.id;
   };
 
   const hydrateExerciseGhostSets = useCallback((
@@ -302,7 +320,7 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
         const id = uuidv4();
         ids.set(ghost.id, id);
         return {
-          ...createSet(ghost),
+          ...createSet(ghost, current.sets[0].startingResistance ?? 0),
           id,
           type: ghost.type,
           previousBest: ghost.weight ?? undefined,
@@ -329,7 +347,7 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
       if (!prev) return null;
       const exs = [...prev.exercises];
       const sets = [...exs[exIndex].sets];
-      const newSet = createSet();
+      const newSet = createSet(undefined, startingResistanceFor(exerciseDefs.get(exs[exIndex].exerciseId)));
       if (insertIndex !== undefined) sets.splice(insertIndex, 0, newSet);
       else sets.push(newSet);
       exs[exIndex] = { ...exs[exIndex], sets };
@@ -349,10 +367,18 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
     setWorkout(prev => {
       if (!prev) return null;
       const exs = [...prev.exercises];
-      const sets = [...exs[exIndex].sets];
-      sets.splice(setIndex, 1);
+      const sets = removeWorkoutSet(exs[exIndex].sets, setIndex);
       exs[exIndex] = { ...exs[exIndex], sets };
       return { ...prev, exercises: exs };
+    });
+  };
+
+  const changeSetType = (exIndex: number, setIndex: number, type: ExerciseSet['type']) => {
+    setWorkout(previous => {
+      if (!previous?.exercises[exIndex]) return previous;
+      const exercises = [...previous.exercises];
+      exercises[exIndex] = { ...exercises[exIndex], sets: changeWorkoutSetType(exercises[exIndex].sets, setIndex, type, uuidv4()) };
+      return { ...previous, exercises };
     });
   };
 
@@ -372,7 +398,7 @@ export const WorkoutProvider = ({ children }: { children: ReactNode }) => {
       workout: resolvedWorkout, elapsed, isActive: !!resolvedWorkout,
       historyCache, prCache, prSetCache, prCacheReady,
       startWorkout, logRestDay, cancelWorkout, finishWorkout,
-      addExercise, hydrateExerciseGhostSets, removeExercise, moveExercise, addSet, removeSet, updateSet,
+      addExercise, hydrateExerciseGhostSets, removeExercise, moveExercise, addSet, removeSet, updateSet, changeSetType,
       exerciseDefs,
       restTimer: { ...restTimerState, prefs: restTimerPrefs },
       openRestTimer, closeRestTimer, dockRestTimer, undockRestTimer, updateRestTimerPref

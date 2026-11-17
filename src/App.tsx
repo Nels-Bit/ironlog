@@ -3,7 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation, Link } from 'react
 import type { Session } from '@supabase/supabase-js';
 import { Analytics } from '@vercel/analytics/react';
 import { supabase, demoMode } from './lib/supabase';
-import { exitDemo, startDemo } from './lib/demo-session';
+import { DEMO_USER_ID, exitDemo, startDemo } from './lib/demo-session';
+import { checkAppUpdate } from './lib/app-updates';
 import { WorkoutProvider } from './context/WorkoutContext';
 import { authService } from './services/authService';
 
@@ -18,6 +19,9 @@ import { FriendProfile } from './pages/FriendProfile';
 // Components
 import { Navbar } from './components/Navbar';
 import { RestTimer } from './components/RestTimer';
+import { NotificationProvider } from './context/NotificationProvider';
+import { NotificationSettings } from './pages/NotificationSettings';
+import { NotificationTarget } from './pages/NotificationTarget';
 import { cn } from './lib/utils';
 
 // Resets scroll position to top on every route change (fixes PWA scroll retention)
@@ -25,17 +29,19 @@ const ScrollToTop = () => {
   const { pathname } = useLocation();
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+    checkAppUpdate();
   }, [pathname]);
   return null;
 };
 
 // Wrapper component to handle location-based logic
-const AppContent = () => {
+const AppContent = ({userId}:{userId:string}) => {
   const location = useLocation();
   const [missingWeight, setMissingWeight] = useState(false);
   
   // Define which paths should be "Full Screen" (No padding/container)
   const isFullScreen = location.pathname === '/workout' || 
+    location.pathname === '/alerts' || location.pathname === '/settings/notifications' ||
     location.pathname.startsWith('/history/') ||
     location.pathname.startsWith('/summary') ||
     location.pathname.startsWith('/workout/summary');
@@ -52,7 +58,7 @@ const AppContent = () => {
   }, []);
 
   return (
-    <WorkoutProvider>
+    <NotificationProvider userId={userId}><WorkoutProvider>
       <ScrollToTop />
       <RestTimer />
       <div className="min-h-screen bg-black text-white font-sans selection:bg-brand-orange selection:text-white pb-20 md:pb-0 md:pl-64">
@@ -96,11 +102,13 @@ const AppContent = () => {
             <Route path="/friends/:userId" element={<FriendProfile />} />
             <Route path="/alerts" element={<Alerts />} />
             <Route path="/notifications" element={<Navigate to="/alerts" replace />} />
+            <Route path="/settings/notifications" element={<NotificationSettings />} />
+            <Route path="/notifications/open/:id" element={<NotificationTarget />} />
             <Route path="*" element={<Navigate to="/profile" replace />} />
           </Routes>
         </main>
       </div>
-    </WorkoutProvider>
+    </WorkoutProvider></NotificationProvider>
   );
 };
 
@@ -115,8 +123,9 @@ export default function App() {
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
+      if (event === 'SIGNED_IN') checkAppUpdate(true);
     });
 
     return () => subscription.unsubscribe();
@@ -131,7 +140,7 @@ export default function App() {
           <Route path="*" element={<Auth />} />
         </Routes>
       ) : (
-        <AppContent />
+        <AppContent key={session?.user.id || DEMO_USER_ID} userId={session?.user.id || DEMO_USER_ID} />
       )}
       <Analytics />
     </BrowserRouter>

@@ -1,4 +1,5 @@
-import type { Exercise, WorkoutSession } from '../types';
+import type { Exercise, WorkoutSession } from '../types.js';
+import { getBarbellLift, type BarbellLift } from './barbellLifts.js';
 
 export interface StreakSummary {
   currentStreak: number;
@@ -33,7 +34,6 @@ const XP_BASE = 250;
 const XP_STEP = 85;
 
 const normalizeDateKey = (value: number) => new Date(value).toISOString().slice(0, 10);
-const getDateKeyForToday = () => normalizeDateKey(Date.now());
 
 const countStreakEndingAt = (activeDays: Set<string>, endDateKey: string) => {
   let streak = 0;
@@ -110,9 +110,9 @@ const formatDateLabel = (value: number | null) => {
   });
 };
 
-export const calculateWorkoutStreak = (history: WorkoutSession[]): StreakSummary => {
-  const todayKey = getDateKeyForToday();
-  const yesterdayKey = new Date(Date.now() - DAY_MS).toISOString().slice(0, 10);
+export const calculateWorkoutStreak = (history: WorkoutSession[], referenceTime = Date.now()): StreakSummary => {
+  const todayKey = normalizeDateKey(referenceTime);
+  const yesterdayKey = new Date(referenceTime - DAY_MS).toISOString().slice(0, 10);
   const activeDays = new Set(history.filter(session => !isRestDaySession(session)).map(workout => normalizeDateKey(workout.startTime)));
   const sortedActiveDays = Array.from(activeDays).sort((a, b) => b.localeCompare(a));
   const hasWorkoutToday = sortedActiveDays.includes(todayKey);
@@ -170,16 +170,16 @@ export const calculateWorkoutStreak = (history: WorkoutSession[]): StreakSummary
 };
 
 export const calculateStrengthAchievements = (history: WorkoutSession[], exerciseDefs: Map<string, Exercise>) => {
-  const liftMap: Array<{ lift: 'bench' | 'squat' | 'deadlift'; label: string; names: string[]; thresholds: number[] }> = [
-    { lift: 'bench', label: 'Bench Press', names: ['bench press', 'barbell bench press', 'dumbbell bench press', 'weighted bench press'], thresholds: [135, 225, 315, 405] },
-    { lift: 'squat', label: 'Squat', names: ['squat', 'back squat', 'front squat', 'barbell squat'], thresholds: [135, 225, 315, 405] },
-    { lift: 'deadlift', label: 'Deadlift', names: ['deadlift', 'barbell deadlift', 'romanian deadlift'], thresholds: [135, 225, 315, 405] }
+  const liftMap: Array<{ lift: 'bench' | 'squat' | 'deadlift'; label: string; barbell: BarbellLift; thresholds: number[] }> = [
+    { lift: 'bench', label: 'Barbell Bench Press', barbell: 'bench_press', thresholds: [135, 225, 315, 405] },
+    { lift: 'squat', label: 'Barbell Squat', barbell: 'squat', thresholds: [135, 225, 315, 405] },
+    { lift: 'deadlift', label: 'Barbell Deadlift', barbell: 'deadlift', thresholds: [135, 225, 315, 405] }
   ];
 
-  return liftMap.map(({ lift, label, names, thresholds }) => {
+  return liftMap.map(({ lift, label, barbell, thresholds }) => {
     const matchingExerciseIds = new Set(
       Array.from(exerciseDefs.values())
-        .filter(exercise => names.some(name => exercise.name.toLowerCase().includes(name)))
+        .filter(exercise => getBarbellLift(exercise) === barbell)
         .map(exercise => exercise.id)
     );
 

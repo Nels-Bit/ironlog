@@ -17,12 +17,13 @@ export interface WorkoutContextType {
   logRestDay: () => Promise<string | null>;
   cancelWorkout: () => void;
   finishWorkout: () => Promise<string | null>;
-  addExercise: (exDef: Exercise) => void;
+  addExercise: (exDef: Exercise) => string | undefined;
   hydrateExerciseGhostSets: (workoutExerciseId: string, exerciseId: string, sets: ExerciseSet[]) => void;
   removeExercise: (index: number) => void;
   moveExercise: (workoutExerciseId: string, direction: 'up' | 'down') => void;
   addSet: (exIndex: number, insertIndex?: number) => void;
   removeSet: (exIndex: number, setIndex: number) => void;
+  changeSetType: (exIndex: number, setIndex: number, type: ExerciseSet['type']) => void;
   updateSet: <K extends keyof ExerciseSet>(exIndex: number, setIndex: number, field: K, value: ExerciseSet[K]) => void;
   exerciseDefs: Map<string, Exercise>;
 

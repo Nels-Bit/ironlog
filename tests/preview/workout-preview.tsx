@@ -15,6 +15,7 @@ import { workoutService } from '../../src/services/workoutService';
 import { socialService } from '../../src/services/socialService';
 import type { Exercise, ExerciseSet, WorkoutSession } from '../../src/types';
 import { getBestPRPerformance } from '../../src/utils/workoutMath';
+import { EXERCISE_CHANGED, validateExerciseSettings } from '../../src/utils/exerciseDetails';
 import '../../src/index.css';
 
 if (!import.meta.env.DEV) throw new Error('The workout review is available in development only.');
@@ -57,7 +58,25 @@ if (!localStorage.getItem('preview_initialized')) {
 }
 authService.getUser = async () => ({ id: 'preview-user', userId: 'PREVIEW', name: 'Preview Athlete', email: 'preview@example.invalid', isPublic: false, weight: 180 });
 exerciseService.getAllExercises = async () => definitions;
+exerciseService.getAliases = async () => new Map();
+const updateDefinition = (exercise: Exercise) => {
+  definitions = definitions.map(definition=>definition.id===exercise.id?exercise:definition);
+  localStorage.setItem('preview_definitions',JSON.stringify(definitions));
+  window.dispatchEvent(new CustomEvent(EXERCISE_CHANGED,{detail:exercise}));
+  return exercise;
+};
+exerciseService.updateExercise = async (id,patch) => {
+  validateExerciseSettings(patch);
+  const existing=definitions.find(exercise=>exercise.id===id);
+  if (!existing?.isCustom) throw new Error('Only exercises you created can be edited.');
+  return updateDefinition({...existing,...patch});
+};
+exerciseService.savePersonalSettings = async (exercise,patch) => {
+  validateExerciseSettings(patch);
+  return updateDefinition({...exercise,...patch,settingsAvailable:true});
+};
 exerciseService.createExercise = async ex => {
+  validateExerciseSettings(ex);
   const created: Exercise = { ...ex, id: crypto.randomUUID(), name: ex.name || 'Custom exercise', category: ex.category || 'Free Weights', isCustom: true };
   definitions = [...definitions, created];
   localStorage.setItem('preview_definitions', JSON.stringify(definitions));

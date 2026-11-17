@@ -1,10 +1,10 @@
 import { Link, useLocation } from 'react-router-dom';
-import { useEffect, useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { Dumbbell, User, Bell } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '../lib/utils';
 import { useWorkout } from '../context/useWorkout';
-import { socialService } from '../services/socialService';
+import { useUnreadNotifications } from '../context/notificationContext.shared';
 import { haptics } from '../utils/haptics';
 
 const MotionLink = motion.create(Link);
@@ -12,43 +12,10 @@ const MotionLink = motion.create(Link);
 export const Navbar = () => {
   const location = useLocation();
   const { isActive } = useWorkout();
-  const [unreadCount, setUnreadCount] = useState(0);
+  const unreadCount = useUnreadNotifications();
 
   const isActiveRoute = (path: string) => location.pathname === path;
 
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadUnreadCount = async () => {
-      try {
-        const count = await socialService.getUnreadNotificationCount();
-        if (isMounted) {
-          setUnreadCount(count);
-        }
-      } catch (error) {
-        console.error('Failed to load unread notifications.', error);
-      }
-    };
-
-    loadUnreadCount();
-    const intervalId = window.setInterval(loadUnreadCount, 30_000);
-    let unsubscribe: (() => void) | undefined;
-    void socialService.subscribeToNotifications(() => {
-      void loadUnreadCount();
-    }).then(stop => {
-      if (isMounted) unsubscribe = stop;
-      else stop();
-    }).catch(error => {
-      // Polling remains the fallback when Realtime is unavailable.
-      console.error('Failed to subscribe to unread notifications.', error);
-    });
-
-    return () => {
-      isMounted = false;
-      window.clearInterval(intervalId);
-      unsubscribe?.();
-    };
-  }, []);
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-[100] bg-iron-950/95 backdrop-blur-xl border-t border-white/10 md:left-0 md:top-0 md:bottom-0 md:w-64 md:border-r md:border-t-0 pb-safe">
@@ -76,8 +43,8 @@ export const Navbar = () => {
         <NavItem
           to="/alerts"
           icon={<Bell size={28} />}
-          label="Alerts"
-          active={isActiveRoute('/alerts')}
+          label="Notifications"
+          active={isActiveRoute('/alerts') || location.pathname.startsWith('/notifications') || location.pathname==='/settings/notifications'}
           badgeCount={unreadCount}
         />
       </div>
@@ -116,7 +83,7 @@ const NavItem = ({ to, icon, label, active, highlight, badgeCount = 0, emphasize
       {icon}
       {badgeCount > 0 && (
         <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-brand-orange text-white text-[10px] font-black flex items-center justify-center">
-          {badgeCount > 99 ? '99+' : badgeCount}
+          {badgeCount > 9 ? '9+' : badgeCount}
         </span>
       )}
     </div>

@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { X, Search, Plus, Trash2, ChevronLeft, Loader2, Dumbbell, Check } from 'lucide-react';
+import { X, Search, Plus, Trash2, ChevronLeft, Loader2, Dumbbell, Check, Pencil } from 'lucide-react';
 import { exerciseService } from '../services/exerciseService';
 import type { Exercise } from '../types';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQueryClient } from '@tanstack/react-query';
+import { filterExercises, getExerciseFilterOptions } from '../utils/exerciseSearch';
+import { validateExerciseSettings } from '../utils/exerciseDetails';
 
 interface Props {
   isOpen: boolean;
@@ -15,12 +17,15 @@ interface Props {
 export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
   const [mode, setMode] = useState<'search' | 'create'>('search');
   const [search, setSearch] = useState('');
+  const [muscleFilter, setMuscleFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [loading, setLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [formSuccess, setFormSuccess] = useState<string | null>(null);
   const [libraryError, setLibraryError] = useState<string | null>(null);
+  const [librarySuccess,setLibrarySuccess] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
@@ -29,6 +34,8 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
   const [newCategory, setNewCategory] = useState('Free Weights');
   const [newTarget, setNewTarget] = useState('Chest');
   const [isUnilateral, setIsUnilateral] = useState(false);
+  const [editing,setEditing] = useState<Exercise | null>(null);
+  const [startingResistance,setStartingResistance] = useState('');
   const isCardio = newCategory.toLowerCase() === 'cardio';
 
   const loadExercises = async () => exerciseService.getAllExercises();
@@ -43,11 +50,12 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
 
       void (async () => {
         setLoading(true);
-        const data = await loadExercises();
-        if (!cancelled) {
-          setExercises(data);
-          setLoading(false);
-        }
+        try {
+          const data = await loadExercises();
+          if (!cancelled) { setExercises(data); setLibraryError(null); }
+        } catch (error) {
+          if (!cancelled) setLibraryError(error instanceof Error?error.message:'Unable to load exercises. Please retry.');
+        } finally { if (!cancelled) setLoading(false); }
       })();
 
       return () => {
@@ -76,6 +84,7 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
   };
 
   const handleCreate = async () => {
+    if (isSubmitting) return;
     const name = newName.trim();
     if (!name) {
       setFormError('Enter a name for the exercise.');
@@ -86,20 +95,24 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
     setIsSubmitting(true);
     const isCardio = newCategory.toLowerCase() === 'cardio';
     try {
-      const created = await exerciseService.createExercise({
+      const resistance = startingResistance.trim()===''?0:Number(startingResistance);
+      validateExerciseSettings({startingResistance:resistance});
+      const details: Partial<Exercise> = {
         name,
         category: newCategory,
         exerciseCategory: isCardio ? 'cardio' : 'strength',
         target: isCardio ? null : newTarget,
-        isUnilateral: isCardio ? false : isUnilateral
-      });
+        isUnilateral: isCardio ? false : isUnilateral,
+        startingResistance:isCardio?0:resistance,
+      };
+      const created = editing ? await exerciseService.updateExercise(editing.id,details) : await exerciseService.createExercise(details);
       // Update this open picker immediately, then invalidate any future exercise queries.
-      setExercises(previous => [...previous, created].sort((a, b) => a.name.localeCompare(b.name)));
+      setExercises(previous => [...previous.filter(ex=>ex.id!==created.id), created].sort((a, b) => a.name.localeCompare(b.name)));
       await queryClient.invalidateQueries({ queryKey: ['exercises'] });
       setFormSuccess(`Created ${created.name}.`);
-      onSelect(created);
-      onClose();
+      if (!editing) { onSelect(created); onClose(); }
       resetForm();
+      if (editing) setLibrarySuccess(`Updated ${created.name}.`);
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Unable to create this exercise.');
     } finally {
@@ -112,21 +125,32 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
     setNewCategory('Free Weights');
     setNewTarget('Chest');
     setIsUnilateral(false);
+    setEditing(null); setStartingResistance('');
     setFormError(null);
     setFormSuccess(null);
     setMode('search');
     setSearch('');
+    setMuscleFilter('');
+    setTypeFilter('');
   };
 
   const switchToCreate = () => {
+    setEditing(null); setStartingResistance(''); setFormError(null);
     setNewName(search);
     setMode('create');
   };
 
-  const filtered = exercises.filter(ex =>
-    ex.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const editExercise = (event: React.MouseEvent, exercise: Exercise) => {
+    event.stopPropagation();
+    setEditing(exercise); setNewName(exercise.name); setNewCategory(exercise.category);
+    setNewTarget(exercise.target || 'Other'); setIsUnilateral(Boolean(exercise.isUnilateral));
+    setStartingResistance(String(exercise.startingResistance ?? 0));
+    setFormError(null); setFormSuccess(null); setMode('create');
+  };
 
+  const filterOptions = getExerciseFilterOptions(exercises);
+  const filtered = filterExercises(exercises, search, muscleFilter, typeFilter);
+  const hasFilters = muscleFilter !== '' || typeFilter !== '';
   const hasNoResults = search.trim() !== '' && filtered.length === 0;
 
   if (!isOpen) return null;
@@ -163,7 +187,7 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
             </motion.button>
           )}
           <h2 className="text-xl font-bold text-white tracking-tight">
-            {mode === 'search' ? 'Select Exercise' : 'New Exercise'}
+            {mode === 'search' ? 'Select Exercise' : editing ? 'Edit Exercise' : 'New Exercise'}
           </h2>
         </div>
 
@@ -171,6 +195,7 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
           {mode === 'search' && (
             <motion.button
               onClick={switchToCreate}
+              aria-label="Create exercise"
               className="w-10 h-10 flex items-center justify-center rounded-full bg-brand-orange text-white"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -182,6 +207,7 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
           
           <motion.button
             onClick={onClose}
+            aria-label="Close exercise library"
             className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 text-zinc-400 hover:text-red-500"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -203,6 +229,7 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
                 autoFocus
                 type="text"
                 placeholder="Find movement..."
+                aria-label="Search exercises"
                 className="w-full bg-iron-950 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-lg text-white placeholder:text-zinc-600 focus:border-brand-orange outline-none transition-all shadow-sm"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -210,10 +237,38 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
                 transition={{ type: "spring", stiffness: 300 }}
               />
             </div>
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:gap-4">
+              <label className="min-w-0 space-y-1.5">
+                <span className="pl-1 text-[11px] font-bold uppercase tracking-wider text-base-content/60">Muscle</span>
+                <select
+                  aria-label="Filter by muscle"
+                  value={muscleFilter}
+                  onChange={event => setMuscleFilter(event.target.value)}
+                  className="select min-h-11 w-full min-w-0 rounded-xl border-white/10 bg-iron-950 text-base text-white focus:border-brand-orange focus:outline-brand-orange"
+                >
+                  <option value="">All muscles</option>
+                  {filterOptions.muscles.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </label>
+              <label className="min-w-0 space-y-1.5">
+                <span className="pl-1 text-[11px] font-bold uppercase tracking-wider text-base-content/60">Type</span>
+                <select
+                  aria-label="Filter by exercise type"
+                  value={typeFilter}
+                  onChange={event => setTypeFilter(event.target.value)}
+                  className="select min-h-11 w-full min-w-0 rounded-xl border-white/10 bg-iron-950 text-base text-white focus:border-brand-orange focus:outline-brand-orange"
+                >
+                  <option value="">All types</option>
+                  {filterOptions.types.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                </select>
+              </label>
+            </div>
+            <p role="status" className="sr-only">{loading ? 'Loading exercises' : `${filtered.length} exercises found`}</p>
           </div>
 
           {/* Scrollable List */}
           <div className="flex-1 overflow-y-auto px-4 pb-safe space-y-3">
+            {librarySuccess && <p role="status" className="mt-3 text-sm text-success">{librarySuccess}</p>}
             {libraryError && <p role="alert" className="mt-3 rounded-xl border border-error/30 bg-error/10 p-3 text-sm font-medium text-error">{libraryError}</p>}
             {loading ? (
               <div className="flex flex-col items-center justify-center py-20 opacity-50">
@@ -259,6 +314,7 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
                       </div>
                       
                       <div className="flex items-center gap-3 shrink-0">
+                        {ex.isCustom && <button type="button" aria-label={`Edit ${ex.name}`} onClick={event=>editExercise(event,ex)} className="btn btn-ghost btn-square h-11 min-h-11 w-11 text-zinc-400"><Pencil size={19} /></button>}
                         {ex.isCustom && (
                           <button 
                             onClick={(e) => handleDelete(e, ex.id, ex.name)}
@@ -285,6 +341,10 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
                       <Dumbbell className="text-zinc-700" size={32} />
                     </div>
                     <p className="text-zinc-500 font-medium">No exercises found.</p>
+                    {hasFilters && <button
+                      onClick={() => { setMuscleFilter(''); setTypeFilter(''); }}
+                      className="btn btn-ghost mt-3 min-h-11 text-brand-orange"
+                    >Clear filters</button>}
                     {search && (
                       <button 
                         onClick={switchToCreate}
@@ -323,6 +383,8 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
               <input 
                 autoFocus
                 value={newName}
+                aria-label="Exercise name"
+                maxLength={100}
                 onChange={e => setNewName(e.target.value)}
                 placeholder="e.g. Bulgarian Split Squat"
                 className="w-full bg-iron-950 border border-white/10 rounded-2xl p-5 text-white text-xl font-bold placeholder:text-zinc-700 focus:border-brand-orange focus:ring-1 focus:ring-brand-orange outline-none transition-all"
@@ -335,11 +397,12 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
                 <label className="text-xs font-bold uppercase text-zinc-500 tracking-widest pl-1">Category</label>
                 <div className="relative">
                   <select 
+                    aria-label="Exercise type"
                     value={newCategory}
                     onChange={e => setNewCategory(e.target.value)}
                     className="select select-lg min-h-16 w-full rounded-2xl border border-white/10 bg-iron-950 px-5 pr-12 text-lg font-semibold text-white appearance-none focus:border-brand-orange focus:outline-none"
                   >
-                    {['Free Weights', 'Machines', 'Cables', 'Cardio', 'Bodyweight', 'Other'].map(c => (
+                    {[...new Set(['Free Weights', 'Machines', 'Cables', 'Cardio', 'Bodyweight', 'Other', newCategory])].map(c => (
                       <option key={c} value={c}>{c}</option>
                     ))}
                   </select>
@@ -352,6 +415,7 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
                   <label className="text-xs font-bold uppercase text-zinc-500 tracking-widest pl-1">Target Muscle</label>
                   <div className="relative">
                     <select 
+                      aria-label="Target muscle"
                       value={newTarget}
                       onChange={e => setNewTarget(e.target.value)}
                       className="select select-lg min-h-16 w-full rounded-2xl border border-white/10 bg-iron-950 px-5 pr-12 text-lg font-semibold text-white appearance-none focus:border-brand-orange focus:outline-none"
@@ -394,6 +458,8 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
                     : "bg-iron-950 border-white/10 hover:bg-white/5"
                 )}
                 onClick={() => setIsUnilateral(!isUnilateral)}
+                role="switch" aria-label="Unilateral exercise" aria-checked={isUnilateral} tabIndex={0}
+                onKeyDown={event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();setIsUnilateral(value=>!value);}}}
               >
                 <div className={cn(
                   "w-8 h-8 rounded-lg flex items-center justify-center border-2 transition-all shrink-0",
@@ -415,6 +481,14 @@ export const ExerciseSelector = ({ isOpen, onClose, onSelect }: Props) => {
               </div>
             )}
 
+            {!isCardio && <label className="block space-y-3">
+              <span className="pl-1 text-xs font-bold uppercase tracking-widest text-base-content/60">Starting resistance (lb)</span>
+              <input aria-label="Starting resistance in pounds" type="number" min="0" max="10000" step="any" inputMode="decimal"
+                value={startingResistance} onChange={event=>setStartingResistance(event.target.value)} placeholder="0"
+                className="input input-lg min-h-16 w-full rounded-2xl border-white/10 bg-iron-950 px-5 text-lg font-semibold text-base-content focus:border-brand-orange focus:outline-brand-orange" />
+              <span className="block pl-1 text-xs text-base-content/60">Included in XP and volume. Your logs show only the weight you enter.</span>
+            </label>}
+            {editing && <p className="text-xs text-zinc-500">If this exercise has workout history, keep its type and left/right tracking unchanged to preserve those logs.</p>}
             {formError && <p role="alert" className="text-sm font-medium text-error">{formError}</p>}
             {formSuccess && <p role="status" className="text-sm font-medium text-success">{formSuccess}</p>}
 

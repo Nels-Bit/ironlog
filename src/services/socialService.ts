@@ -1,12 +1,11 @@
 import { supabase } from '../lib/supabase';
-import { exerciseService } from './exerciseService';
 import { calculateWorkoutStreak, calculateStrengthAchievements } from '../utils/achievementUtils';
 import { replayAllXP } from '../utils/xpEngine';
 import { parseUserWeight } from '../utils/workoutMath';
 import { calculateTrophyCabinet } from '../utils/gamification';
-import { buildFriendMilestoneEvents, countPersonalRecords } from '../utils/friendMilestones';
-import { getWorkoutExercises } from './workoutService';
-import type { FriendRequest, FriendSummary, FriendWithStats, NotificationItem, SocialProfile, FriendProfileData, WorkoutSession, UserProfile, Exercise } from '../types';
+import { notificationService } from './notificationService';
+import { countPersonalRecords } from '../utils/friendMilestones';
+import type { FriendRequest, FriendSummary, FriendWithStats, NotificationItem, SocialProfile, FriendProfileData, WorkoutSession, UserProfile } from '../types';
 
 type UserProfileRow = {
   user_id: string;
@@ -24,20 +23,7 @@ type FriendshipRow = {
   responded_at: string | null;
 };
 
-type NotificationRow = {
-  id: string;
-  recipient_id: string;
-  actor_id: string | null;
-  type: 'friend_request' | 'friend_request_accepted' | 'workout_completed' | 'achievement_unlocked';
-  message: string;
-  payload: Record<string, unknown> | null;
-  read_at: string | null;
-  created_at: string;
-};
 
-type NotificationInsert = Omit<NotificationRow, 'id' | 'created_at' | 'read_at'> & {
-  event_key: string;
-};
 
 const isMissingSocialSchemaError = (error: { message?: string } | null): boolean => {
   if (!error?.message) return false;
@@ -167,7 +153,7 @@ export const socialService = {
       throw new Error('You cannot send a friend request to yourself.');
     }
 
-    const { data: friendship, error } = await supabase
+    const { error } = await supabase
       .from('friendships')
       .insert({
         requester_id: selfProfile.user_id,
@@ -179,18 +165,8 @@ export const socialService = {
 
     if (error) throw error;
 
-    const { error: notificationError } = await supabase
-      .from('notifications')
-      .insert({
-        recipient_id: typedTarget.user_id,
-        actor_id: selfProfile.user_id,
-        type: 'friend_request',
-        event_key: `friend-request:${friendship.id}`,
-        message: `${selfProfile.display_name} sent you a friend request.`,
-        payload: { userId: selfProfile.user_code }
-      });
-
-    if (notificationError) throw notificationError;
+    // Database transition trigger is authoritative; kick is a latency optimization.
+    void notificationService.kick().catch(() => {});
   },
 
   async getIncomingFriendRequests(): Promise<FriendRequest[]> {
@@ -233,7 +209,7 @@ export const socialService = {
     const currentUserId = await getCurrentAuthUserId();
     const nextStatus = accept ? 'accepted' : 'declined';
 
-    const { data: requestRow, error: requestError } = await supabase
+    const { error: requestError } = await supabase
       .from('friendships')
       .update({
         status: nextStatus,
@@ -246,26 +222,7 @@ export const socialService = {
       .single();
 
     if (requestError) throw requestError;
-    const typedRequest = requestRow as FriendshipRow;
-
-    if (accept) {
-      const profileMap = await fetchProfilesByAuthUserIds([currentUserId]);
-      const actor = profileMap.get(currentUserId);
-      const actorName = actor?.display_name || 'A friend';
-
-      const { error: notificationError } = await supabase
-        .from('notifications')
-        .insert({
-          recipient_id: typedRequest.requester_id,
-          actor_id: currentUserId,
-          type: 'friend_request_accepted',
-          event_key: `friend-accepted:${typedRequest.id}`,
-          message: `${actorName} accepted your friend request.`,
-          payload: { friendshipId: typedRequest.id }
-        });
-
-      if (notificationError) throw notificationError;
-    }
+    void notificationService.kick().catch(() => {});
   },
 
   async getFriendsWithStats(): Promise<FriendWithStats[]> {
@@ -322,74 +279,10 @@ export const socialService = {
     });
   },
 
-  async getNotifications(): Promise<NotificationItem[]> {
-    const currentUserId = await getCurrentAuthUserId();
-
-    const { data, error } = await supabase
-      .from('notifications')
-      .select('id, recipient_id, actor_id, type, message, payload, read_at, created_at')
-      .eq('recipient_id', currentUserId)
-      .order('created_at', { ascending: false })
-      .limit(20);
-
-    if (error) throw error;
-
-    const rows = (data ?? []) as NotificationRow[];
-    const actorIds = rows
-      .map((row) => row.actor_id)
-      .filter((actorId): actorId is string => Boolean(actorId));
-    const actorMap = await fetchProfilesByAuthUserIds(actorIds);
-
-    return rows.map((row) => ({
-      id: row.id,
-      type: row.type,
-      message: row.message,
-      payload: row.payload || undefined,
-      createdAt: new Date(row.created_at).getTime(),
-      readAt: row.read_at ? new Date(row.read_at).getTime() : null,
-      actor: row.actor_id && actorMap.get(row.actor_id) ? toSummary(actorMap.get(row.actor_id) as UserProfileRow) : null
-    }));
-  },
-
-  async markNotificationAsRead(notificationId: string): Promise<void> {
-    const currentUserId = await getCurrentAuthUserId();
-    const { error } = await supabase
-      .from('notifications')
-      .update({ read_at: new Date().toISOString() })
-      .eq('id', notificationId)
-      .eq('recipient_id', currentUserId)
-      .is('read_at', null);
-
-    if (error) throw error;
-  },
-
-  async markAllNotificationsAsRead(): Promise<void> {
-    const currentUserId = await getCurrentAuthUserId();
-    const { error } = await supabase
-      .from('notifications')
-      .update({ read_at: new Date().toISOString() })
-      .eq('recipient_id', currentUserId)
-      .is('read_at', null);
-
-    if (error) throw error;
-  },
-
-  async getUnreadNotificationCount(): Promise<number> {
-    const currentUserId = await getCurrentAuthUserId();
-    const { count, error } = await supabase
-      .from('notifications')
-      .select('id', { count: 'exact', head: true })
-      .eq('recipient_id', currentUserId)
-      .is('read_at', null);
-
-    if (error) {
-      if (isMissingSocialSchemaError(error)) {
-        return 0;
-      }
-      throw error;
-    }
-    return count ?? 0;
-  },
+  async getNotifications(): Promise<NotificationItem[]> { return (await notificationService.page()).items; },
+  async markNotificationAsRead(notificationId:string) { await notificationService.mutate('read',notificationId); },
+  async markAllNotificationsAsRead() { await notificationService.mutate('read'); },
+  async getUnreadNotificationCount() { return notificationService.count(); },
 
   async getFriendProfile(friendIdOrCode: string): Promise<FriendProfileData> {
     console.log('[getFriendProfile] Requested ID/Code:', friendIdOrCode);
@@ -529,7 +422,7 @@ export const socialService = {
     const channel = supabase
       .channel(`notifications:${currentUserId}`)
       .on('postgres_changes', {
-        event: 'INSERT',
+        event: '*',
         schema: 'public',
         table: 'notifications',
         filter: `recipient_id=eq.${currentUserId}`
@@ -539,107 +432,9 @@ export const socialService = {
     return () => { void supabase.removeChannel(channel); };
   },
 
-  async dispatchFriendMilestones(workoutId: string): Promise<{ recipients: number; notifications: number }> {
-      const currentAuthId = await getCurrentAuthUserId();
-
-      // 1. Get history and this workout
-      const { data: workoutsData, error: workoutsError } = await supabase
-        .from('workouts')
-        .select('*')
-        .eq('user_id', currentAuthId)
-        .order('start_time', { ascending: true });
-
-      if (workoutsError) throw workoutsError;
-      if (!workoutsData) throw new Error('Unable to load workouts for notification dispatch.');
-
-      const history: WorkoutSession[] = workoutsData.map(w => ({
-        id: w.id,
-        name: w.name,
-        startTime: w.start_time,
-        endTime: w.end_time || undefined,
-        volumeLoad: w.volume_load,
-        exercises: getWorkoutExercises(w.exercises),
-        bodyWeight: w.body_weight || undefined
-      }));
-
-      const allExercises = await exerciseService.getAllExercises();
-      const defMap = new Map<string, Exercise>(allExercises.map(e => [e.id, e]));
-      
-      const { data: myProfileData, error: profileError } = await supabase
-        .from('user_profiles')
-        .select('display_name, user_code, weight')
-        .eq('user_id', currentAuthId)
-        .single();
-      if (profileError) throw profileError;
-      if (!myProfileData) throw new Error('Unable to load the current social profile.');
-
-      const userWeight = parseUserWeight(myProfileData.weight);
-
-      // 2. XP & Level before vs after
-      const savedWorkout = history.find(workout => workout.id === workoutId);
-      if (!savedWorkout) throw new Error('The saved workout was not found for notification dispatch.');
-      const historyBefore = history.filter(workout => workout.id !== workoutId && workout.startTime <= savedWorkout.startTime);
-      const historyAfter = history.filter(workout => workout.startTime <= savedWorkout.startTime);
-
-      const xpBefore = replayAllXP(historyBefore, defMap, userWeight);
-      const xpAfter = replayAllXP(historyAfter, defMap, userWeight);
-
-      const milestoneEvents = buildFriendMilestoneEvents({
-        workoutId,
-        historyBefore,
-        historyAfter,
-        exerciseDefs: defMap,
-        totalXPBefore: xpBefore.totalXP,
-        totalXPAfter: xpAfter.totalXP,
-        prCountBefore: countPersonalRecords(historyBefore, defMap, userWeight),
-        prCountAfter: countPersonalRecords(historyAfter, defMap, userWeight)
-      });
-
-      // 4. Find friends
-      const { data: friendsData, error: friendsError } = await supabase
-        .from('friendships')
-        .select('requester_id, addressee_id')
-        .eq('status', 'accepted')
-        .or(`requester_id.eq.${currentAuthId},addressee_id.eq.${currentAuthId}`);
-      
-      if (friendsError) throw friendsError;
-      if (!friendsData || friendsData.length === 0) return { recipients: 0, notifications: 0 };
-      const friendIds = friendsData.map(f => f.requester_id === currentAuthId ? f.addressee_id : f.requester_id);
-
-      // 5. Dispatch
-      const notifications: NotificationInsert[] = [];
-      const workoutName = savedWorkout.name || 'a workout';
-
-      friendIds.forEach(fId => {
-        milestoneEvents.forEach(event => {
-          if (event.kind === 'workout_completed') {
-            notifications.push({
-              recipient_id: fId,
-              actor_id: currentAuthId,
-              type: 'workout_completed',
-              event_key: event.eventKey,
-              message: `${myProfileData.display_name} logged a new workout: ${workoutName}`,
-              payload: { workoutName, userId: myProfileData.user_code }
-            });
-          } else {
-            notifications.push({
-              recipient_id: fId,
-              actor_id: currentAuthId,
-              type: 'achievement_unlocked',
-              event_key: event.eventKey,
-              message: `${myProfileData.display_name} unlocked ${event.achievementName}!`,
-              payload: { achievementName: event.achievementName, userId: myProfileData.user_code }
-            });
-          }
-        });
-      });
-
-      if (notifications.length > 0) {
-        const { error: notificationError } = await supabase
-          .from('notifications')
-          .upsert(notifications, { onConflict: 'recipient_id,event_key', ignoreDuplicates: true });
-        if (notificationError) throw notificationError;
-      }
-      return { recipients: friendIds.length, notifications: notifications.length };
+  async dispatchFriendMilestones(_workoutId: string): Promise<{recipients:number;notifications:number}> {
+    if (!_workoutId) return {recipients:0,notifications:0};
+    const result=await notificationService.kick();
+    return {recipients:0,notifications:result.notifications || 0};
   }
 };

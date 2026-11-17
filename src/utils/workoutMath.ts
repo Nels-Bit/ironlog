@@ -1,4 +1,4 @@
-import type { Exercise, ExerciseSet, PersonalRecordPerformance, WorkoutExercise } from '../types';
+import type { Exercise, ExerciseSet, PersonalRecordPerformance, WorkoutExercise } from '../types.js';
 
 export const parseUserWeight = (value: unknown): number | null => {
   const parsed = typeof value === 'number'

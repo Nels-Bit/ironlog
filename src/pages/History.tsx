@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Dumbbell, Calendar, Clock, Flame, Skull, ArrowDown, ChevronDown } from 'lucide-react';
 import { isRestDaySession } from '../utils/achievementUtils';
 import { isCardioExercise } from '../utils/workoutMath';
+import { enteredSetWeight } from '../utils/exerciseDetails';
 import { workoutService } from '../services/workoutService';
 import { exerciseService } from '../services/exerciseService';
 import { Button } from '../components/ui/Button';
@@ -391,7 +392,7 @@ export const History = () => {
                                           </span>
                                         ) : (
                                           <>
-                                            {set.weight ? `${set.weight} lbs` : '-'}
+                                            {enteredSetWeight(set) != null ? `${enteredSetWeight(set)} lbs` : '-'}
                                             <span className="text-zinc-600 mx-1">×</span>
                                             {def?.isUnilateral ? `${set.repsLeft}L / ${set.repsRight}R` : set.reps}
                                           </>

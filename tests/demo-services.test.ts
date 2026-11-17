@@ -1,6 +1,7 @@
 import { it, expect, vi } from 'vitest';
 import { createDemoProvider } from '../src/lib/demo-transport';
 import { createIronLogSeed } from '../src/lib/demo-seed';
+import { DEMO_USER_ID } from '../src/lib/demo-session';
 
 it('existing auth, workout, exercise and social services use only the local provider', async () => {
   const provider = createDemoProvider(createIronLogSeed());
@@ -13,6 +14,7 @@ it('existing auth, workout, exercise and social services use only the local prov
     const { exerciseService } = await import('../src/services/exerciseService');
     const { socialService } = await import('../src/services/socialService');
     expect((await authService.getUser())?.name).toBe('Alex Morgan');
+    expect((await authService.getUser())?.id).toBe(DEMO_USER_ID);
     await authService.updateProfile({ name: 'Demo visitor', weight: 180.2, isPublic: true });
     expect((await authService.getUser())?.weight).toBe(180.2);
     const custom = await exerciseService.createExercise({ name: 'Demo lift', category: 'Chest', target: 'Chest' });

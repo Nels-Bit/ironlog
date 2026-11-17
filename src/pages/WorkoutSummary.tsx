@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { CheckCircle, Zap, Dumbbell, Clock, BarChart2, Share2, ChevronRight, Trophy, Sparkles, Flame } from 'lucide-react';
 import { workoutService } from '../services/workoutService';
 import { exerciseService } from '../services/exerciseService';
@@ -10,6 +10,7 @@ import { getXPForWorkout, PR_BONUS, NEW_EXERCISE_BONUS, type WorkoutXPResult } f
 import { parseUserWeight } from '../utils/workoutMath';
 import { cn } from '../lib/utils';
 import { Button } from '../components/ui/Button';
+import { WorkoutSummaryExercise } from '../components/WorkoutSummaryExercise';
 import type { WorkoutSession, Exercise } from '../types';
 
 // ─── Animated count-up hook ────────────────────────────────────────────────
@@ -99,22 +100,30 @@ const XPLine = ({ label, value, icon, detail, accent, delay = 0 }: XPLineProps) 
 );
 
 // ─── Level Up Overlay ──────────────────────────────────────────────────────
-const LevelUpOverlay = ({ level, onDismiss }: { level: number; onDismiss: () => void }) => (
-  <AnimatePresence>
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-      onClick={onDismiss}
+const LevelUpOverlay = ({ level, onDismiss }: { level: number; onDismiss: () => void }) => {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    dialog?.showModal();
+    return () => dialog?.close();
+  }, []);
+  return (
+    <dialog
+      ref={dialogRef}
+      aria-label={`Level up! Level ${level}`}
+      className="modal z-[200] bg-black/80 backdrop-blur-sm"
+      onClick={event => { event.preventDefault(); onDismiss(); }}
+      onCancel={event => { event.preventDefault(); onDismiss(); }}
+      onKeyDown={event => {
+        if (event.key === 'Escape') { event.preventDefault(); onDismiss(); }
+      }}
     >
       <motion.div
         initial={{ scale: 0, rotate: -15 }}
         animate={{ scale: 1, rotate: 0 }}
         exit={{ scale: 0, rotate: 15 }}
         transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-        className="relative flex flex-col items-center gap-4 p-10 rounded-3xl bg-gradient-to-br from-amber-500/20 via-orange-500/20 to-red-500/20 border border-yellow-400/30 shadow-2xl shadow-yellow-500/20"
-        onClick={e => e.stopPropagation()}
+        className="modal-box relative flex flex-col items-center gap-4 w-auto max-w-[calc(100%-2rem)] p-10 rounded-3xl bg-gradient-to-br from-amber-500/20 via-orange-500/20 to-red-500/20 border border-yellow-400/30 shadow-2xl shadow-yellow-500/20"
       >
         {/* Glow ring */}
         <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-yellow-400/10 to-orange-500/10 blur-xl pointer-events-none" />
@@ -139,18 +148,19 @@ const LevelUpOverlay = ({ level, onDismiss }: { level: number; onDismiss: () => 
           <p className="text-5xl font-black text-white">{level}</p>
         </motion.div>
 
-        <motion.p
+        <motion.form
+          method="dialog"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.7 }}
           className="relative z-10 text-xs text-zinc-400 font-medium"
         >
-          Tap anywhere to continue
-        </motion.p>
+          <button type="submit" className="btn btn-ghost btn-sm h-auto min-h-11 whitespace-normal">Tap anywhere to continue</button>
+        </motion.form>
       </motion.div>
-    </motion.div>
-  </AnimatePresence>
-);
+    </dialog>
+  );
+};
 
 // ─── Format helpers ─────────────────────────────────────────────────────────
 const formatDuration = (ms: number) => {
@@ -184,6 +194,8 @@ export const WorkoutSummary = () => {
   // Load data
   useEffect(() => {
     if (!id) return;
+    let active = true;
+    const timers: ReturnType<typeof setTimeout>[] = [];
     const load = async () => {
       const [session, defs, history, user] = await Promise.all([
         workoutService.getWorkoutById(id),
@@ -191,7 +203,10 @@ export const WorkoutSummary = () => {
         workoutService.getHistory(),
         authService.getUser(),
       ]);
-      if (session) setWorkout(session);
+      if (!active) return;
+      setWorkout(session);
+      setShowLevelUp(false);
+      setXpBarFilled(false);
       const map = new Map(defs.map(d => [d.id, d]));
       setExerciseDefs(map);
 
@@ -203,18 +218,22 @@ export const WorkoutSummary = () => {
       setLoading(false);
 
       // Trigger XP bar animation shortly after content appears
-      setTimeout(() => setXpBarFilled(true), 600);
+      timers.push(setTimeout(() => setXpBarFilled(true), 600));
 
       // Show level up overlay if applicable
       if (xpResult) {
         const prev = getLevelProgress(xpResult.totalXPBefore);
         const next = getLevelProgress(xpResult.totalXPAfter);
         if (next.currentLevel > prev.currentLevel) {
-          setTimeout(() => setShowLevelUp(true), 1400);
+          timers.push(setTimeout(() => setShowLevelUp(true), 1400));
         }
       }
     };
-    load();
+    void load().catch(() => { if (active) setLoading(false); });
+    return () => {
+      active = false;
+      timers.forEach(clearTimeout);
+    };
   }, [id]);
 
   // ── Derived stats ─────────────────────────────────────────────────────────
@@ -492,25 +511,18 @@ export const WorkoutSummary = () => {
             <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 px-4 pt-4 pb-2">
               Exercises
             </p>
+            <p className="px-4 pb-2 text-xs text-base-content/60">Tap an exercise to view its sets.</p>
             <div className="divide-y divide-white/5">
               {workout.exercises.map((ex, i) => {
                 const def = exerciseDefs.get(ex.exerciseId);
-                const doneSets = ex.sets.filter(s => s.isCompleted && s.type !== 'warmup').length;
                 return (
                   <motion.div
                     key={ex.id}
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.6 + i * 0.06 }}
-                    className="flex items-center justify-between px-4 py-3"
                   >
-                    <div>
-                      <p className="text-sm font-bold text-white">{def?.name || 'Exercise'}</p>
-                      <p className="text-xs text-zinc-500">{def?.target || def?.category || ''}</p>
-                    </div>
-                    <span className="text-xs font-bold text-zinc-400 tabular-nums">
-                      {doneSets} set{doneSets !== 1 ? 's' : ''}
-                    </span>
+                    <WorkoutSummaryExercise exercise={ex} definition={def} />
                   </motion.div>
                 );
               })}
