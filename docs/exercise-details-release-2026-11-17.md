@@ -53,4 +53,35 @@ compatible with the prior client; reverting the frontend does not require deleti
 new settings or restoring old workout rows. Use the private snapshot only for an
 explicitly reviewed data recovery, preserving workouts created since the snapshot.
 
-Deployment identity and live verification are recorded after publication.
+## Published release
+
+- Runtime commit: `632fdee89a0cec1df2c44924a99f54522ce57ed6`.
+- GitHub: https://github.com/Nels-Bit/ironlog/pull/31 (updated on the feature branch).
+- Preview: `dpl_Fwmx8HU8tVajyUfTMCFnjAHfkjyA`, READY.
+- Production: `dpl_Din49SrPYHZuq9kAMrPFzGkL5iET`, READY, correct project and commit.
+- Immutable URL: https://iron-l3zooiz5j-nels-bits-projects.vercel.app.
+- Stable URL: https://iron-log-tau.vercel.app, assigned to that production build.
+- Public HTML serves `/assets/index-BUvXSKfc.js`; `/sw.js` returns 200 with no-cache.
+
+The existing cached browser initially loaded the previous bundle. Closing and
+reopening the app once after the new worker installed loaded the correct new
+bundle. This verifies the stated first-transition caveat rather than guaranteeing
+an immediate update for every existing installation.
+
+Live fictional-demo browser checks passed:
+
+- Create custom machine with a 100 lb base; complete 8 lb x 10 reps -> PR 108 lb.
+- Edit that same definition to a 120 lb base -> PR 128 lb; entered weight stays 8.
+- Notes begin collapsed, autosave, and remain available after leaving/reopening.
+- Notes grow from 80 px to 306 px with multiline text and shrink back to 80 px.
+  Manual resize is disabled. The edit-definition form does not show notes.
+- At 390 x 844, the exercise screen did not overflow horizontally. Screenshot:
+  `.vercel/exercise-release-live-2026-11-17.jpg`. Temporary viewport override reset.
+- Captured browser warning/error logs were empty. Only fictional demo data was used.
+
+The hosted rolled-back save test and isolated tests cover data persistence; this
+browser demo does not establish a real iOS push-receipt or cross-device acceptance
+result. No log drains are configured. GitHub reported 44 existing default-branch
+dependency alerts during push (1 critical, 19 high, 19 moderate, 5 low); this update
+does not change package versions or establish those alerts' applicability to this
+feature branch. Treat dependency remediation as a separate maintenance task.
